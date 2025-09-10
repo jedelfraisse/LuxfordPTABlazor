@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36327.8
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LuxfordPTAWeb", "LuxfordPTAWeb\LuxfordPTAWeb.csproj", "{7BA23831-D382-4F6A-BC43-19D5631C740E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LuxfordPTAWeb.Client", "LuxfordPTAWeb.Client\LuxfordPTAWeb.Client.csproj", "{10B38547-30FF-40BC-ADFB-F2E090C26CDF}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solutions", "Solutions", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		Readme.md = Readme.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7BA23831-D382-4F6A-BC43-19D5631C740E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BA23831-D382-4F6A-BC43-19D5631C740E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BA23831-D382-4F6A-BC43-19D5631C740E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BA23831-D382-4F6A-BC43-19D5631C740E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {41AC1E63-6691-476D-BB69-6DA7F8B8316A}
+	EndGlobalSection
+EndGlobal
