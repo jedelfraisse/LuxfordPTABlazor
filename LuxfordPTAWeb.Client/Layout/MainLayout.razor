@@ -1,0 +1,85 @@
+﻿@inherits LayoutComponentBase
+
+<div class="container-fluid p-0">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10">
+            <!-- Header Box -->
+            <div class="pta-header-box mb-3">
+                <!-- Top Row: All elements centered as a group -->
+                <div class="pta-header-top d-flex justify-content-center align-items-end gap-5 mb-2">
+                    <!-- PTA Logo -->
+                    <div class="pta-logo-box">
+                        <a href="/">
+                        <img src="images/pta-logo.png" alt="PTA Logo" class="pta-logo" /></a>
+                    </div>
+                    <!-- School Name/Logo -->
+                    <div class="text-center pta-school-logo-box">
+                        <a href="/">
+                        <img src="images/luxford-logo.png" alt="Luxford Elementary" class="pta-school-logo mb-2" />
+                        </a>
+                    </div>
+                    <!-- Mascot -->
+                    <div class="pta-mascot-box">
+                        <a href="/">
+                        <img src="images/mascot.png" alt="Mascot" class="pta-mascot" />
+                        </a>
+                    </div>
+                    <!-- Sponsor Badge -->
+                    <div class="text-center">
+                        <NavLink href="sponsors" aria-label="Sponsors" title="Sponsors">
+                            <img src="sponsors/chuck-e-cheeses-car-design-png-logo-8.png" alt="Chuck E. Cheese's Sponsors" class="sponsor-logo" />
+                        </NavLink>
+                    </div>
+                </div>
+                <!-- Navigation Row -->
+                <nav class="pta-header-nav d-flex justify-content-center align-items-center gap-4 mb-2">
+                    <NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
+                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+                        Get Involved
+                    </NavLink>
+                    <NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
+                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
+                        Events
+                    </NavLink>
+                  
+                    <NavLink href="givebacks" class="pta-nav-link text-warning" aria-label="Givebacks" title="Givebacks">
+                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-gift"></i></span>
+                        Givebacks
+                    </NavLink>
+                    <NavLink href="documents" class="pta-nav-link text-secondary" aria-label="Documents" title="Documents">
+                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+                        Documents
+                    </NavLink>
+                    <NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
+                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
+                        Sponsors
+                    </NavLink>
+                </nav>
+            </div>
+            <div class="col-lg-9 mx-auto">
+                <div class="card-body">
+                    @Body
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="bg-light border-top py-3 mt-auto">
+    <div class="container d-flex justify-content-center gap-3 flex-wrap">
+        <NavLink href="events" class="text-decoration-none text-primary">Events</NavLink>
+        <NavLink href="get-involved" class="text-decoration-none text-success">Get Involved</NavLink>
+        <NavLink href="sponsors" class="text-decoration-none text-info">Sponsors</NavLink>
+        <NavLink href="givebacks" class="text-decoration-none text-warning">Givebacks</NavLink>
+        <NavLink href="documents" class="text-decoration-none text-secondary">Documents</NavLink>
+    </div>
+    <div class="text-center mt-2">
+        <small>&copy; 2025 Luxford Elementary PTA</small>
+    </div>
+</footer>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
