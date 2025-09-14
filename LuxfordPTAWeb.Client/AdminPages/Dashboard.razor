@@ -1,0 +1,129 @@
+﻿@page "/admin"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-danger text-white">
+        <h1 class="mb-0"><i class="bi bi-shield-lock"></i> Admin Dashboard</h1>
+    </div>
+    <div class="card-body">
+        <p class="lead">Welcome to the PTA administration panel. Here you can manage events, content, and other administrative tasks.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Event Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Add, edit, and manage school and PTA events.</p>
+                <div class="d-grid gap-2">
+                    <a href="/admin/events" class="btn btn-primary">Manage Events</a>
+                    <a href="/admin/events/create" class="btn btn-outline-primary">Add New Event</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> User Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Manage user accounts and permissions.</p>
+                <div class="d-grid gap-2">
+                    <a href="/admin/users" class="btn btn-success">Manage Users</a>
+                    <a href="/admin/roles" class="btn btn-outline-success">Manage Roles</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-star"></i> Sponsor Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Add and manage sponsor information and logos.</p>
+                <div class="d-grid gap-2">
+                    <a href="/admin/sponsors" class="btn btn-info">Manage Sponsors</a>
+                    <a href="/admin/sponsors/create" class="btn btn-outline-info">Add New Sponsor</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Content Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Update page content, documents, and announcements.</p>
+                <div class="d-grid gap-2">
+                    <a href="/admin/content" class="btn btn-warning">Manage Content</a>
+                    <a href="/admin/documents" class="btn btn-outline-warning">Manage Documents</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <h6><i class="bi bi-info-circle"></i> Quick Stats</h6>
+    <div class="row">
+        <div class="col-md-3">
+            <strong>Total Events:</strong> @totalEvents
+        </div>
+        <div class="col-md-3">
+            <strong>Upcoming Events:</strong> @upcomingEvents
+        </div>
+        <div class="col-md-3">
+            <strong>Active Users:</strong> @totalUsers
+        </div>
+        <div class="col-md-3">
+            <strong>Sponsors:</strong> @totalSponsors
+        </div>
+    </div>
+</div>
+
+@code {
+    private int totalEvents = 0;
+    private int upcomingEvents = 0;
+    private int totalUsers = 0;
+    private int totalSponsors = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Load dashboard statistics
+            var events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+            totalEvents = events?.Count ?? 0;
+            upcomingEvents = events?.Count(e => e.Date >= DateTime.Now) ?? 0;
+
+            // You can add more API calls here for users and sponsors when those endpoints are ready
+            totalUsers = 25; // Placeholder
+            totalSponsors = 5; // Placeholder
+        }
+        catch (Exception)
+        {
+            // Handle errors silently for now
+        }
+    }
+
+    public class EventDto
+    {
+        public string Title { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,133 @@
+﻿@page "/admin/events"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage Events</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-calendar-event"></i> Manage Events</h1>
+    <div>
+        <a href="/admin" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+        <a href="/admin/events/create" class="btn btn-primary">
+            <i class="bi bi-plus"></i> Add New Event
+        </a>
+    </div>
+</div>
+
+@if (events == null)
+{
+    <div class="alert alert-info">
+        <em>Loading events...</em>
+    </div>
+}
+else if (!events.Any())
+{
+    <div class="alert alert-warning">
+        <em>No events found.</em>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Location</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var evt in events.OrderBy(e => e.Date))
+                {
+                    <tr class="@(evt.Date < DateTime.Now ? "table-secondary" : "")">
+                        <td>
+                            <strong>@evt.Title</strong>
+                            @if (evt.Date < DateTime.Now)
+                            {
+                                <span class="badge bg-secondary ms-2">Past</span>
+                            }
+                            else if (evt.Date <= DateTime.Now.AddDays(7))
+                            {
+                                <span class="badge bg-warning ms-2">Soon</span>
+                            }
+                        </td>
+                        <td>@evt.Date.ToString("MMM d, yyyy")</td>
+                        <td>@evt.Location</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/admin/events/edit/@evt.Id" class="btn btn-outline-primary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteEvent(evt.Id)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<EventDto>? events;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvents();
+    }
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+        }
+        catch (Exception)
+        {
+            // Handle errors
+            events = new List<EventDto>();
+        }
+    }
+
+    private async Task DeleteEvent(int eventId)
+    {
+        if (await ConfirmDelete())
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/events/{eventId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    await LoadEvents(); // Reload the list
+                }
+            }
+            catch (Exception)
+            {
+                // Handle errors - you might want to show a toast notification
+            }
+        }
+    }
+
+    private async Task<bool> ConfirmDelete()
+    {
+        // In a real application, you'd use a JavaScript confirm dialog or a modal
+        // For now, we'll assume confirmation
+        return await Task.FromResult(true);
+    }
+
+    public class EventDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+    }
+}

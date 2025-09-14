@@ -12,6 +12,12 @@ namespace LuxfordPTAWeb.Client
             builder.Services.AddCascadingAuthenticationState();
             builder.Services.AddAuthenticationStateDeserialization();
 
+            // Register HttpClient with the correct base address for WASM
+            builder.Services.AddScoped(sp => new HttpClient
+            {
+                BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+            });
+
             await builder.Build().RunAsync();
         }
     }
