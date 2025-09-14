@@ -4,12 +4,13 @@ using LuxfordPTAWeb.Data;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 namespace LuxfordPTAWeb;
 
 public class Program
 {
-    public static async Task Main(string[] args)  // Make Main async
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,39 @@ public class Program
             .AddInteractiveWebAssemblyComponents()
             .AddAuthenticationStateSerialization();
 
-        // ADD THIS: Add controllers support
-        builder.Services.AddControllers();
+        // Add controllers support with JSON configuration
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                // Configure JSON serialization to handle cycles
+                options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+                options.JsonSerializerOptions.WriteIndented = true;
+            });
+
+        // Configure HttpClient for server-side components
+        builder.Services.AddHttpClient();
+        builder.Services.AddScoped<HttpClient>(serviceProvider =>
+        {
+            var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient();
+            
+            // Configure base address for server-side components
+            var context = serviceProvider.GetService<IHttpContextAccessor>();
+            if (context?.HttpContext != null)
+            {
+                var request = context.HttpContext.Request;
+                httpClient.BaseAddress = new Uri($"{request.Scheme}://{request.Host}");
+            }
+            else
+            {
+                // Fallback for development
+                httpClient.BaseAddress = new Uri("https://localhost:7123/");
+            }
+            
+            return httpClient;
+        });
+
+        builder.Services.AddHttpContextAccessor();
 
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddScoped<IdentityUserAccessor>();
@@ -40,63 +72,32 @@ public class Program
         builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
         builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
-            .AddRoles<IdentityRole>()  // Add this line for role support
+            .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders();
 
         builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-			builder.Services.AddHttpClient("Default", client =>
-			{
-				client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:5001/");
-			});
+        var app = builder.Build();
 
-			var app = builder.Build();
+        // Proper async seeding
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            try
+            {
+                await SeedRolesAndAdminUser(services);
+            }
+            catch (Exception ex)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogError(ex, "An error occurred while seeding roles and admin user.");
+            }
+        }
 
-			// FIXED: Proper async seeding
-			using (var scope = app.Services.CreateScope())
-			{
-				var services = scope.ServiceProvider;
-				try
-				{
-					await SeedRolesAndAdminUser(services);
-				}
-				catch (Exception ex)
-				{
-					var logger = services.GetRequiredService<ILogger<Program>>();
-					logger.LogError(ex, "An error occurred while seeding roles and admin user.");
-				}
-			}
-
-
-			// Place the migration code here
-			if (!app.Environment.IsDevelopment())
-			{
-				using var scope = app.Services.CreateScope();
-				var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
-				var markerFile = Path.Combine(env.ContentRootPath, "run-migration.txt");
-
-				if (File.Exists(markerFile))
-				{
-					var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-					using var writer = File.AppendText(markerFile);
-					writer.WriteLine("======");
-					writer.WriteLine($"Migration run at {DateTime.Now:u}");
-					try
-					{
-						db.Database.Migrate();
-						writer.WriteLine("Migration completed successfully.");
-					}
-					catch (Exception ex)
-					{
-						writer.WriteLine($"Migration failed: {ex.Message}");
-					}
-				}
-			}
-
-			// Configure the HTTP request pipeline.
-			if (app.Environment.IsDevelopment())
+        // Configure the HTTP request pipeline.
+        if (app.Environment.IsDevelopment())
         {
             app.UseWebAssemblyDebugging();
             app.UseMigrationsEndPoint();
@@ -104,12 +105,10 @@ public class Program
         else
         {
             app.UseExceptionHandler("/Error");
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
             app.UseHsts();
         }
 
         app.UseHttpsRedirection();
-
         app.UseAntiforgery();
 
         app.MapStaticAssets();
@@ -118,47 +117,43 @@ public class Program
             .AddInteractiveWebAssemblyRenderMode()
             .AddAdditionalAssemblies(typeof(Client._Imports).Assembly);
 
-        // ADD THIS: Map controller endpoints
+        // Map controller endpoints
         app.MapControllers();
-
-        // Add additional endpoints required by the Identity /Account Razor components.
         app.MapAdditionalIdentityEndpoints();
 
-        await app.RunAsync();  // Use RunAsync since Main is now async
+        await app.RunAsync();
     }
 
+    static async Task SeedRolesAndAdminUser(IServiceProvider serviceProvider)
+    {
+        var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-	// Add this method at the end of the Program class:
-	static async Task SeedRolesAndAdminUser(IServiceProvider serviceProvider)
-	{
-		var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-		var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        // Create roles
+        string[] roleNames = { "Admin", "BoardMember", "Volunteer" };
+        foreach (var roleName in roleNames)
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new IdentityRole(roleName));
+            }
+        }
 
-		// Create roles
-		string[] roleNames = { "Admin", "BoardMember", "Volunteer" };
-		foreach (var roleName in roleNames)
-		{
-			if (!await roleManager.RoleExistsAsync(roleName))
-			{
-				await roleManager.CreateAsync(new IdentityRole(roleName));
-			}
-		}
-
-		// Create admin user
-		var adminEmail = "jonathan@delfraisse.com";
-		var adminUser = await userManager.FindByEmailAsync(adminEmail);
-		if (adminUser == null)
-		{
-			adminUser = new ApplicationUser
-			{
-				UserName = adminEmail,
-				Email = adminEmail,
-				EmailConfirmed = true,
-				FirstName = "Jonathan",
-				LastName = "Delfraisse"
-			};
-			await userManager.CreateAsync(adminUser, "Admin123!"); // Use a strong password
-			await userManager.AddToRoleAsync(adminUser, "Admin");
-		}
-	}
+        // Create admin user
+        var adminEmail = "jonathan@delfraisse.com";
+        var adminUser = await userManager.FindByEmailAsync(adminEmail);
+        if (adminUser == null)
+        {
+            adminUser = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true,
+                FirstName = "Jonathan",
+                LastName = "Delfraisse"
+            };
+            await userManager.CreateAsync(adminUser, "Admin123!");
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+    }
 }

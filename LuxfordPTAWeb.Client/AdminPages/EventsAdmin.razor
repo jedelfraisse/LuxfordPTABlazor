@@ -11,22 +11,86 @@
         <a href="/admin" class="btn btn-outline-secondary me-2">
             <i class="bi bi-arrow-left"></i> Back to Dashboard
         </a>
+        <a href="/admin/school-years" class="btn btn-outline-warning me-2">
+            <i class="bi bi-calendar3"></i> School Years
+        </a>
+        <a href="/admin/event-types" class="btn btn-outline-info me-2">
+            <i class="bi bi-tags"></i> Event Types
+        </a>
         <a href="/admin/events/create" class="btn btn-primary">
             <i class="bi bi-plus"></i> Add New Event
         </a>
     </div>
 </div>
 
-@if (events == null)
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Events</h6>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-end">
+            <div class="col-md-3">
+                <label for="schoolYearFilter" class="form-label">School Year</label>
+                <select id="schoolYearFilter" class="form-select" @onchange="FilterBySchoolYear">
+                    <option value="0">All School Years</option>
+                    @if (schoolYears != null)
+                    {
+                        @foreach (var year in schoolYears)
+                        {
+                            <option value="@year.Id" selected="@(selectedSchoolYearId == year.Id)">
+                                @year.Name @(year.Id == currentSchoolYearId ? "(Current)" : "")
+                            </option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="eventTypeFilter" class="form-label">Event Type</label>
+                <select id="eventTypeFilter" class="form-select" @onchange="FilterByEventType">
+                    <option value="0">All Event Types</option>
+                    @if (eventTypes != null)
+                    {
+                        @foreach (var eventType in eventTypes)
+                        {
+                            <option value="@eventType.Id" selected="@(selectedEventTypeId == eventType.Id)">
+                                @eventType.Name
+                            </option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters">
+                    <i class="bi bi-x-circle"></i> Clear Filters
+                </button>
+                <button type="button" class="btn btn-outline-info ms-2" @onclick="ShowCurrentYear">
+                    <i class="bi bi-calendar-check"></i> Current Year
+                </button>
+            </div>
+            <div class="col-md-3 text-end">
+                <span class="text-muted">
+                    Showing @(filteredEvents?.Count ?? 0) of @(allEvents?.Count ?? 0) events
+                </span>
+                @if (selectedSchoolYear != null)
+                {
+                    <div class="small text-primary">@selectedSchoolYear.Name</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (filteredEvents == null)
 {
     <div class="alert alert-info">
         <em>Loading events...</em>
     </div>
 }
-else if (!events.Any())
+else if (!filteredEvents.Any())
 {
     <div class="alert alert-warning">
-        <em>No events found.</em>
+        <em>No events found @(GetFilterDescription()).</em>
     </div>
 }
 else
@@ -36,13 +100,15 @@ else
             <thead class="table-dark">
                 <tr>
                     <th>Title</th>
+                    <th>School Year</th>
+                    <th>Event Type</th>
                     <th>Date</th>
                     <th>Location</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var evt in events.OrderBy(e => e.Date))
+                @foreach (var evt in filteredEvents.OrderBy(e => e.Date))
                 {
                     <tr class="@(evt.Date < DateTime.Now ? "table-secondary" : "")">
                         <td>
@@ -55,6 +121,16 @@ else
                             {
                                 <span class="badge bg-warning ms-2">Soon</span>
                             }
+                        </td>
+                        <td>
+                            <span class="badge @(evt.SchoolYear?.Id == currentSchoolYearId ? "bg-success" : "bg-light text-dark")">
+                                @evt.SchoolYear?.Name
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @GetEventTypeBadgeClass(evt.EventType?.IsMandatory ?? false)">
+                                @evt.EventType?.Name
+                            </span>
                         </td>
                         <td>@evt.Date.ToString("MMM d, yyyy")</td>
                         <td>@evt.Location</td>
@@ -76,24 +152,145 @@ else
 }
 
 @code {
-    private List<EventDto>? events;
+    private List<EventDto>? allEvents;
+    private List<EventDto>? filteredEvents;
+    private List<EventTypeDto>? eventTypes;
+    private List<SchoolYearDto>? schoolYears;
+    private SchoolYearDto? selectedSchoolYear;
+    private int selectedEventTypeId = 0;
+    private int selectedSchoolYearId = 0;
+    private int currentSchoolYearId = 0;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadSchoolYears();
+        await LoadEventTypes();
         await LoadEvents();
+        await LoadCurrentSchoolYear();
     }
 
     private async Task LoadEvents()
     {
         try
         {
-            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+            allEvents = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+            ApplyFilters();
         }
         catch (Exception)
         {
-            // Handle errors
-            events = new List<EventDto>();
+            allEvents = new List<EventDto>();
+            filteredEvents = new List<EventDto>();
         }
+    }
+
+    private async Task LoadEventTypes()
+    {
+        try
+        {
+            eventTypes = await Http.GetFromJsonAsync<List<EventTypeDto>>("api/eventtypes");
+        }
+        catch (Exception)
+        {
+            eventTypes = new List<EventTypeDto>();
+        }
+    }
+
+    private async Task LoadSchoolYears()
+    {
+        try
+        {
+            schoolYears = await Http.GetFromJsonAsync<List<SchoolYearDto>>("api/schoolyears");
+        }
+        catch (Exception)
+        {
+            schoolYears = new List<SchoolYearDto>();
+        }
+    }
+
+    private async Task LoadCurrentSchoolYear()
+    {
+        try
+        {
+            var current = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
+            if (current != null)
+            {
+                currentSchoolYearId = current.Id;
+            }
+        }
+        catch (Exception)
+        {
+            // Current school year not found - this is OK
+        }
+    }
+
+    private async Task FilterBySchoolYear(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int schoolYearId))
+        {
+            selectedSchoolYearId = schoolYearId;
+            selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == schoolYearId);
+            ApplyFilters();
+        }
+    }
+
+    private async Task FilterByEventType(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int eventTypeId))
+        {
+            selectedEventTypeId = eventTypeId;
+            ApplyFilters();
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        if (allEvents == null) return;
+
+        var filtered = allEvents.AsEnumerable();
+
+        if (selectedSchoolYearId > 0)
+        {
+            filtered = filtered.Where(e => e.SchoolYear?.Id == selectedSchoolYearId);
+        }
+
+        if (selectedEventTypeId > 0)
+        {
+            filtered = filtered.Where(e => e.EventType?.Id == selectedEventTypeId);
+        }
+
+        filteredEvents = filtered.ToList();
+    }
+
+    private void ClearFilters()
+    {
+        selectedSchoolYearId = 0;
+        selectedEventTypeId = 0;
+        selectedSchoolYear = null;
+        ApplyFilters();
+    }
+
+    private void ShowCurrentYear()
+    {
+        selectedSchoolYearId = currentSchoolYearId;
+        selectedEventTypeId = 0;
+        selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == currentSchoolYearId);
+        ApplyFilters();
+    }
+
+    private string GetFilterDescription()
+    {
+        var parts = new List<string>();
+        
+        if (selectedSchoolYearId > 0)
+            parts.Add($"in {selectedSchoolYear?.Name}");
+            
+        if (selectedEventTypeId > 0)
+        {
+            var eventType = eventTypes?.FirstOrDefault(et => et.Id == selectedEventTypeId);
+            parts.Add($"for {eventType?.Name}");
+        }
+
+        return parts.Any() ? string.Join(" ", parts) : "";
     }
 
     private async Task DeleteEvent(int eventId)
@@ -105,21 +302,24 @@ else
                 var response = await Http.DeleteAsync($"api/events/{eventId}");
                 if (response.IsSuccessStatusCode)
                 {
-                    await LoadEvents(); // Reload the list
+                    await LoadEvents();
                 }
             }
             catch (Exception)
             {
-                // Handle errors - you might want to show a toast notification
+                // Handle errors
             }
         }
     }
 
     private async Task<bool> ConfirmDelete()
     {
-        // In a real application, you'd use a JavaScript confirm dialog or a modal
-        // For now, we'll assume confirmation
         return await Task.FromResult(true);
+    }
+
+    private string GetEventTypeBadgeClass(bool isMandatory)
+    {
+        return isMandatory ? "bg-danger" : "bg-info";
     }
 
     public class EventDto
@@ -129,5 +329,25 @@ else
         public DateTime Date { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty; // Add missing properties
+        public string Link { get; set; } = string.Empty;     // Add missing properties
+        public EventTypeDto? EventType { get; set; }
+        public SchoolYearDto? SchoolYear { get; set; }
+    }
+
+    public class EventTypeDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsMandatory { get; set; }
+    }
+
+    public class SchoolYearDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
     }
 }
