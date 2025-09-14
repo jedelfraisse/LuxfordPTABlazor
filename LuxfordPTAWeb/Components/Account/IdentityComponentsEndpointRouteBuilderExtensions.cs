@@ -41,12 +41,32 @@ namespace Microsoft.AspNetCore.Routing
             });
 
             accountGroup.MapPost("/Logout", async (
+                HttpContext context,
                 ClaimsPrincipal user,
                 [FromServices] SignInManager<ApplicationUser> signInManager,
-                [FromForm] string returnUrl) =>
+                [FromForm] string? returnUrl) =>
             {
                 await signInManager.SignOutAsync();
-                return TypedResults.LocalRedirect($"~/{returnUrl}");
+                
+                // Handle the returnUrl properly
+                if (string.IsNullOrEmpty(returnUrl))
+                {
+                    return TypedResults.LocalRedirect("~/");
+                }
+
+                // If returnUrl is already a full URI, extract the path
+                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
+                {
+                    returnUrl = uri.PathAndQuery;
+                }
+
+                // Ensure the returnUrl is safe and local
+                if (!returnUrl.StartsWith("/"))
+                {
+                    returnUrl = "/" + returnUrl;
+                }
+
+                return TypedResults.LocalRedirect(returnUrl);
             });
 
             var manageGroup = accountGroup.MapGroup("/Manage").RequireAuthorization();
