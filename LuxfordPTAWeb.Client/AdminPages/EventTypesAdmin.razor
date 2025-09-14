@@ -1,0 +1,351 @@
+@page "/admin/event-types"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage Event Types</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-tags"></i> Manage Event Types</h1>
+    <div>
+        <a href="/admin/events" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+        <button type="button" class="btn btn-primary" @onclick="ShowCreateForm">
+            <i class="bi bi-plus"></i> Add New Event Type
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+<!-- Create/Edit Form -->
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingEventType?.Id > 0 ? "Edit" : "Create") Event Type</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingEventType" OnValidSubmit="SaveEventType">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name *</label>
+                            <InputText id="name" @bind-Value="editingEventType.Name" class="form-control" maxlength="100" />
+                            <ValidationMessage For="() => editingEventType.Name" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <div class="form-check mt-4">
+                                <InputCheckbox id="isMandatory" @bind-Value="editingEventType.IsMandatory" class="form-check-input" />
+                                <label for="isMandatory" class="form-check-label">
+                                    Mandatory Event Type
+                                    <small class="text-muted d-block">Check this for required events like "School Closed"</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" @bind-Value="editingEventType.Description" class="form-control" rows="3" maxlength="500" />
+                    <ValidationMessage For="() => editingEventType.Description" class="text-danger" />
+                    <div class="form-text">Optional description to help users understand this event type</div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-check-circle me-1"></i>
+                        Save Event Type
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (eventTypes == null)
+{
+    <div class="alert alert-info">
+        <em>Loading event types...</em>
+    </div>
+}
+else if (!eventTypes.Any())
+{
+    <div class="alert alert-warning">
+        <em>No event types found. Create your first event type above!</em>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Event Types (@eventTypes.Count)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th>Events Count</th>
+                        <th width="150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var eventType in eventTypes)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@eventType.Name</strong>
+                            </td>
+                            <td>
+                                <small class="text-muted">@TruncateText(eventType.Description, 100)</small>
+                            </td>
+                            <td>
+                                <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info")">
+                                    @(eventType.IsMandatory ? "Mandatory" : "Optional")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-muted">@GetEventCount(eventType.Id)</span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditEventType(eventType)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteEventType(eventType.Id)" 
+                                            disabled="@(GetEventCount(eventType.Id) > 0)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EventTypeDto>? eventTypes;
+    private List<EventDto>? events; // For counting events per type
+    private CreateEventTypeDto editingEventType = new();
+    private bool showForm = false;
+    private bool isSaving = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventTypes();
+        await LoadEvents();
+    }
+
+    private async Task LoadEventTypes()
+    {
+        try
+        {
+            eventTypes = await Http.GetFromJsonAsync<List<EventTypeDto>>("api/eventtypes");
+        }
+        catch (Exception ex)
+        {
+            eventTypes = new List<EventTypeDto>();
+            errorMessage = $"Error loading event types: {ex.Message}";
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+        }
+        catch (Exception)
+        {
+            events = new List<EventDto>();
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        editingEventType = new CreateEventTypeDto();
+        showForm = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void EditEventType(EventTypeDto eventType)
+    {
+        editingEventType = new CreateEventTypeDto
+        {
+            Id = eventType.Id,
+            Name = eventType.Name,
+            Description = eventType.Description,
+            IsMandatory = eventType.IsMandatory
+        };
+        showForm = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingEventType = new CreateEventTypeDto();
+    }
+
+    private async Task SaveEventType()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            HttpResponseMessage response;
+            
+            if (editingEventType.Id > 0)
+            {
+                // Update existing
+                response = await Http.PutAsJsonAsync($"api/eventtypes/{editingEventType.Id}", editingEventType);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Event type updated successfully!";
+                }
+            }
+            else
+            {
+                // Create new
+                response = await Http.PostAsJsonAsync("api/eventtypes", editingEventType);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Event type created successfully!";
+                }
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                showForm = false;
+                await LoadEventTypes();
+                editingEventType = new CreateEventTypeDto();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error saving event type: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving event type: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteEventType(int id)
+    {
+        if (!await ConfirmDelete()) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/eventtypes/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Event type deleted successfully!";
+                await LoadEventTypes();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error deleting event type: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting event type: {ex.Message}";
+        }
+    }
+
+    private async Task<bool> ConfirmDelete()
+    {
+        // In a real application, you'd use a JavaScript confirm dialog or a modal
+        return await Task.FromResult(true);
+    }
+
+    private int GetEventCount(int eventTypeId)
+    {
+        return events?.Count(e => e.EventType?.Id == eventTypeId) ?? 0;
+    }
+
+    private string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        
+        return text.Substring(0, maxLength - 3) + "...";
+    }
+
+    public class EventTypeDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsMandatory { get; set; }
+    }
+
+    public class EventDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public EventTypeDto? EventType { get; set; }
+    }
+
+    public class CreateEventTypeDto
+    {
+        public int Id { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, ErrorMessage = "Name cannot be longer than 100 characters")]
+        public string Name { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
+        public string Description { get; set; } = string.Empty;
+        
+        public bool IsMandatory { get; set; }
+    }
+}

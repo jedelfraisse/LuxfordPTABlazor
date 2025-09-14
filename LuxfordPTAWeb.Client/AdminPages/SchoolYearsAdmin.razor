@@ -1,0 +1,545 @@
+﻿@page "/admin/school-years"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage School Years</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-calendar3"></i> Manage School Years</h1>
+    <div>
+        <a href="/admin/events" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+        <button type="button" class="btn btn-primary" @onclick="ShowCreateForm">
+            <i class="bi bi-plus"></i> Add New School Year
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+<!-- Current School Year Highlight -->
+@if (currentSchoolYear != null)
+{
+    <div class="alert alert-success">
+        <h6><i class="bi bi-calendar-check"></i> Current School Year</h6>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>@currentSchoolYear.Name</strong> 
+                <span class="text-muted">(@currentSchoolYear.StartDate.ToString("MMM yyyy") - @currentSchoolYear.EndDate.ToString("MMM yyyy"))</span>
+            </div>
+            <button type="button" class="btn btn-outline-warning btn-sm" @onclick="ShowTransitionForm">
+                <i class="bi bi-arrow-right-circle"></i> Transition to New Year
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Year Transition Form -->
+@if (showTransitionForm)
+{
+    <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-arrow-right-circle"></i> School Year Transition</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong>Important:</strong> This will create a new school year and begin the transition process. 
+                This is typically done at the end of each academic year.
+            </div>
+            
+            <EditForm Model="transitionModel" OnValidSubmit="TransitionToNewYear">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="newYearName" class="form-label">New School Year Name *</label>
+                            <InputText id="newYearName" @bind-Value="transitionModel.NewYearName" class="form-control" 
+                                      placeholder="e.g., 2025-2026" />
+                            <ValidationMessage For="() => transitionModel.NewYearName" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="newStartDate" class="form-label">Start Date *</label>
+                            <InputDate id="newStartDate" @bind-Value="transitionModel.StartDate" class="form-control" />
+                            <ValidationMessage For="() => transitionModel.StartDate" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="newEndDate" class="form-label">End Date *</label>
+                            <InputDate id="newEndDate" @bind-Value="transitionModel.EndDate" class="form-control" />
+                            <ValidationMessage For="() => transitionModel.EndDate" class="text-danger" />
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <InputCheckbox id="archiveYear" @bind-Value="transitionModel.ArchiveCurrentYear" class="form-check-input" />
+                            <label for="archiveYear" class="form-check-label">
+                                Archive current year data
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <InputCheckbox id="copyEvents" @bind-Value="transitionModel.CopyRecurringEvents" class="form-check-input" />
+                            <label for="copyEvents" class="form-check-label">
+                                Copy recurring events to new year
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-warning" disabled="@isTransitioning">
+                        @if (isTransitioning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-arrow-right-circle me-1"></i>
+                        Begin Transition
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelTransition">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<!-- Create/Edit Form -->
+@if (showForm && !showTransitionForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingSchoolYear?.Id > 0 ? "Edit" : "Create") School Year</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingSchoolYear" OnValidSubmit="SaveSchoolYear">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name *</label>
+                            <InputText id="name" @bind-Value="editingSchoolYear.Name" class="form-control" 
+                                      placeholder="e.g., 2024-2025" />
+                            <ValidationMessage For="() => editingSchoolYear.Name" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label">Start Date *</label>
+                            <InputDate id="startDate" @bind-Value="editingSchoolYear.StartDate" class="form-control" />
+                            <ValidationMessage For="() => editingSchoolYear.StartDate" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label">End Date *</label>
+                            <InputDate id="endDate" @bind-Value="editingSchoolYear.EndDate" class="form-control" />
+                            <ValidationMessage For="() => editingSchoolYear.EndDate" class="text-danger" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-check-circle me-1"></i>
+                        Save School Year
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (schoolYears == null)
+{
+    <div class="alert alert-info">
+        <em>Loading school years...</em>
+    </div>
+}
+else if (!schoolYears.Any())
+{
+    <div class="alert alert-warning">
+        <em>No school years found. Create your first school year above!</em>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">School Years (@schoolYears.Count)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Period</th>
+                        <th>Status</th>
+                        <th>Events</th>
+                        <th width="150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var year in schoolYears.OrderByDescending(sy => sy.StartDate))
+                    {
+                        <tr class="@(year.Id == currentSchoolYear?.Id ? "table-success" : "")">
+                            <td>
+                                <strong>@year.Name</strong>
+                                @if (year.Id == currentSchoolYear?.Id)
+                                {
+                                    <span class="badge bg-success ms-2">Current</span>
+                                }
+                            </td>
+                            <td>
+                                @year.StartDate.ToString("MMM yyyy") - @year.EndDate.ToString("MMM yyyy")
+                            </td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(year)">
+                                    @GetYearStatus(year)
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-muted">@GetEventCount(year.Id) events</span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditSchoolYear(year)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" title="Delete" 
+                                            @onclick="() => DeleteSchoolYear(year.Id)"
+                                            disabled="@(GetEventCount(year.Id) > 0 || year.Id == currentSchoolYear?.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<SchoolYearDto>? schoolYears;
+    private List<EventDto>? events;
+    private SchoolYearDto? currentSchoolYear;
+    private CreateSchoolYearDto editingSchoolYear = new();
+    private TransitionToNewYearDto transitionModel = new();
+    private bool showForm = false;
+    private bool showTransitionForm = false;
+    private bool isSaving = false;
+    private bool isTransitioning = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchoolYears();
+        await LoadEvents();
+        await LoadCurrentSchoolYear();
+    }
+
+    private async Task LoadSchoolYears()
+    {
+        try
+        {
+            schoolYears = await Http.GetFromJsonAsync<List<SchoolYearDto>>("api/schoolyears");
+        }
+        catch (Exception ex)
+        {
+            schoolYears = new List<SchoolYearDto>();
+            errorMessage = $"Error loading school years: {ex.Message}";
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+        }
+        catch (Exception)
+        {
+            events = new List<EventDto>();
+        }
+    }
+
+    private async Task LoadCurrentSchoolYear()
+    {
+        try
+        {
+            currentSchoolYear = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
+        }
+        catch (Exception)
+        {
+            // No current school year found
+        }
+    }
+
+    // Rest of the component methods...
+    private void ShowCreateForm()
+    {
+        editingSchoolYear = new CreateSchoolYearDto();
+        showForm = true;
+        showTransitionForm = false;
+        ClearMessages();
+    }
+
+    private void ShowTransitionForm()
+    {
+        transitionModel = new TransitionToNewYearDto();
+        showTransitionForm = true;
+        showForm = false;
+        ClearMessages();
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingSchoolYear = new CreateSchoolYearDto();
+    }
+
+    private void CancelTransition()
+    {
+        showTransitionForm = false;
+        transitionModel = new TransitionToNewYearDto();
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private async Task SaveSchoolYear()
+    {
+        isSaving = true;
+        ClearMessages();
+
+        try
+        {
+            HttpResponseMessage response;
+            
+            if (editingSchoolYear.Id > 0)
+            {
+                response = await Http.PutAsJsonAsync($"api/schoolyears/{editingSchoolYear.Id}", editingSchoolYear);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "School year updated successfully!";
+                }
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/schoolyears", editingSchoolYear);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "School year created successfully!";
+                }
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                showForm = false;
+                await LoadSchoolYears();
+                await LoadCurrentSchoolYear();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error saving school year: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving school year: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task TransitionToNewYear()
+    {
+        if (currentSchoolYear == null) return;
+
+        isTransitioning = true;
+        ClearMessages();
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/schoolyears/{currentSchoolYear.Id}/transition", transitionModel);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Successfully transitioned to new school year!";
+                showTransitionForm = false;
+                await LoadSchoolYears();
+                await LoadCurrentSchoolYear();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error during transition: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error during transition: {ex.Message}";
+        }
+        finally
+        {
+            isTransitioning = false;
+        }
+    }
+
+    private void EditSchoolYear(SchoolYearDto schoolYear)
+    {
+        editingSchoolYear = new CreateSchoolYearDto
+        {
+            Id = schoolYear.Id,
+            Name = schoolYear.Name,
+            StartDate = schoolYear.StartDate,
+            EndDate = schoolYear.EndDate
+        };
+        showForm = true;
+        showTransitionForm = false;
+        ClearMessages();
+    }
+
+    private async Task DeleteSchoolYear(int id)
+    {
+        if (!await ConfirmDelete()) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/schoolyears/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "School year deleted successfully!";
+                await LoadSchoolYears();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error deleting school year: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting school year: {ex.Message}";
+        }
+    }
+
+    private async Task<bool> ConfirmDelete()
+    {
+        return await Task.FromResult(true);
+    }
+
+    private int GetEventCount(int schoolYearId)
+    {
+        return events?.Count(e => e.SchoolYear?.Id == schoolYearId) ?? 0;
+    }
+
+    private string GetYearStatus(SchoolYearDto year)
+    {
+        var now = DateTime.Now;
+        if (now < year.StartDate) return "Future";
+        if (now > year.EndDate) return "Past";
+        return "Active";
+    }
+
+    private string GetStatusBadgeClass(SchoolYearDto year)
+    {
+        var status = GetYearStatus(year);
+        return status switch
+        {
+            "Active" => "bg-success",
+            "Future" => "bg-primary",
+            "Past" => "bg-secondary",
+            _ => "bg-light text-dark"
+        };
+    }
+
+    // DTO Classes
+    public class SchoolYearDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+    }
+
+    public class EventDto
+    {
+        public int Id { get; set; }
+        public SchoolYearDto? SchoolYear { get; set; }
+    }
+
+    public class CreateSchoolYearDto
+    {
+        public int Id { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime StartDate { get; set; } = DateTime.Now.Date;
+        
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime EndDate { get; set; } = DateTime.Now.AddYears(1).Date;
+    }
+
+    public class TransitionToNewYearDto
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string NewYearName { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime StartDate { get; set; } = DateTime.Now.AddMonths(6).Date;
+        
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime EndDate { get; set; } = DateTime.Now.AddYears(1).AddMonths(6).Date;
+        
+        public bool ArchiveCurrentYear { get; set; } = true;
+        public bool CopyRecurringEvents { get; set; } = true;
+    }
+ }
