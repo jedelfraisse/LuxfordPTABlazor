@@ -21,5 +21,6 @@ namespace LuxfordPTAWeb.Data
 
 		public int EventTypeId { get; set; }
 		public EventType EventType { get; set; } = default!;
+
 	}
 }

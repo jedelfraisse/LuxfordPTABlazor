@@ -41,14 +41,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 
@@ -138,7 +130,7 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasIndex("SchoolYearId");
 
-                    b.ToTable("Events");
+                    b.ToTable("Events", (string)null);
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventMainSponsor", b =>
@@ -153,7 +145,7 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasIndex("SponsorId");
 
-                    b.ToTable("EventMainSponsors");
+                    b.ToTable("EventMainSponsors", (string)null);
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventOtherSponsor", b =>
@@ -168,7 +160,7 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasIndex("SponsorId");
 
-                    b.ToTable("EventOtherSponsors");
+                    b.ToTable("EventOtherSponsors", (string)null);
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
@@ -179,23 +171,9 @@ namespace LuxfordPTAWeb.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ColorClass")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
 
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
@@ -204,69 +182,38 @@ namespace LuxfordPTAWeb.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Size")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
-                    b.ToTable("EventTypes");
+                    b.ToTable("EventTypes", (string)null);
 
                     b.HasData(
                         new
                         {
                             Id = 1,
-                            ColorClass = "text-danger",
-                            Description = "All holidays, staff days, and special schedule days for the school year.",
-                            DisplayOrder = 1,
-                            Icon = "bi-calendar-x",
-                            IsActive = true,
+                            Description = "",
                             IsMandatory = true,
-                            Name = "School Closed & Special Days",
-                            Size = 1,
-                            Slug = "school-closed-days"
+                            Name = "School Closed & Special Days"
                         },
                         new
                         {
                             Id = 2,
-                            ColorClass = "text-success",
-                            Description = "Events focused on raising funds to support school programs, equipment, and activities.",
-                            DisplayOrder = 2,
-                            Icon = "bi-piggy-bank",
-                            IsActive = true,
+                            Description = "",
                             IsMandatory = false,
-                            Name = "Fundraising Events",
-                            Size = 0,
-                            Slug = "fundraising-events"
+                            Name = "Fundraising Events"
                         },
                         new
                         {
                             Id = 3,
-                            ColorClass = "text-primary",
-                            Description = "Events designed to build community, support families, and create fun experiences for students.",
-                            DisplayOrder = 3,
-                            Icon = "bi-people",
-                            IsActive = true,
+                            Description = "",
                             IsMandatory = false,
-                            Name = "Student/Family/Community Support",
-                            Size = 0,
-                            Slug = "community-events"
+                            Name = "Student/Family/Community Support"
                         },
                         new
                         {
                             Id = 4,
-                            ColorClass = "text-info",
-                            Description = "Events focused on supporting our educators, staff, and school operations.",
-                            DisplayOrder = 4,
-                            Icon = "bi-mortarboard",
-                            IsActive = true,
+                            Description = "",
                             IsMandatory = false,
-                            Name = "School/Teacher/Staff Support",
-                            Size = 0,
-                            Slug = "school-support-events"
+                            Name = "School/Teacher/Staff Support"
                         });
                 });
 
@@ -290,7 +237,7 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SchoolYears");
+                    b.ToTable("SchoolYears", (string)null);
 
                     b.HasData(
                         new
@@ -331,7 +278,7 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Sponsors");
+                    b.ToTable("Sponsors", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

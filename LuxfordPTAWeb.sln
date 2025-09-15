@@ -9,8 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LuxfordPTAWeb.Client", "Lux
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solutions", "Solutions", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
-		Readme.md = Readme.md
 		event-managment-devplan.md = event-managment-devplan.md
+		OverallDev.md = OverallDev.md
+		Readme.md = Readme.md
 		TreasurerCheckList.md = TreasurerCheckList.md
 	EndProjectSection
 EndProject
