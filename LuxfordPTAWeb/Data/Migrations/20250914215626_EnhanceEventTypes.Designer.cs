@@ -4,6 +4,7 @@ using LuxfordPTAWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxfordPTAWeb.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250914215626_EnhanceEventTypes")]
+    partial class EnhanceEventTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -207,10 +210,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<int>("Size")
                         .HasColumnType("int");
 
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
                     b.ToTable("EventTypes");
@@ -226,8 +225,7 @@ namespace LuxfordPTAWeb.Migrations
                             IsActive = true,
                             IsMandatory = true,
                             Name = "School Closed & Special Days",
-                            Size = 1,
-                            Slug = "school-closed-days"
+                            Size = 1
                         },
                         new
                         {
@@ -239,8 +237,7 @@ namespace LuxfordPTAWeb.Migrations
                             IsActive = true,
                             IsMandatory = false,
                             Name = "Fundraising Events",
-                            Size = 0,
-                            Slug = "fundraising-events"
+                            Size = 0
                         },
                         new
                         {
@@ -252,8 +249,7 @@ namespace LuxfordPTAWeb.Migrations
                             IsActive = true,
                             IsMandatory = false,
                             Name = "Student/Family/Community Support",
-                            Size = 0,
-                            Slug = "community-events"
+                            Size = 0
                         },
                         new
                         {
@@ -265,8 +261,7 @@ namespace LuxfordPTAWeb.Migrations
                             IsActive = true,
                             IsMandatory = false,
                             Name = "School/Teacher/Staff Support",
-                            Size = 0,
-                            Slug = "school-support-events"
+                            Size = 0
                         });
                 });
 

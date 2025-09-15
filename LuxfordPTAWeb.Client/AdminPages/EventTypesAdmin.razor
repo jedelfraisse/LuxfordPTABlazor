@@ -49,19 +49,62 @@
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="name" class="form-label">Name *</label>
-                            <InputText id="name" @bind-Value="editingEventType.Name" class="form-control" maxlength="100" />
+                            <InputText id="name" @bind-Value="editingEventType.Name" @onblur="GenerateSlugFromName" class="form-control" maxlength="100" />
                             <ValidationMessage For="() => editingEventType.Name" class="text-danger" />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <div class="form-check mt-4">
-                                <InputCheckbox id="isMandatory" @bind-Value="editingEventType.IsMandatory" class="form-check-input" />
-                                <label for="isMandatory" class="form-check-label">
-                                    Mandatory Event Type
-                                    <small class="text-muted d-block">Check this for required events like "School Closed"</small>
-                                </label>
-                            </div>
+                            <label for="slug" class="form-label">URL Slug *</label>
+                            <InputText id="slug" @bind-Value="editingEventType.Slug" class="form-control" maxlength="100" />
+                            <ValidationMessage For="() => editingEventType.Slug" class="text-danger" />
+                            <div class="form-text">Used in URLs: /events/category/<strong>@(editingEventType.Slug ?? "slug")</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="displayOrder" class="form-label">Display Order</label>
+                            <InputNumber id="displayOrder" @bind-Value="editingEventType.DisplayOrder" class="form-control" />
+                            <ValidationMessage For="() => editingEventType.DisplayOrder" class="text-danger" />
+                            <div class="form-text">Lower numbers appear first</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="icon" class="form-label">Icon Class</label>
+                            <InputText id="icon" @bind-Value="editingEventType.Icon" class="form-control" placeholder="bi-calendar-event" />
+                            <ValidationMessage For="() => editingEventType.Icon" class="text-danger" />
+                            <div class="form-text">Bootstrap Icons class (e.g., bi-calendar-event)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="size" class="form-label">Card Size</label>
+                            <InputSelect id="size" @bind-Value="editingEventType.Size" class="form-select">
+                                <option value="0">Half Size</option>
+                                <option value="1">Full Size</option>
+                            </InputSelect>
+                            <div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="colorClass" class="form-label">Color Class</label>
+                            <InputSelect id="colorClass" @bind-Value="editingEventType.ColorClass" class="form-select">
+                                <option value="">Default</option>
+                                <option value="text-primary">Blue</option>
+                                <option value="text-success">Green</option>
+                                <option value="text-danger">Red</option>
+                                <option value="text-warning">Yellow</option>
+                                <option value="text-info">Cyan</option>
+                                <option value="text-secondary">Gray</option>
+                            </InputSelect>
                         </div>
                     </div>
                 </div>
@@ -70,7 +113,28 @@
                     <label for="description" class="form-label">Description</label>
                     <InputTextArea id="description" @bind-Value="editingEventType.Description" class="form-control" rows="3" maxlength="500" />
                     <ValidationMessage For="() => editingEventType.Description" class="text-danger" />
-                    <div class="form-text">Optional description to help users understand this event type</div>
+                    <div class="form-text">Description shown on event category cards</div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <InputCheckbox id="isMandatory" @bind-Value="editingEventType.IsMandatory" class="form-check-input" />
+                            <label for="isMandatory" class="form-check-label">
+                                Mandatory Event Type
+                                <small class="text-muted d-block">Mandatory types persist across school years</small>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <InputCheckbox id="isActive" @bind-Value="editingEventType.IsActive" class="form-check-input" />
+                            <label for="isActive" class="form-check-label">
+                                Active
+                                <small class="text-muted d-block">Inactive types are hidden from public view</small>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="d-flex gap-2">
@@ -114,22 +178,47 @@ else
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th>Order</th>
                         <th>Name</th>
-                        <th>Description</th>
+                        <th>Size</th>
+                        <th>Status</th>
                         <th>Type</th>
-                        <th>Events Count</th>
+                        <th>Events</th>
                         <th width="150">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var eventType in eventTypes)
+                    @foreach (var eventType in eventTypes.OrderBy(et => et.DisplayOrder))
                     {
-                        <tr>
+                        <tr class="@(eventType.IsActive ? "" : "table-secondary")">
                             <td>
-                                <strong>@eventType.Name</strong>
+                                <span class="badge bg-light text-dark">@eventType.DisplayOrder</span>
                             </td>
                             <td>
-                                <small class="text-muted">@TruncateText(eventType.Description, 100)</small>
+                                <div class="d-flex align-items-center">
+                                    @if (!string.IsNullOrEmpty(eventType.Icon))
+                                    {
+                                        <i class="@eventType.Icon @eventType.ColorClass me-2"></i>
+                                    }
+                                    <div>
+                                        <strong>@eventType.Name</strong>
+                                        @if (!eventType.IsActive)
+                                        {
+                                            <span class="badge bg-secondary ms-2">Inactive</span>
+                                        }
+                                        <div class="small text-muted">@TruncateText(eventType.Description, 80)</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info")">
+                                    @(eventType.Size == 1 ? "Full" : "Half")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
+                                    @(eventType.IsActive ? "Active" : "Inactive")
+                                </span>
                             </td>
                             <td>
                                 <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info")">
@@ -144,8 +233,9 @@ else
                                     <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditEventType(eventType)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteEventType(eventType.Id)" 
-                                            disabled="@(GetEventCount(eventType.Id) > 0)">
+                                    <button type="button" class="btn btn-outline-danger" title="Delete" 
+                                            @onclick="() => DeleteEventType(eventType.Id)"
+                                            disabled="@(eventType.IsMandatory || GetEventCount(eventType.Id) > 0)">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -213,7 +303,13 @@ else
             Id = eventType.Id,
             Name = eventType.Name,
             Description = eventType.Description,
-            IsMandatory = eventType.IsMandatory
+            IsMandatory = eventType.IsMandatory,
+            DisplayOrder = eventType.DisplayOrder,
+            IsActive = eventType.IsActive,
+            Size = eventType.Size,
+            Icon = eventType.Icon,
+            ColorClass = eventType.ColorClass,
+            Slug = eventType.Slug
         };
         showForm = true;
         errorMessage = string.Empty;
@@ -320,12 +416,41 @@ else
         return text.Substring(0, maxLength - 3) + "...";
     }
 
+    private void GenerateSlugFromName()
+    {
+        if (!string.IsNullOrEmpty(editingEventType.Name) && string.IsNullOrEmpty(editingEventType.Slug))
+        {
+            editingEventType.Slug = GenerateSlug(editingEventType.Name);
+        }
+    }
+
+    private string GenerateSlug(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return string.Empty;
+            
+        return name.ToLowerInvariant()
+                   .Replace(" ", "-")
+                   .Replace("&", "and")
+                   .Replace("/", "-")
+                   .Replace("'", "")
+                   .Replace("\"", "")
+                   .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                   .Aggregate("", (current, c) => current + c);
+    }
+
     public class EventTypeDto
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsMandatory { get; set; }
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public int Size { get; set; } // 0 = Half, 1 = Full
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
     }
 
     public class EventDto
@@ -340,12 +465,28 @@ else
         public int Id { get; set; }
         
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required")]
-        [System.ComponentModel.DataAnnotations.StringLength(100, ErrorMessage = "Name cannot be longer than 100 characters")]
         public string Name { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Slug is required")]
+        public string Slug { get; set; } = string.Empty;
         
         [System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
         public string Description { get; set; } = string.Empty;
         
         public bool IsMandatory { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
+        public int DisplayOrder { get; set; } = 0;
+        
+        public bool IsActive { get; set; } = true;
+        
+        [System.ComponentModel.DataAnnotations.Range(0, 1, ErrorMessage = "Size must be Half (0) or Full (1)")]
+        public int Size { get; set; } = 1; // Default to Full
+        
+        [System.ComponentModel.DataAnnotations.StringLength(50, ErrorMessage = "Icon class cannot be longer than 50 characters")]
+        public string Icon { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.StringLength(30, ErrorMessage = "Color class cannot be longer than 30 characters")]
+        public string ColorClass { get; set; } = string.Empty;
     }
 }
