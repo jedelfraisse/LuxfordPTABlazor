@@ -13,6 +13,12 @@ public class EventType
 	public string Icon { get; set; } = string.Empty; // Bootstrap icon class (e.g., "bi-calendar-x")
 	public string ColorClass { get; set; } = string.Empty; // CSS class for styling (e.g., "text-danger")
 
+	// New display options for main events page
+	public EventDisplayMode DisplayMode { get; set; } = EventDisplayMode.ShowCategory; // How to display this type
+	public int MaxEventsToShow { get; set; } = 0; // For InlineWithLimit mode (0 = unlimited)
+	public bool ShowViewEventsButton { get; set; } = true; // Whether to show "View Events" button
+	public bool ShowInlineOnMainPage { get; set; } = false; // Show events directly on main page instead of category card
+
 	public ICollection<Event> Events { get; set; } = new List<Event>();
 }
 
@@ -20,4 +26,12 @@ public enum EventTypeSize
 {
 	Half = 0,
 	Full = 1
+}
+
+public enum EventDisplayMode
+{
+	ShowCategory = 0,     // Show normal category card with "View Events" button
+	HideEvents = 1,       // Don't show any events or category
+	InlineAll = 2,        // Show all events directly on main page in a section
+	InlineWithLimit = 3   // Show limited number of events directly on main page
 }

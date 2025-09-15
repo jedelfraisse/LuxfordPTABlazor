@@ -29,7 +29,7 @@
 else
 {
     <div class="row mb-4">
-        @foreach (var eventType in eventTypes.Where(et => et.IsActive).OrderBy(et => et.DisplayOrder))
+        @foreach (var eventType in eventTypes.Where(et => et.IsActive && et.DisplayMode == 0).OrderBy(et => et.DisplayOrder))
         {
             var colClass = eventType.Size == 1 ? "col-12 mb-3" : "col-md-6 mb-3";
             <div class="@colClass">
@@ -40,22 +40,73 @@ else
                             {
                                 <i class="@eventType.Icon"></i>
                             }
-                            <a href="events/category/@eventType.Slug" class="text-decoration-none">@eventType.Name</a>
+                            @if (eventType.ShowViewEventsButton)
+                            {
+                                <a href="events/category/@eventType.Slug" class="text-decoration-none">@eventType.Name</a>
+                            }
+                            else
+                            {
+                                @eventType.Name
+                            }
                         </h5>
                         <p class="card-text">@eventType.Description</p>
                         <div class="mt-auto">
                             <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info") me-2">
                                 @GetEventCount(eventType.Id) events
                             </span>
-                            <a href="events/category/@eventType.Slug" class="btn btn-sm btn-outline-primary">
-                                View Events <i class="bi bi-arrow-right"></i>
-                            </a>
+                            @if (eventType.ShowViewEventsButton)
+                            {
+                                <a href="events/category/@eventType.Slug" class="btn btn-sm btn-outline-primary">
+                                    View Events <i class="bi bi-arrow-right"></i>
+                                </a>
+                            }
                         </div>
                     </div>
                 </div>
             </div>
         }
     </div>
+}
+
+@* Display inline event sections for event types configured to show directly *@
+@if (eventTypes != null && allEvents != null)
+{
+    @foreach (var eventType in eventTypes.Where(et => et.IsActive && (et.DisplayMode == 2 || et.DisplayMode == 3)).OrderBy(et => et.DisplayOrder))
+    {
+        var eventsToShow = GetEventsForType(eventType.Id, eventType.DisplayMode, eventType.MaxEventsToShow);
+        
+        if (eventsToShow.Any())
+        {
+            <div class="card mb-4">
+                <div class="card-header @GetHeaderColorClass(eventType) text-white fw-bold">
+                    @if (!string.IsNullOrEmpty(eventType.Icon))
+                    {
+                        <i class="@eventType.Icon me-2"></i>
+                    }
+                    @eventType.Name (@GetCurrentSchoolYear())
+                </div>
+                <div class="card-body">
+                    @if (eventType.Id == 1) // School Closed & Special Days
+                    {
+                        @RenderSchoolClosedEvents(eventsToShow)
+                    }
+                    else
+                    {
+                        @RenderRegularEvents(eventsToShow)
+                    }
+                    
+                    @if (eventType.ShowViewEventsButton && eventsToShow.Count() < GetEventCount(eventType.Id))
+                    {
+                        <div class="text-end mt-3">
+                            <a href="events/category/@eventType.Slug" class="btn btn-sm btn-outline-primary">
+                                View All @eventType.Name <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
 }
 
 <h2 class="h4 mt-4">📅 Upcoming Events</h2>
@@ -151,43 +202,6 @@ else
     </div>
 </div>
 
-<div class="card mb-4">
-    <div class="card-header bg-secondary text-white fw-bold">🏫 School Closed & Special Days (2025–2026)</div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <h5>Holidays (School Closed)</h5>
-                <ul class="list-unstyled">
-                    <li><strong>Labor Day:</strong> August 29, 2025 and September 1, 2025</li>
-                    <li><strong>Veterans Day:</strong> November 11, 2025</li>
-                    <li><strong>Thanksgiving:</strong> November 26–28, 2025</li>
-                    <li><strong>Winter Break:</strong> December 22–31, 2025 and January 1–2, 2026</li>
-                    <li><strong>Martin Luther King Jr. Day:</strong> January 19, 2026</li>
-                    <li><strong>Presidents Day:</strong> February 16, 2026</li>
-                    <li><strong>Spring Break:</strong> April 6–10, 2026</li>
-                    <li><strong>Memorial Day:</strong> May 25, 2026</li>
-                    <li><strong>Juneteenth:</strong> June 19, 2026</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h5>Adjusted Dismissal Days</h5>
-                <ul class="list-unstyled">
-                    <li><strong>All Students:</strong> June 12, 2026</li>
-                    <li><strong>High School Students:</strong> June 9–11, 2026</li>
-                </ul>
-                <h5 class="mt-3">Staff Days (School Closed for Students)</h5>
-                <ul class="list-unstyled">
-                    <li>August 18–22, 2025</li>
-                    <li>September 29, 2025</li>
-                    <li>November 3, 2025</li>
-                    <li>January 26–27, 2026</li>
-                    <li>April 3, 2026</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="alert alert-success text-center mt-4">
     <em>Mark your calendars and join us for these wonderful community events!</em><br />
     <strong>Email List</strong> - Contact us at: TBD
@@ -259,6 +273,170 @@ else
         return allEvents?.Count(e => e.EventType?.Id == eventTypeId) ?? 0;
     }
 
+    private RenderFragment RenderSchoolClosedEvents(IEnumerable<EventDto> events) => __builder =>
+    {
+        var holidays = events.Where(e => e.Title.Contains("Holiday") || e.Title.Contains("Day") || e.Title.Contains("Break")).OrderBy(e => e.Date);
+        var staffDays = events.Where(e => e.Title.Contains("Staff") || e.Title.Contains("Training")).OrderBy(e => e.Date);
+        var adjustedDays = events.Where(e => e.Title.Contains("Adjusted") || e.Title.Contains("Dismissal")).OrderBy(e => e.Date);
+
+        __builder.OpenElement(0, "div");
+        __builder.AddAttribute(1, "class", "row");
+        
+        if (holidays.Any())
+        {
+            __builder.OpenElement(2, "div");
+            __builder.AddAttribute(3, "class", "col-md-6");
+            __builder.OpenElement(4, "h5");
+            __builder.AddContent(5, "Holidays (School Closed)");
+            __builder.CloseElement();
+            __builder.OpenElement(6, "ul");
+            __builder.AddAttribute(7, "class", "list-unstyled");
+            
+            foreach (var holiday in holidays)
+            {
+                __builder.OpenElement(8, "li");
+                __builder.OpenElement(9, "strong");
+                __builder.AddContent(10, holiday.Title + ":");
+                __builder.CloseElement();
+                __builder.AddContent(11, " " + holiday.Date.ToString("MMMM d, yyyy"));
+                __builder.CloseElement();
+            }
+            
+            __builder.CloseElement(); // ul
+            __builder.CloseElement(); // div col-md-6
+        }
+        
+        if (adjustedDays.Any() || staffDays.Any())
+        {
+            __builder.OpenElement(12, "div");
+            __builder.AddAttribute(13, "class", "col-md-6");
+            
+            if (adjustedDays.Any())
+            {
+                __builder.OpenElement(14, "h5");
+                __builder.AddContent(15, "Adjusted Dismissal Days");
+                __builder.CloseElement();
+                __builder.OpenElement(16, "ul");
+                __builder.AddAttribute(17, "class", "list-unstyled");
+                
+                foreach (var day in adjustedDays)
+                {
+                    __builder.OpenElement(18, "li");
+                    __builder.OpenElement(19, "strong");
+                    __builder.AddContent(20, day.Title + ":");
+                    __builder.CloseElement();
+                    __builder.AddContent(21, " " + day.Date.ToString("MMMM d, yyyy"));
+                    __builder.CloseElement();
+                }
+                
+                __builder.CloseElement(); // ul
+            }
+            
+            if (staffDays.Any())
+            {
+                __builder.OpenElement(22, "h5");
+                __builder.AddAttribute(23, "class", "mt-3");
+                __builder.AddContent(24, "Staff Days (School Closed for Students)");
+                __builder.CloseElement();
+                __builder.OpenElement(25, "ul");
+                __builder.AddAttribute(26, "class", "list-unstyled");
+                
+                foreach (var day in staffDays)
+                {
+                    __builder.OpenElement(27, "li");
+                    __builder.AddContent(28, day.Date.ToString("MMMM d, yyyy"));
+                    __builder.CloseElement();
+                }
+                
+                __builder.CloseElement(); // ul
+            }
+            
+            __builder.CloseElement(); // div col-md-6
+        }
+        
+        __builder.CloseElement(); // div row
+    };
+
+    private RenderFragment RenderRegularEvents(IEnumerable<EventDto> events) => __builder =>
+    {
+        __builder.OpenElement(0, "ul");
+        __builder.AddAttribute(1, "class", "list-group list-group-flush");
+        
+        foreach (var evt in events.OrderBy(e => e.Date))
+        {
+            __builder.OpenElement(2, "li");
+            __builder.AddAttribute(3, "class", "list-group-item");
+            __builder.OpenElement(4, "strong");
+            __builder.AddContent(5, evt.Title);
+            __builder.CloseElement();
+            __builder.OpenElement(6, "br");
+            __builder.CloseElement();
+            __builder.OpenElement(7, "small");
+            __builder.AddAttribute(8, "class", "text-muted");
+            __builder.AddContent(9, evt.Date.ToString("MMMM d, yyyy"));
+            __builder.CloseElement();
+            __builder.OpenElement(10, "br");
+            __builder.CloseElement();
+            
+            if (!string.IsNullOrWhiteSpace(evt.Description))
+            {
+                __builder.AddContent(11, evt.Description);
+            }
+            
+            if (!string.IsNullOrWhiteSpace(evt.Location))
+            {
+                __builder.OpenElement(12, "div");
+                __builder.OpenElement(13, "em");
+                __builder.AddContent(14, evt.Location);
+                __builder.CloseElement();
+                __builder.CloseElement();
+            }
+            
+            __builder.CloseElement(); // li
+        }
+        
+        __builder.CloseElement(); // ul
+    };
+
+    private IEnumerable<EventDto> GetEventsForType(int eventTypeId, int displayMode, int maxEvents)
+    {
+        if (allEvents == null) return Enumerable.Empty<EventDto>();
+        
+        var events = allEvents.Where(e => e.EventType?.Id == eventTypeId);
+        
+        // For school closed events, show upcoming and some recent/relevant ones
+        if (eventTypeId == 1)
+        {
+            var currentDate = DateTime.Now;
+            var currentSchoolYearStart = new DateTime(currentDate.Month >= 7 ? currentDate.Year : currentDate.Year - 1, 7, 1);
+            var currentSchoolYearEnd = currentSchoolYearStart.AddYears(1).AddDays(-1);
+            
+            events = events.Where(e => e.Date >= currentSchoolYearStart && e.Date <= currentSchoolYearEnd);
+        }
+        
+        return displayMode == 3 && maxEvents > 0 ? events.Take(maxEvents) : events;
+    }
+
+    private string GetHeaderColorClass(EventTypeDto eventType)
+    {
+        return eventType.ColorClass switch
+        {
+            "text-danger" => "bg-danger",
+            "text-success" => "bg-success", 
+            "text-primary" => "bg-primary",
+            "text-info" => "bg-info",
+            "text-warning" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetCurrentSchoolYear()
+    {
+        var currentDate = DateTime.Now;
+        var startYear = currentDate.Month >= 7 ? currentDate.Year : currentDate.Year - 1;
+        return $"{startYear}–{startYear + 1}";
+    }
+
     public class EventDto
     {
         public int Id { get; set; }
@@ -276,7 +454,7 @@ else
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public string Slug { get; set; } = string.Empty; // Add this line
+        public string Slug { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsMandatory { get; set; }
         public int DisplayOrder { get; set; }
@@ -284,6 +462,12 @@ else
         public int Size { get; set; }
         public string Icon { get; set; } = string.Empty;
         public string ColorClass { get; set; } = string.Empty;
+        
+        // New properties for display configuration
+        public int DisplayMode { get; set; } = 0; // EventDisplayMode as int
+        public int MaxEventsToShow { get; set; } = 0;
+        public bool ShowViewEventsButton { get; set; } = true;
+        public bool ShowInlineOnMainPage { get; set; } = false;
     }
 
     public class SchoolYearDto

@@ -62,16 +62,13 @@
                         </div>
                     </div>
                 </div>
-
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" @bind-Value="editingEventType.Description" class="form-control" rows="3" maxlength="500" />
+                    <ValidationMessage For="() => editingEventType.Description" class="text-danger" />
+                    <div class="form-text">Description shown on event category cards</div>
+                </div>
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="displayOrder" class="form-label">Display Order</label>
-                            <InputNumber id="displayOrder" @bind-Value="editingEventType.DisplayOrder" class="form-control" />
-                            <ValidationMessage For="() => editingEventType.DisplayOrder" class="text-danger" />
-                            <div class="form-text">Lower numbers appear first</div>
-                        </div>
-                    </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="icon" class="form-label">Icon Class</label>
@@ -80,20 +77,7 @@
                             <div class="form-text">Bootstrap Icons class (e.g., bi-calendar-event)</div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="mb-3">
-                            <label for="size" class="form-label">Card Size</label>
-                            <InputSelect id="size" @bind-Value="editingEventType.Size" class="form-select">
-                                <option value="0">Half Size</option>
-                                <option value="1">Full Size</option>
-                            </InputSelect>
-                            <div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="mb-3">
                             <label for="colorClass" class="form-label">Color Class</label>
                             <InputSelect id="colorClass" @bind-Value="editingEventType.ColorClass" class="form-select">
@@ -109,12 +93,20 @@
                     </div>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="description" class="form-label">Description</label>
-                    <InputTextArea id="description" @bind-Value="editingEventType.Description" class="form-control" rows="3" maxlength="500" />
-                    <ValidationMessage For="() => editingEventType.Description" class="text-danger" />
-                    <div class="form-text">Description shown on event category cards</div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="size" class="form-label">Card Size</label>
+                            <InputSelect id="size" @bind-Value="editingEventType.Size" class="form-select">
+                                <option value="0">Half Size</option>
+                                <option value="1">Full Size</option>
+                            </InputSelect>
+                            <div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
+                        </div>
+                    </div>
                 </div>
+                
+               
 
                 <div class="row">
                     <div class="col-md-6">
@@ -170,80 +162,148 @@ else if (!eventTypes.Any())
 }
 else
 {
-    <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">Event Types (@eventTypes.Count)</h5>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Order</th>
-                        <th>Name</th>
-                        <th>Size</th>
-                        <th>Status</th>
-                        <th>Type</th>
-                        <th>Events</th>
-                        <th width="150">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var eventType in eventTypes.OrderBy(et => et.DisplayOrder))
-                    {
-                        <tr class="@(eventType.IsActive ? "" : "table-secondary")">
-                            <td>
-                                <span class="badge bg-light text-dark">@eventType.DisplayOrder</span>
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    @if (!string.IsNullOrEmpty(eventType.Icon))
-                                    {
-                                        <i class="@eventType.Icon @eventType.ColorClass me-2"></i>
-                                    }
-                                    <div>
-                                        <strong>@eventType.Name</strong>
-                                        @if (!eventType.IsActive)
+    <!-- Event Types Management -->
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Event Types (@eventTypes.Count)</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="80">Order</th>
+                                <th>Name</th>
+                                <th width="80">Size</th>
+                                <th width="80">Status</th>
+                                <th width="100">Events</th>
+                                <th width="150">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var eventType in eventTypes.OrderBy(et => et.DisplayOrder))
+                            {
+                                <tr class="@(eventType.IsActive ? "" : "table-secondary")">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="badge bg-light text-dark">@eventType.DisplayOrder</span>
+                                            <div class="btn-group-vertical" style="width: 20px;">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" 
+                                                        title="Move Up" @onclick="() => MoveEventTypeUp(eventType.Id)"
+                                                        disabled="@(!CanMoveUp(eventType) || isReordering)"
+                                                        style="font-size: 10px; line-height: 1;">
+                                                    <i class="bi bi-chevron-up"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" 
+                                                        title="Move Down" @onclick="() => MoveEventTypeDown(eventType.Id)"
+                                                        disabled="@(!CanMoveDown(eventType) || isReordering)"
+                                                        style="font-size: 10px; line-height: 1;">
+                                                    <i class="bi bi-chevron-down"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            @if (!string.IsNullOrEmpty(eventType.Icon))
+                                            {
+                                                <i class="@eventType.Icon @eventType.ColorClass me-2"></i>
+                                            }
+                                            <div>
+                                                <strong>@eventType.Name</strong>
+                                                @if (!eventType.IsActive)
+                                                {
+                                                    <span class="badge bg-secondary ms-2">Inactive</span>
+                                                }
+                                                <div class="small text-muted">@TruncateText(eventType.Description, 50)</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info")">
+                                            @(eventType.Size == 1 ? "Full" : "Half")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (eventType.IsMandatory)
                                         {
-                                            <span class="badge bg-secondary ms-2">Inactive</span>
+                                            <span class="badge bg-danger">Required</span>
                                         }
-                                        <div class="small text-muted">@TruncateText(eventType.Description, 80)</div>
+                                        else
+                                        {
+                                            <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
+                                                @(eventType.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">@GetEventCount(eventType.Id)</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditEventType(eventType)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" title="Delete" 
+                                                    @onclick="() => DeleteEventType(eventType.Id)"
+                                                    disabled="@(eventType.IsMandatory || GetEventCount(eventType.Id) > 0)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-eye"></i> Live Preview</h5>
+                    <small class="text-muted">How the event types will appear on the main page</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @foreach (var eventType in eventTypes.Where(et => et.IsActive).OrderBy(et => et.DisplayOrder))
+                        {
+                            <div class="@(eventType.Size == 1 ? "col-12" : "col-6") mb-3">
+                                <div class="card border @(eventType.Size == 1 ? "border-primary" : "border-secondary")" style="height: 120px;">
+                                    <div class="card-body p-3 d-flex flex-column">
+                                        <div class="d-flex align-items-center mb-2">
+                                            @if (!string.IsNullOrEmpty(eventType.Icon))
+                                            {
+                                                <i class="@eventType.Icon @eventType.ColorClass me-2" style="font-size: 1.2rem;"></i>
+                                            }
+                                            <h6 class="mb-0 @eventType.ColorClass" style="font-size: 0.9rem; line-height: 1.2;">@eventType.Name</h6>
+                                        </div>
+                                        <p class="text-muted small mb-2 flex-grow-1" style="font-size: 0.75rem; line-height: 1.2;">
+                                            @TruncateText(eventType.Description, eventType.Size == 1 ? 80 : 50)
+                                        </p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-light text-dark small">Order: @eventType.DisplayOrder</span>
+                                            <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info") small">
+                                                @(eventType.Size == 1 ? "Full" : "Half")
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </td>
-                            <td>
-                                <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info")">
-                                    @(eventType.Size == 1 ? "Full" : "Half")
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
-                                    @(eventType.IsActive ? "Active" : "Inactive")
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info")">
-                                    @(eventType.IsMandatory ? "Mandatory" : "Optional")
-                                </span>
-                            </td>
-                            <td>
-                                <span class="text-muted">@GetEventCount(eventType.Id)</span>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditEventType(eventType)">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-danger" title="Delete" 
-                                            @onclick="() => DeleteEventType(eventType.Id)"
-                                            disabled="@(eventType.IsMandatory || GetEventCount(eventType.Id) > 0)">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                            </div>
+                        }
+                    </div>
+                    @if (!eventTypes.Any(et => et.IsActive))
+                    {
+                        <div class="text-center text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            <p>No active event types to preview</p>
+                        </div>
                     }
-                </tbody>
-            </table>
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -254,6 +314,7 @@ else
     private CreateEventTypeDto editingEventType = new();
     private bool showForm = false;
     private bool isSaving = false;
+    private bool isReordering = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
 
@@ -288,9 +349,81 @@ else
         }
     }
 
+    private bool CanMoveUp(EventTypeDto eventType)
+    {
+        if (eventTypes == null) return false;
+        return eventTypes.OrderBy(et => et.DisplayOrder).First().Id != eventType.Id;
+    }
+
+    private bool CanMoveDown(EventTypeDto eventType)
+    {
+        if (eventTypes == null) return false;
+        return eventTypes.OrderBy(et => et.DisplayOrder).Last().Id != eventType.Id;
+    }
+
+    private async Task MoveEventTypeUp(int id)
+    {
+        isReordering = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/eventtypes/{id}/move-up", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadEventTypes();
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder event type.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering event type: {ex.Message}";
+        }
+        finally
+        {
+            isReordering = false;
+        }
+    }
+
+    private async Task MoveEventTypeDown(int id)
+    {
+        isReordering = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/eventtypes/{id}/move-down", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadEventTypes();
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder event type.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering event type: {ex.Message}";
+        }
+        finally
+        {
+            isReordering = false;
+        }
+    }
+
     private void ShowCreateForm()
     {
-        editingEventType = new CreateEventTypeDto();
+        // Set the display order to the next available number
+        var nextOrder = eventTypes?.Any() == true ? eventTypes.Max(et => et.DisplayOrder) + 1 : 0;
+        
+        editingEventType = new CreateEventTypeDto
+        {
+            DisplayOrder = nextOrder,
+            IsActive = true,
+            Size = 1 // Default to Full size
+        };
         showForm = true;
         errorMessage = string.Empty;
         successMessage = string.Empty;
