@@ -14,6 +14,23 @@
     </div>
 </div>
 
+<!-- Current School Year Highlight -->
+@if (currentSchoolYear != null)
+{
+    <div class="alert alert-success">
+        <h6><i class="bi bi-calendar-check"></i> Current School Year</h6>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>@currentSchoolYear.Name</strong>
+                <span class="text-muted">(@currentSchoolYear.StartDate.ToString("MMM yyyy") - @currentSchoolYear.EndDate.ToString("MMM yyyy"))</span>
+            </div>
+            <a href="/admin/school-years" class="btn btn-outline-warning me-2">
+                <i class="bi bi-calendar3"></i> School Years
+            </a>
+        </div>
+    </div>
+}
+
 <div class="row">
     <div class="col-md-6 mb-4">
         <div class="card h-100">
@@ -25,8 +42,6 @@
                 <p>Add, edit, and manage school and PTA events.</p>
                 <div class="d-grid gap-2">
                     <a href="/admin/events" class="btn btn-primary">Manage Events</a>
-                    <a href="/admin/school-years" class="btn btn-outline-warning">Manage School Years</a>
-                    <a href="/admin/event-types" class="btn btn-outline-info">Manage Event Types</a>
                     <a href="/admin/events/create" class="btn btn-outline-primary">Add New Event</a>
                 </div>
             </div>
@@ -102,6 +117,7 @@
     private int upcomingEvents = 0;
     private int totalUsers = 0;
     private int totalSponsors = 0;
+    private SchoolYearDto? currentSchoolYear;
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,12 +129,28 @@
             upcomingEvents = events?.Count(e => e.Date >= DateTime.Now) ?? 0;
 
             // You can add more API calls here for users and sponsors when those endpoints are ready
-            totalUsers = 25; // Placeholder
+            totalUsers = 1; // Placeholder
             totalSponsors = 5; // Placeholder
+           
+            await LoadCurrentSchoolYear();
+
+
         }
         catch (Exception)
         {
             // Handle errors silently for now
+        }
+    }
+
+    private async Task LoadCurrentSchoolYear()
+    {
+        try
+        {
+            currentSchoolYear = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
+        }
+        catch (Exception)
+        {
+            // No current school year found
         }
     }
 
@@ -128,5 +160,14 @@
         public DateTime Date { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
+    }
+
+    // DTO Classes
+    public class SchoolYearDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
     }
 }

@@ -2,6 +2,7 @@ using LuxfordPTAWeb.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -88,7 +89,42 @@ public class EventTypesController : ControllerBase
 
 public class CreateEventTypeDto
 {
+    public int Id { get; set; }
+    
+    [Required(ErrorMessage = "Name is required")]
+    [StringLength(100, ErrorMessage = "Name cannot be longer than 100 characters")]
     public string Name { get; set; } = string.Empty;
+    
+    [StringLength(100, ErrorMessage = "Slug cannot be longer than 100 characters")]
+    public string Slug { get; set; } = string.Empty;
+    
+    [StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
     public string Description { get; set; } = string.Empty;
+    
     public bool IsMandatory { get; set; }
+    public int DisplayOrder { get; set; } = 0;
+    public bool IsActive { get; set; } = true;
+    public int Size { get; set; } = 1;
+    public string Icon { get; set; } = string.Empty;
+    public string ColorClass { get; set; } = string.Empty;
+
+
+	// Helper method to generate slug from name
+	private string GenerateSlug(string name)
+	{
+		if (string.IsNullOrEmpty(name))
+			return string.Empty;
+
+		return name.ToLowerInvariant()
+				   .Replace(" ", "-")
+				   .Replace("&", "and")
+				   .Replace("/", "-")
+				   .Replace("'", "")
+				   .Replace("\"", "")
+				   .Where(c => char.IsLetterOrDigit(c) || c == '-')
+				   .Aggregate("", (current, c) => current + c);
+	}
+
+
 }
+

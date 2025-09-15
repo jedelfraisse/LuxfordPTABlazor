@@ -1,0 +1,254 @@
+﻿@page "/events/category/{slug}"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>@pageTitle</PageTitle>
+
+@if (eventType == null || events == null)
+{
+    <div class="alert alert-info">
+        <em>Loading @Slug events...</em>
+    </div>
+}
+else if (!events.Any())
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-body text-center">
+            <div class="mb-3">
+                @if (!string.IsNullOrEmpty(eventType.Icon))
+                {
+                    <i class="@eventType.Icon @eventType.ColorClass display-4"></i>
+                }
+            </div>
+            <h1 class="card-title @eventType.ColorClass">@eventType.Name</h1>
+            <p class="lead">@eventType.Description</p>
+        </div>
+    </div>
+    
+    <div class="alert alert-warning text-center">
+        <h5>No Events Found</h5>
+        <p>There are currently no events scheduled for this category.</p>
+        <a href="/events" class="btn btn-primary">
+            <i class="bi bi-arrow-left"></i> Back to All Events
+        </a>
+    </div>
+}
+else
+{
+    var upcomingEvents = events.Where(e => e.Date >= DateTime.Now).OrderBy(e => e.Date).ToList();
+    var pastEvents = events.Where(e => e.Date < DateTime.Now).OrderByDescending(e => e.Date).ToList();
+
+    <!-- Header -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body text-center">
+            <div class="mb-3">
+                @if (!string.IsNullOrEmpty(eventType.Icon))
+                {
+                    <i class="@eventType.Icon @eventType.ColorClass display-4"></i>
+                }
+            </div>
+            <h1 class="card-title @eventType.ColorClass">@eventType.Name</h1>
+            <p class="lead">@eventType.Description</p>
+            <div>
+                <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info") me-2">
+                    @events.Count @(events.Count == 1 ? "Event" : "Events")
+                </span>
+                <a href="/events" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Back to All Events
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Events -->
+    @if (upcomingEvents.Any())
+    {
+        <h2 class="h4 mb-3">
+            <i class="bi bi-calendar-plus @eventType.ColorClass"></i> 
+            Upcoming @eventType.Name (@upcomingEvents.Count)
+        </h2>
+        <div class="row mb-4">
+            @foreach (var evt in upcomingEvents)
+            {
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100 border-start border-4" style="border-left-color: @GetBorderColor(eventType.ColorClass) !important;">
+                        <div class="card-body">
+                            <h5 class="card-title">@evt.Title</h5>
+                            <p class="text-muted mb-2">
+                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
+                            </p>
+                            @if (!string.IsNullOrWhiteSpace(evt.Location))
+                            {
+                                <p class="text-muted mb-2">
+                                    <i class="bi bi-geo-alt"></i> @evt.Location
+                                </p>
+                            }
+                            <p class="card-text">@TruncateDescription(evt.Description, 100)</p>
+                            @if (!string.IsNullOrWhiteSpace(evt.Link))
+                            {
+                                <a href="@evt.Link" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    Learn More <i class="bi bi-arrow-up-right"></i>
+                                </a>
+                            }
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <small class="text-muted">
+                                @if (evt.Date <= DateTime.Now.AddDays(7))
+                                {
+                                    <span class="badge bg-warning">Coming Soon!</span>
+                                }
+                                else if (evt.Date <= DateTime.Now.AddDays(30))
+                                {
+                                    <span class="badge bg-info">This Month</span>
+                                }
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Past Events -->
+    @if (pastEvents.Any())
+    {
+        <h2 class="h4 mb-3">
+            <i class="bi bi-calendar-check text-muted"></i> 
+            Past @eventType.Name (@pastEvents.Count)
+        </h2>
+        <div class="accordion mb-4" id="pastEventsAccordion">
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pastEventsList">
+                        Show Past Events
+                    </button>
+                </h3>
+                <div id="pastEventsList" class="accordion-collapse collapse" data-bs-parent="#pastEventsAccordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                            @foreach (var evt in pastEvents.Take(12)) // Limit to most recent 12
+                            {
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card h-100 text-muted">
+                                        <div class="card-body">
+                                            <h6 class="card-title">@evt.Title</h6>
+                                            <p class="small mb-1">
+                                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMM d, yyyy")
+                                            </p>
+                                            @if (!string.IsNullOrWhiteSpace(evt.Location))
+                                            {
+                                                <p class="small mb-2">
+                                                    <i class="bi bi-geo-alt"></i> @evt.Location
+                                                </p>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+    
+    private List<EventDto>? events;
+    private EventTypeDto? eventType;
+    private string pageTitle = "Events";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategoryEvents();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(Slug))
+        {
+            await LoadCategoryEvents();
+        }
+    }
+
+    private async Task LoadCategoryEvents()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/events/by-category/{Slug}");
+            if (response.IsSuccessStatusCode)
+            {
+                events = await response.Content.ReadFromJsonAsync<List<EventDto>>();
+                eventType = events?.FirstOrDefault()?.EventType;
+                pageTitle = eventType?.Name ?? "Events";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                NavigationManager.NavigateTo("/404");
+            }
+        }
+        catch (Exception)
+        {
+            events = new List<EventDto>();
+        }
+    }
+
+    private string TruncateDescription(string description, int maxLength)
+    {
+        if (string.IsNullOrEmpty(description) || description.Length <= maxLength)
+            return description;
+        
+        return description.Substring(0, maxLength - 3) + "...";
+    }
+
+    private string GetBorderColor(string colorClass)
+    {
+        return colorClass switch
+        {
+            "text-primary" => "var(--bs-primary)",
+            "text-success" => "var(--bs-success)",
+            "text-danger" => "var(--bs-danger)",
+            "text-warning" => "var(--bs-warning)",
+            "text-info" => "var(--bs-info)",
+            "text-secondary" => "var(--bs-secondary)",
+            _ => "var(--bs-secondary)"
+        };
+    }
+
+    public class EventDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public string Link { get; set; } = string.Empty;
+        public EventTypeDto? EventType { get; set; }
+        public SchoolYearDto? SchoolYear { get; set; }
+    }
+
+    public class EventTypeDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsMandatory { get; set; }
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public int Size { get; set; }
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
+    }
+
+    public class SchoolYearDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+    }
+}

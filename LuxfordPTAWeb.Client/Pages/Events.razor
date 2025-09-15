@@ -1,7 +1,6 @@
 ﻿@page "/events"
 @inject HttpClient Http
 
-
 <PageTitle>Events</PageTitle>
 
 <div class="card shadow-sm mb-4">
@@ -20,40 +19,44 @@
 
 <h2 class="h4 mt-4">Event Categories</h2>
 <p>Browse our events by category:</p>
-<div class="row mb-4">
-    <div class="col-md-6 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">🎯 <a href="fundraising-events">Fundraising Events</a></h5>
-                <p class="card-text">Events focused on raising funds to support school programs, equipment, and activities.</p>
-            </div>
-        </div>
+
+@if (eventTypes == null)
+{
+    <div class="alert alert-info">
+        <em>Loading event categories...</em>
     </div>
-    <div class="col-md-6 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">👨‍👩‍👧‍👦 <a href="community-events">Student/Family/Community Support</a></h5>
-                <p class="card-text">Events designed to build community, support families, and create fun experiences for students.</p>
+}
+else
+{
+    <div class="row mb-4">
+        @foreach (var eventType in eventTypes.Where(et => et.IsActive).OrderBy(et => et.DisplayOrder))
+        {
+            var colClass = eventType.Size == 1 ? "col-12 mb-3" : "col-md-6 mb-3";
+            <div class="@colClass">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title @eventType.ColorClass">
+                            @if (!string.IsNullOrEmpty(eventType.Icon))
+                            {
+                                <i class="@eventType.Icon"></i>
+                            }
+                            <a href="events/category/@eventType.Slug" class="text-decoration-none">@eventType.Name</a>
+                        </h5>
+                        <p class="card-text">@eventType.Description</p>
+                        <div class="mt-auto">
+                            <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info") me-2">
+                                @GetEventCount(eventType.Id) events
+                            </span>
+                            <a href="events/category/@eventType.Slug" class="btn btn-sm btn-outline-primary">
+                                View Events <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        }
     </div>
-    <div class="col-md-6 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">🏫 <a href="school-support-events">School/Teacher/Staff Support</a></h5>
-                <p class="card-text">Events focused on supporting our educators, staff, and school operations.</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title">📅 <a href="school-closed-days">School Closed & Special Days</a></h5>
-                <p class="card-text">All holidays, staff days, and special schedule days for the school year.</p>
-            </div>
-        </div>
-    </div>
-</div>
+}
 
 <h2 class="h4 mt-4">📅 Upcoming Events</h2>
 @if (upcomingEvents == null)
@@ -192,16 +195,35 @@ else
 
 @code {
     private List<EventDto>? upcomingEvents;
+    private List<EventTypeDto>? eventTypes;
+    private List<EventDto>? allEvents;
     string testtext = string.Empty;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadEventTypes();
+        await LoadUpcomingEvents();
+        await LoadAllEvents();
+    }
+
+    private async Task LoadEventTypes()
+    {
+        try
+        {
+            eventTypes = await Http.GetFromJsonAsync<List<EventTypeDto>>("api/eventtypes");
+        }
+        catch (Exception)
+        {
+            eventTypes = new List<EventTypeDto>();
+        }
+    }
+
+    private async Task LoadUpcomingEvents()
     {
         try
         {
             testtext = "Calling API...";
             var response = await Http.GetAsync("api/events/upcoming");
-            
-            testtext = $"API Response Status: {response.StatusCode}";
             
             if (response.IsSuccessStatusCode)
             {
@@ -216,18 +238,59 @@ else
         }
         catch (Exception ex)
         {
-            testtext = "Exception occurred.";
-            testtext += "<hr>Type: " + ex.GetType().Name;
-            testtext += "<hr>Message: " + ex.Message;
-            testtext += "<hr>Stack Trace: " + ex.StackTrace;
+            testtext = "Exception occurred: " + ex.Message;
         }
+    }
+
+    private async Task LoadAllEvents()
+    {
+        try
+        {
+            allEvents = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+        }
+        catch (Exception)
+        {
+            allEvents = new List<EventDto>();
+        }
+    }
+
+    private int GetEventCount(int eventTypeId)
+    {
+        return allEvents?.Count(e => e.EventType?.Id == eventTypeId) ?? 0;
     }
 
     public class EventDto
     {
+        public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public string Description { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public string Link { get; set; } = string.Empty;
+        public EventTypeDto? EventType { get; set; }
+        public SchoolYearDto? SchoolYear { get; set; }
+    }
+
+    public class EventTypeDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty; // Add this line
+        public string Description { get; set; } = string.Empty;
+        public bool IsMandatory { get; set; }
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public int Size { get; set; }
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
+    }
+
+    public class SchoolYearDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
     }
 }
