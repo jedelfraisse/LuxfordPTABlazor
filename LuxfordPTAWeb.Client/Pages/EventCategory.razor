@@ -50,7 +50,7 @@ else
             <h1 class="card-title @eventType.ColorClass">@eventType.Name</h1>
             <p class="lead">@eventType.Description</p>
             <div>
-                <span class="badge @(eventType.IsMandatory ? "bg-danger" : "bg-info") me-2">
+                <span class="badge bg-info me-2">
                     @events.Count @(events.Count == 1 ? "Event" : "Events")
                 </span>
                 <a href="/events" class="btn btn-outline-secondary btn-sm">
@@ -236,7 +236,6 @@ else
         public string Name { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public bool IsMandatory { get; set; }
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; }
         public int Size { get; set; }
@@ -251,4 +250,4 @@ else
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
     }
-}
+}}

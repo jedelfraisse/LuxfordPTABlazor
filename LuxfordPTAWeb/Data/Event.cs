@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using LuxfordPTAWeb.Data.Enums;
 
 namespace LuxfordPTAWeb.Data
 {
@@ -13,6 +14,39 @@ namespace LuxfordPTAWeb.Data
 		public string ImageUrl { get; set; } = string.Empty;
 		public string Link { get; set; } = string.Empty;
 
+		// Enhanced fields from Phase 1.1
+		
+		// Event Coordinator
+		public string? EventCoordinatorId { get; set; }
+		public ApplicationUser? EventCoordinator { get; set; }
+		
+		// Event Status
+		public EventStatus Status { get; set; } = EventStatus.Planning;
+		
+		// Timing fields
+		public DateTime? SetupStartTime { get; set; }
+		public DateTime EventStartTime { get; set; }
+		public DateTime EventEndTime { get; set; }
+		public DateTime? CleanupEndTime { get; set; }
+		
+		// Capacity fields
+		public int? MaxAttendees { get; set; }
+		public int? EstimatedAttendees { get; set; }
+		
+		// Volunteer flags
+		public bool RequiresVolunteers { get; set; } = false;
+		public bool RequiresSetup { get; set; } = false;
+		public bool RequiresCleanup { get; set; } = false;
+		
+		// Additional information fields
+		public string Notes { get; set; } = string.Empty; // Internal notes for coordinators/admins
+		public string PublicInstructions { get; set; } = string.Empty; // Public-facing instructions
+		public string WeatherBackupPlan { get; set; } = string.Empty;
+		
+		// Excel import tracking (for volunteer coordination)
+		public string? ExcelImportId { get; set; } // Links to volunteer signups from Excel imports
+
+		// Existing relationships
 		public int SchoolYearId { get; set; }
 		public SchoolYear SchoolYear { get; set; } = default!;
 
@@ -22,5 +56,19 @@ namespace LuxfordPTAWeb.Data
 		public int EventTypeId { get; set; }
 		public EventType EventType { get; set; } = default!;
 
+		// Computed properties for convenience
+		public bool IsActive => Status == EventStatus.Active;
+		public bool IsCompleted => Status == EventStatus.Completed;
+		public bool IsCancelled => Status == EventStatus.Cancelled;
+		public bool IsInProgress => Status == EventStatus.InProgress;
+		
+		// Duration helpers
+		public TimeSpan? EventDuration => EventEndTime != default && EventStartTime != default 
+			? EventEndTime - EventStartTime 
+			: null;
+			
+		public TimeSpan? TotalEventDuration => CleanupEndTime.HasValue && SetupStartTime.HasValue 
+			? CleanupEndTime.Value - SetupStartTime.Value 
+			: null;
 	}
 }

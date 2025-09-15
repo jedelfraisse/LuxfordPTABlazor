@@ -9,22 +9,24 @@ Building a comprehensive event management system for the Luxford PTA that handle
 **Status: 🟡 In Progress**
 
 #### 1.1 Enhanced Event Model & Database
-- [ ] **Event Model Enhancement**
-  - [ ] Add EventCoordinatorId (FK to ApplicationUser)
-  - [ ] Add EventStatus enum (Planning, Active, InProgress, Completed, Cancelled)
-  - [ ] Add timing fields (SetupStartTime, EventStartTime, EventEndTime, CleanupEndTime)
-  - [ ] Add capacity fields (MaxAttendees, EstimatedAttendees)
-  - [ ] Add volunteer flags (RequiresVolunteers, RequiresSetup, RequiresCleanup)
-  - [ ] Add Notes (internal) and PublicInstructions fields
-  - [ ] Add WeatherBackupPlan field
-  - [ ] Add ExcelImportId for volunteer tracking
+- [x] **Event Model Enhancement**
+  - [x] Add EventCoordinatorId (FK to ApplicationUser)
+  - [ ] **UPDATED** EventStatus enum (Planning, SubmittedForApproval, Active, InProgress, WrapUp, Completed, Cancelled)
+  - [x] Add timing fields (SetupStartTime, EventStartTime, EventEndTime, CleanupEndTime)
+  - [x] Add capacity fields (MaxAttendees, EstimatedAttendees)
+  - [x] Add volunteer flags (RequiresVolunteers, RequiresSetup, RequiresCleanup)
+  - [x] Add Notes (internal) and PublicInstructions fields
+  - [x] Add WeatherBackupPlan field
+  - [x] Add ExcelImportId for volunteer tracking
+  - [ ] **NEW** Add approval tracking fields (ApprovedBy, ApprovedDate, ApprovalNotes)
 
 #### 1.2 Basic Event CRUD Operations
 - [ ] **EventsController Updates**
-  - [ ] POST /api/events (Create)
+  - [ ] POST /api/events (Create) - Auto-submit for approval
   - [ ] PUT /api/events/{id} (Update)  
   - [ ] GET /api/events/{id} (Single event details)
   - [ ] Event ownership validation (coordinators can only edit their events)
+  - [ ] **NEW** Approval workflow endpoints (approve, reject, request changes)
 
 #### 1.3 Basic Create/Edit Forms
 - [ ] **EventsCreate.razor**
@@ -32,10 +34,12 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Event type and school year selection
   - [ ] Coordinator assignment (Admin only)
   - [ ] Timing configuration
-  - [ ] Status management
+  - [ ] **NEW** Copy from previous event functionality
+  - [ ] **NEW** Auto-submit for approval after creation
 - [ ] **EventsEdit.razor**  
   - [ ] Same as create with pre-populated data
   - [ ] Access control (coordinators vs admins)
+  - [ ] **NEW** Approval status display and actions
   - [ ] Edit history/audit trail
 
 #### 1.4 File Storage Setup
@@ -45,71 +49,165 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Document upload for forms/flyers
   - [ ] File management API endpoints
 
+#### 1.5 Event Template/Instance System (NEW)
+- [ ] **Event Copy & Template Relationships**
+  - [ ] Add `Slug` property to Event model for URL generation
+  - [ ] Add `SourceEventId` (FK to source event) to Event model
+  - [ ] Add `CopyGeneration` int to Event model
+  - [ ] Helper methods for copy relationships
+
+- [ ] **Copy Functionality**
+  - [ ] "Copy from Previous Event" in EventsCreate.razor
+  - [ ] "Copy Event" button in EventsAdmin.razor
+  - [ ] API endpoint: `POST /api/events/{id}/copy`
+  - [ ] API endpoint: `GET /api/events/available-for-copy`
+  - [ ] Preserve relationships between original and copies
+
+- [ ] **Smart Event Resolution**
+  - [ ] `GET /api/events/by-slug/{slug}` - Smart event instance resolution
+  - [ ] Priority logic: Active/InProgress → Most Recent Completed → Planning
+  - [ ] Include all related instances in response
+  - [ ] Query parameters: `?instance=2024`, `?showAll=true`
+
+- [ ] **EventDetail.razor (NEW)**
+  - [ ] Individual event page: `/events/{slug}`
+  - [ ] Show primary event with full details
+  - [ ] List other instances/copies with key metrics
+  - [ ] Template information and "based on" relationships
+
+#### 1.6 School Year Navigation System (NEW)
+- [ ] **Dynamic School Year Selector**
+  - [ ] Replace static calendar download with year navigation
+  - [ ] API endpoint: `GET /api/events/school-years`
+  - [ ] API endpoint: `GET /api/events/by-school-year/{year}`
+  - [ ] Previous/Current/Next year navigation buttons
+
+- [ ] **Enhanced Events.razor**
+  - [ ] School year selector in header
+  - [ ] Dynamic calendar download links
+  - [ ] Filter all events by selected school year
+  - [ ] Planning year visibility (draft/pending events)
+
+#### 1.7 Approval Workflow System (NEW)
+- [ ] **Enhanced EventStatus Enum**
+  - [ ] Planning (0) - Initial creation state
+  - [ ] SubmittedForApproval (1) - Submitted to board/principal
+  - [ ] Active (2) - Approved and public
+  - [ ] InProgress (3) - Event currently happening
+  - [ ] WrapUp (4) - Event finished, collecting feedback/metrics
+  - [ ] Completed (5) - Event fully closed out
+  - [ ] Cancelled (6) - Event cancelled or not approved
+
+- [ ] **Approval Workflow API**
+  - [ ] `POST /api/events/{id}/submit-for-approval`
+  - [ ] `POST /api/events/{id}/approve` (Admin/BoardMember only)
+  - [ ] `POST /api/events/{id}/reject` (Admin/BoardMember only)
+  - [ ] `POST /api/events/{id}/request-changes` (Admin/BoardMember only)
+  - [ ] `GET /api/events/pending-approval` (Admin/BoardMember only)
+
+- [ ] **Approval UI Components**
+  - [ ] Approval status badges and indicators
+  - [ ] Board member approval dashboard
+  - [ ] Event coordinator notification system
+  - [ ] Approval history tracking
+
 ### 🎨 **Phase 2: Event Planning Components** ⏱️ *Week 3-4*
 **Status: ⏳ Planned**
 
 #### 2.1 Station Management System
 - [ ] **EventStation Model**
-```
-  - Id, EventId, Name, Description, Location
-  - RequiredVolunteers, SetupInstructions
-  - DisplayOrder, IsActive
-```
+  - [ ] StationId (PK)
+  - [ ] EventId (FK to Event)
+  - [ ] StationType (enum: Game, Food, Activity, etc.)
+  - [ ] Coordinates/Location on map
+  - [ ] Capacity/Size
+  - [ ] RequiredResources (FK to Resource)
+  - [ ] SetupInstructions, CleanupInstructions
+  - [ ] SignupGeniusLink, GivebacksLink
+
 - [ ] **Station CRUD Operations**
   - [ ] Add/Edit/Delete stations within events
   - [ ] Drag-and-drop reordering
   - [ ] Station templates (Ring Toss, Duck Pond, Food, etc.)
+  - [ ] Copy stations from source events
 
 #### 2.2 Schedule/Timeline Builder  
 - [ ] **EventScheduleItem Model**
-```
-  - Id, EventId, StartTime, EndTime, Title
-  - Description, ResponsibleVolunteer, Location
-```
-- [ ] **Schedule Management UI**
-  - [ ] Visual timeline builder
-  - [ ] Conflict detection
-  - [ ] Schedule templates
+  - [ ] ScheduleItemId (PK)
+  - [ ] EventId (FK to Event)
+  - [ ] StationId (FK to EventStation)
+  - [ ] TimeSlot (enum: Setup, EventStart, Cleanup)
+  - [ ] Duration
+  - [ ] AssignedTo (FK to ApplicationUser)
+  - [ ] Notes
+
+- [ ] **Schedule CRUD Operations**
+  - [ ] Add/Edit/Delete schedule items
+  - [ ] Drag-and-drop reordering
+  - [ ] Auto-generate schedule from event template
+  - [ ] Assign volunteers to schedule items
+  - [ ] **NEW** Schedule Management UI
+    - [ ] Visual timeline builder
+    - [ ] Conflict detection
+    - [ ] Schedule templates
+    - [ ] Copy schedule from source events
 
 #### 2.3 Rules & Guidelines System
 - [ ] **EventRule Model**
-```
-  - Id, EventId, RuleType, Title, Description
-  - IsRequired, DisplayOrder
-```
+  - [ ] RuleId (PK)
+  - [ ] EventId (FK to Event)
+  - [ ] Description
+  - [ ] AppliesTo (enum: Volunteers, Attendees, Both)
+  - [ ] IsActive
+  - [ ] CreatedDate
+  - [ ] UpdatedDate
+  - [ ] RuleTemplates (FK to global rule templates)
+  - [ ] SequenceOrder
+
 - [ ] **Rule Management UI**
   - [ ] Safety requirements
   - [ ] Age restrictions  
   - [ ] Weather policies
   - [ ] Rule templates
+  - [ ] Copy rules from source events
 
 ### 🤝 **Phase 3: Volunteer & Integration Systems** ⏱️ *Week 5-6*
 **Status: ⏳ Planned**
 
 #### 3.1 Excel Import System (SignUpGenius Alternative)
 - [ ] **Excel Import Models**
-```
-  - SignUpImport (Id, EventId, ImportDate, FileName)
-  - VolunteerSignUp (Id, ImportId, Name, Email, PhoneNumber, Role, TimeSlot)
-```
 - [ ] **Import Functionality**
   - [ ] Excel file upload and parsing
   - [ ] Data validation and cleanup
   - [ ] Volunteer status tracking
   - [ ] Duplicate detection
+  - [ ] Compare with previous event volunteers
 
 #### 3.2 Volunteer Role Management
 - [ ] **EventVolunteerRole Model**
-```
-  - Id, EventId, RoleName, Description
-  - RequiredCount, SignedUpCount, StationId
-```
+  - [ ] RoleId (PK)
+  - [ ] EventId (FK to Event)
+  - [ ] RoleName
+  - [ ] Description
+  - [ ] Capacity
+  - [ ] SignUpGeniusTemplateLink
+  - [ ] GivebacksGoal
+  - [ ] CustomFields (JSON)
+
+- [ ] **Role Management UI**
+  - [ ] Create/edit roles within events
+  - [ ] Assign volunteers to roles
+  - [ ] Role-specific requirements and permissions
+  - [ ] Integration with SignUpGenius and Givebacks
+
+#### 3.3 Volunteer Management Interface
 - [ ] **Volunteer Dashboard**
   - [ ] Role requirements vs. signups
   - [ ] Volunteer contact information
   - [ ] Check-in functionality
+  - [ ] Volunteer retention tracking (across copies)
 
-#### 3.3 Givebacks Integration Prep
+#### 3.4 Givebacks Integration Prep
 - [ ] **Membership Import System**
   - [ ] Excel import for Givebacks membership data
   - [ ] Member account creation (email-based)
@@ -119,59 +217,73 @@ Building a comprehensive event management system for the Luxford PTA that handle
 ### 📧 **Phase 4: Communication & Templates** ⏱️ *Week 7-8*
 **Status: ⏳ Planned**
 
-#### 4.1 Event Templates
-- [ ] **EventTemplate Model**
-```
-  - Id, Name, Description, EventTypeId
-  - DefaultStations, DefaultSchedule, DefaultRules
-```
-- [ ] **Template System**
-  - [ ] Fall Festival template
-  - [ ] Book Fair template  
-  - [ ] Talent Show template
-  - [ ] Custom template creation
+#### 4.1 Event Analytics & Comparison (ENHANCED)
+- [ ] **Copy Performance Analytics**
+  - [ ] Compare metrics across event instances
+  - [ ] Volunteer retention rates between copies
+  - [ ] Fundraising performance tracking
+  - [ ] Success factor analysis
+
+- [ ] **Template Effectiveness**
+  - [ ] Track which events are copied most frequently
+  - [ ] Success metrics for template-based events
+  - [ ] Template optimization recommendations
 
 #### 4.2 Google Cloud Integration Prep
 - [ ] **Email System Foundation**
   - [ ] Email service interface
   - [ ] Template-based email generation
   - [ ] Coordinator notification system
+  - [ ] Approval workflow notifications
   - [ ] Volunteer communication tools
 
-#### 4.3 Document Management
-- [ ] **EventDocument Model**
-```
-  - Id, EventId, FileName, FilePath
-  - DocumentType, IsPublic, UploadDate
-```
-- [ ] **Document Features**
+- [ ] **Document Management**
+  - [ ] **EventDocument Model (ENHANCED)**
+  - [ ] DocumentId (PK)
+  - [ ] EventId (FK to Event)
+  - [ ] DocumentType (enum: Flyer, Form, Report, etc.)
+  - [ ] FilePath
+  - [ ] UploadedBy (FK to ApplicationUser)
+  - [ ] UploadDate
+  - [ ] AccessLevel (enum: Public, Private, Restricted)
+  - [ ] RelatedTo (FK to Event, if applicable)
+  - [ ] TemplateId (FK to DocumentTemplate, if applicable)
+  - [ ] Status (enum: Active, Archived)
+
+- [ ] **Document Management UI**
+  - [ ] Upload, edit, delete documents
+  - [ ] Document categorization and tagging
+  - [ ] Search and filter documents
+  - [ ] Integration with event forms and reports
+  - [ ] **Document Features**
   - [ ] Public vs. internal document separation
   - [ ] Google Cloud storage preparation
   - [ ] Document version control
+  - [ ] Copy documents from source events
 
 ### 🗺️ **Phase 5: Advanced Features** ⏱️ *Week 9-10*
 **Status: ⏳ Future**
 
-#### 5.1 Event Mapping System
-- [ ] **Event Map Integration**
-  - [ ] Station location mapping
-  - [ ] Interactive venue maps
-  - [ ] Accessibility information
-  - [ ] QR codes for station information
+#### 5.1 Advanced Approval Workflow
+- [ ] **Multi-Level Approvals**
+  - [ ] Principal approval for school events
+  - [ ] Board approval for PTA events
+  - [ ] Budget approval thresholds
+  - [ ] Conditional approvals with requirements
 
-#### 5.2 Approval Workflow
-- [ ] **Event Approval System**
-  - [ ] Draft → Review → Approved → Published workflow
-  - [ ] Admin approval requirements
-  - [ ] Change request system
-  - [ ] Approval history tracking
+#### 5.2 Event Analytics Dashboard
+- [ ] **Performance Tracking**
+  - [ ] Event success scoring system
+  - [ ] Volunteer satisfaction metrics
+  - [ ] Fundraising goal tracking
+  - [ ] Attendance vs. projections
 
-#### 5.3 Reporting & Analytics  
-- [ ] **Event Analytics**
-  - [ ] Volunteer participation reports
-  - [ ] Event attendance tracking
-  - [ ] Success metrics dashboard
-  - [ ] Year-over-year comparisons
+#### 5.3 Automated Workflows
+- [ ] **Smart Reminders**
+  - [ ] Approval deadline notifications
+  - [ ] Volunteer recruitment reminders
+  - [ ] Event preparation checklists
+  - [ ] Post-event feedback collection
 
 ### 🔮 **Phase 6: Future Integrations** ⏱️ *Future*
 **Status: 📋 Backlog**
@@ -191,294 +303,79 @@ Building a comprehensive event management system for the Luxford PTA that handle
 #### 6.2 Mobile & Advanced Features
 - [ ] **Mobile App Considerations**
   - [ ] Progressive Web App (PWA) features
-  - [ ] Mobile check-in system
-  - [ ] Push notifications
+  - [ ] Mobile approval workflow
+  - [ ] Push notifications for approvals
 - [ ] **Advanced Analytics**
-  - [ ] Volunteer retention tracking
-  - [ ] Event ROI analysis
-  - [ ] Predictive planning tools
+  - [ ] Predictive event success modeling
+  - [ ] Volunteer retention prediction
+  - [ ] Optimal scheduling recommendations
 
-## 📁 File Structure Plan
+## 📁 File Structure Plan (UPDATED)
 
-```
-LuxfordPTAWeb/
-├── Data/
-│   ├── Models/
-│   │   ├── Event.cs ✅ (Enhanced)
-│   │   ├── EventStation.cs
-│   │   ├── EventScheduleItem.cs
-│   │   ├── EventRule.cs
-│   │   ├── EventVolunteerRole.cs
-│   │   ├── EventTemplate.cs
-│   │   ├── EventDocument.cs
-│   │   ├── SignUpImport.cs
-│   │   ├── VolunteerSignUp.cs
-│   │   └── Enums/
-│   │       ├── EventStatus.cs
-│   │       ├── DocumentType.cs
-│   │       └── RuleType.cs
-│   └── ApplicationDbContext.cs ✅ (Updated)
-├── Controllers/
-│   ├── EventsController.cs ✅ (Enhanced)
-│   ├── EventStationsController.cs
-│   ├── EventScheduleController.cs
-│   ├── EventVolunteersController.cs
-│   ├── EventDocumentsController.cs
-│   └── FileUploadController.cs
-├── Services/
-│   ├── Interfaces/
-│   │   ├── IExcelImportService.cs
-│   │   ├── IEmailService.cs
-│   │   └── IFileStorageService.cs
-│   ├── ExcelImportService.cs
-│   ├── EmailService.cs (Implementation placeholder)
-│   └── FileStorageService.cs
-└── wwwroot/
-    └── events/ (File storage)
-        ├── {eventId}/
-        │   ├── images/
-        │   ├── documents/
-        │   └── flyers/
-
-LuxfordPTAWeb.Client/
-├── AdminPages/
-│   ├── EventsAdmin.razor ✅
-│   ├── EventsCreate.razor 📝 (In Progress)
-│   ├── EventsEdit.razor 📝 (In Progress)  
-│   ├── EventStations.razor
-│   ├── EventSchedule.razor
-│   ├── EventVolunteers.razor
-│   ├── EventDocuments.razor
-│   └── EventTemplates.razor
-├── Components/
-│   ├── Events/
-│   │   ├── EventStationManager.razor
-│   │   ├── ScheduleBuilder.razor
-│   │   ├── VolunteerRoleManager.razor
-│   │   ├── RuleManager.razor
-│   │   └── FileUploader.razor
-│   └── Shared/
-│       ├── TimeRangePicker.razor
-│       └── StatusBadge.razor
-├── Services/
-│   ├── EventService.cs
-│   ├── FileUploadService.cs
-│   └── ExcelImportService.cs
-└── Models/
-    └── DTOs/
-        ├── EventDto.cs
-        ├── EventStationDto.cs
-        ├── EventScheduleDto.cs
-        └── VolunteerRoleDto.cs
-```
-
-## 🎯 Current Sprint Focus
+## 🎯 Current Sprint Focus (UPDATED)
 
 ### **Sprint 1** (This Week)
 1. ✅ Enhanced Event Model + Migration
-2. 🔄 Basic EventsCreate.razor form
-3. 🔄 Basic EventsEdit.razor form  
-4. 🔄 Updated EventsController CRUD operations
+2. 🔄 **NEW** Updated EventStatus enum with approval workflow
+3. 🔄 **NEW** Basic copy functionality in EventsCreate.razor
+4. 🔄 Updated EventsController with approval endpoints
 
 ### **Next Sprint** (Week 2)
+1. 📝 **NEW** Approval workflow UI (EventApprovals.razor)
+2. 📝 **NEW** School year navigation system
+3. 📝 **NEW** Event copy system (API + UI)
+4. 📝 Individual event detail pages
+
+### **Sprint 3** (Week 3)
 1. 📝 File upload system
-2. 📝 Station management MVP
-3. 📝 Event coordinator assignment
-4. 📝 Basic schedule builder
+2. 📝 Station management MVP (with copy support)
+3. 📝 Enhanced approval notifications
+4. 📝 Event analytics dashboard
 
-## 📊 Progress Tracking
+## 📊 Progress Tracking (UPDATED)
 
-- **Phase 1**: 🟡 25% Complete
+- **Phase 1**: 🟡 35% Complete (Enhanced with new features)
 - **Phase 2**: ⏳ Not Started
 - **Phase 3**: ⏳ Not Started  
 - **Phase 4**: ⏳ Not Started
 - **Phase 5**: ⏳ Not Started
 - **Phase 6**: 📋 Future
 
-## 🔧 Technical Specifications
+## 🔧 Technical Specifications (UPDATED)
 
 ### Database Schema Changes
-```sql
--- New tables to be created in migrations
-CREATE TABLE EventStations (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    EventId int NOT NULL FOREIGN KEY REFERENCES Events(Id),
-    Name nvarchar(100) NOT NULL,
-    Description nvarchar(500),
-    Location nvarchar(100),
-    RequiredVolunteers int DEFAULT 0,
-    SetupInstructions nvarchar(1000),
-    DisplayOrder int DEFAULT 0,
-    IsActive bit DEFAULT 1
-);
 
-CREATE TABLE EventScheduleItems (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    EventId int NOT NULL FOREIGN KEY REFERENCES Events(Id),
-    StartTime datetime2 NOT NULL,
-    EndTime datetime2 NOT NULL,
-    Title nvarchar(200) NOT NULL,
-    Description nvarchar(500),
-    ResponsibleVolunteer nvarchar(100),
-    Location nvarchar(100)
-);
+### Security & Permissions (UPDATED)
+- **Event Coordinators**: Can create/edit assigned events, view approval status
+- **Board Members**: Can approve PTA events, view all pending approvals
+- **Admins**: Can approve all events, manage approval workflow
+- **Principal**: Can approve school-related events (future enhancement)
+- **Public**: Can only view Active, InProgress, WrapUp, and Completed events
 
-CREATE TABLE EventRules (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    EventId int NOT NULL FOREIGN KEY REFERENCES Events(Id),
-    RuleType nvarchar(50) NOT NULL, -- Safety, Age, Weather, General
-    Title nvarchar(200) NOT NULL,
-    Description nvarchar(1000) NOT NULL,
-    IsRequired bit DEFAULT 0,
-    DisplayOrder int DEFAULT 0
-);
+## 🤔 Updated Open Questions & Decisions
 
-CREATE TABLE EventVolunteerRoles (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    EventId int NOT NULL FOREIGN KEY REFERENCES Events(Id),
-    RoleName nvarchar(100) NOT NULL,
-    Description nvarchar(500),
-    RequiredCount int DEFAULT 1,
-    SignedUpCount int DEFAULT 0,
-    StationId int FOREIGN KEY REFERENCES EventStations(Id)
-);
+1. **Approval Authority**: Should Principal approval be required for school events vs. PTA events?
+2. **Auto-Approval**: Should certain event types or coordinators have auto-approval privileges?
+3. **Approval Deadlines**: How far in advance must events be submitted for approval?
+4. **Copy Permissions**: Who can copy events? Original coordinators vs. anyone?
+5. **School Year Transitions**: When should the system switch to showing the next school year?
+6. **Notification Preferences**: Email vs. in-app notifications for approval workflow?
+7. **Bulk Approvals**: Should board members be able to approve multiple events at once?
 
-CREATE TABLE SignUpImports (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    EventId int NOT NULL FOREIGN KEY REFERENCES Events(Id),
-    ImportDate datetime2 DEFAULT GETDATE(),
-    FileName nvarchar(255) NOT NULL,
-    RecordCount int DEFAULT 0
-);
+## 📝 Updated Implementation Notes
 
-CREATE TABLE VolunteerSignUps (
-    Id int IDENTITY(1,1) PRIMARY KEY,
-    ImportId int NOT NULL FOREIGN KEY REFERENCES SignUpImports(Id),
-    Name nvarchar(100) NOT NULL,
-    Email nvarchar(255),
-    PhoneNumber nvarchar(20),
-    Role nvarchar(100),
-    TimeSlot nvarchar(100),
-    IsCheckedIn bit DEFAULT 0,
-    CheckInTime datetime2
-);
-```
+- **Approval-First Design**: All new events automatically submit for approval upon creation
+- **Copy-Friendly Architecture**: Every component supports copying data from source events
+- **School Year Context**: All views can be filtered by school year for better organization
+- **Progressive Enhancement**: Start with basic approval workflow, add complexity later
+- **Audit Trail**: Complete history of all approval actions for transparency
+- **Performance Focus**: Track success metrics to improve future event planning
 
-### API Endpoints Plan
-```
-Events API:
-POST   /api/events                      - Create event
-PUT    /api/events/{id}                 - Update event
-GET    /api/events/{id}                 - Get single event with full details
-DELETE /api/events/{id}                 - Delete event
-GET    /api/events/{id}/coordinator     - Get coordinator info
-
-Stations API:
-GET    /api/events/{id}/stations        - Get all stations for event
-POST   /api/events/{id}/stations        - Add station
-PUT    /api/events/{id}/stations/{id}   - Update station
-DELETE /api/events/{id}/stations/{id}   - Delete station
-POST   /api/events/{id}/stations/reorder - Reorder stations
-
-Schedule API:
-GET    /api/events/{id}/schedule        - Get event schedule
-POST   /api/events/{id}/schedule        - Add schedule item
-PUT    /api/events/{id}/schedule/{id}   - Update schedule item
-DELETE /api/events/{id}/schedule/{id}   - Delete schedule item
-
-Volunteers API:
-GET    /api/events/{id}/volunteers      - Get volunteer info
-POST   /api/events/{id}/import-excel    - Import volunteer data
-GET    /api/events/{id}/roles           - Get volunteer roles
-POST   /api/events/{id}/roles           - Add volunteer role
-POST   /api/events/{id}/checkin/{volunteerId} - Check in volunteer
-
-File Upload API:
-POST   /api/events/{id}/upload          - Upload file
-GET    /api/events/{id}/files           - Get event files
-DELETE /api/events/{id}/files/{fileId}  - Delete file
-```
-
-### Security & Permissions
-- **Event Coordinators**: Can only edit assigned events
-- **Board Members**: Can edit any event + assign coordinators
-- **Admins**: Full access to all features
-- **Public**: Read-only access to published events
-
-## 🤔 Open Questions & Decisions
-
-1. **Volunteer Membership Requirement**: Confirm with PTA if volunteers must be members
-2. **Google Cloud Timeline**: When will Google Cloud credentials be available?
-3. **Event Approval Workflow**: Which events require approval? All or just public ones?
-4. **File Size Limits**: What are the limits for uploaded documents/images?
-5. **Event Archive Policy**: How long should completed events be retained?
-6. **Template Sharing**: Should event templates be shared across school years?
-7. **Volunteer Check-in**: Do we need QR code or manual check-in system?
-
-## 📝 Notes
-
-- Focus on local storage and Excel imports until external APIs are available
-- Build interfaces now, implement integrations later
-- Prioritize coordinator workflow over admin features initially
-- Keep public event display simple and clean
-- Consider mobile-first design for volunteer check-in features
-- Plan for offline functionality during events
-
-## 🚀 Getting Started Checklist
-
-### Phase 1 Prerequisites
-- [ ] Enhanced Event model completed
-- [ ] Database migration created and applied
-- [ ] Basic EventsController CRUD operations
-- [ ] Authentication/authorization working
-- [ ] File upload directory structure created
-
-### Development Environment Setup
-- [ ] .NET 9 SDK installed
-- [ ] SQL Server/LocalDB configured
-- [ ] Visual Studio 2022 with Blazor templates
-- [ ] Git repository configured
-- [ ] Development database seeded with test data
-
-## 🎪 Sample Event Structure Example
-```
-Fall Festival 2025
-├── Basic Info
-│   ├── Date: October 25, 2025
-│   ├── Time: 10:00 AM - 2:00 PM
-│   ├── Location: School Campus
-│   └── Coordinator: Ashley Threadgill
-├── Schedule
-│   ├── 8:00 AM - Setup begins
-│   ├── 10:00 AM - Event opens to public  
-│   ├── 2:00 PM - Event ends
-│   └── 4:00 PM - Cleanup complete
-├── Stations (8 total)
-│   ├── Game Station 1 (Ring Toss) - 2 volunteers
-│   ├── Game Station 2 (Duck Pond) - 2 volunteers
-│   ├── Food Station (Popcorn & Cotton Candy) - 3 volunteers
-│   ├── Check-in/Ticket Sales - 2 volunteers
-│   └── Information Booth - 1 volunteer
-├── Volunteer Roles (24 total needed)
-│   ├── Event Coordinator (1) ✅
-│   ├── Station Leaders (5) - 3/5 filled
-│   ├── Setup Crew (8) - 2/8 filled
-│   ├── Cleanup Crew (6) - 1/6 filled
-│   └── Floater/Support (4) - 0/4 filled
-├── Rules & Guidelines
-│   ├── Safety Requirements (5 rules)
-│   ├── Age Restrictions (3 rules)
-│   └── Weather Policy (1 rule)
-└── Documents
-    ├── Volunteer Instructions.pdf
-    ├── Setup Diagram.jpg
-    ├── Emergency Contacts.pdf
-    └── Event Flyer.jpg
-```
+## 🎪 Enhanced Sample Event Structure Example
 
 ---
 
-**Last Updated**: December 2024  
-**Current Sprint**: Phase 1 - Foundation & Basic CRUD  
-**Next Review**: After Phase 1 completion  
+**Last Updated**: 09/15/25 
+**Current Sprint**: Phase 1 - Foundation, Copy System & Approval Workflow
+**Next Review**: After approval workflow implementation  
 **Repository**: [LuxfordPTABlazor](https://github.com/jedelfraisse/LuxfordPTABlazor)

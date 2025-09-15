@@ -110,16 +110,7 @@
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-check mb-3">
-                            <InputCheckbox id="isMandatory" @bind-Value="editingEventType.IsMandatory" class="form-check-input" />
-                            <label for="isMandatory" class="form-check-label">
-                                Mandatory Event Type
-                                <small class="text-muted d-block">Mandatory types persist across school years</small>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-check mb-3">
+                        <div class="form-check mb-3 d-flex align-items-center" style="height: 38px;">
                             <InputCheckbox id="isActive" @bind-Value="editingEventType.IsActive" class="form-check-input" />
                             <label for="isActive" class="form-check-label">
                                 Active
@@ -226,16 +217,9 @@ else
                                         </span>
                                     </td>
                                     <td>
-                                        @if (eventType.IsMandatory)
-                                        {
-                                            <span class="badge bg-danger">Required</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
-                                                @(eventType.IsActive ? "Active" : "Inactive")
-                                            </span>
-                                        }
+                                        <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
+                                            @(eventType.IsActive ? "Active" : "Inactive")
+                                        </span>
                                     </td>
                                     <td>
                                         <span class="text-muted">@GetEventCount(eventType.Id)</span>
@@ -247,7 +231,7 @@ else
                                             </button>
                                             <button type="button" class="btn btn-outline-danger" title="Delete" 
                                                     @onclick="() => DeleteEventType(eventType.Id)"
-                                                    disabled="@(eventType.IsMandatory || GetEventCount(eventType.Id) > 0)">
+                                                    disabled="@(GetEventCount(eventType.Id) > 0)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -436,7 +420,6 @@ else
             Id = eventType.Id,
             Name = eventType.Name,
             Description = eventType.Description,
-            IsMandatory = eventType.IsMandatory,
             DisplayOrder = eventType.DisplayOrder,
             IsActive = eventType.IsActive,
             Size = eventType.Size,
@@ -578,7 +561,6 @@ else
         public string Name { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public bool IsMandatory { get; set; }
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; }
         public int Size { get; set; } // 0 = Half, 1 = Full
@@ -605,8 +587,6 @@ else
         
         [System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
         public string Description { get; set; } = string.Empty;
-        
-        public bool IsMandatory { get; set; }
         
         [System.ComponentModel.DataAnnotations.Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
         public int DisplayOrder { get; set; } = 0;
