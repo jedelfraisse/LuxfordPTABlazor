@@ -56,13 +56,11 @@ namespace LuxfordPTAWeb.Data
 		public int EventTypeId { get; set; }
 		public EventType EventType { get; set; } = default!;
 
-		// Computed properties for convenience
-		public bool IsActive => Status == EventStatus.Active;
-		public bool IsCompleted => Status == EventStatus.Completed;
-		public bool IsCancelled => Status == EventStatus.Cancelled;
-		public bool IsInProgress => Status == EventStatus.InProgress;
-		
-		// Duration helpers
+		// New Event Sub-type fields
+		public int? EventSubTypeId { get; set; }
+		public EventSubType? EventSubType { get; set; }
+
+		// Duration helpers (these ARE useful and used)
 		public TimeSpan? EventDuration => EventEndTime != default && EventStartTime != default 
 			? EventEndTime - EventStartTime 
 			: null;

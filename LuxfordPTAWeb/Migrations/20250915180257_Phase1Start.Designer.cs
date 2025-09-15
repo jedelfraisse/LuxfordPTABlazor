@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxfordPTAWeb.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250915153015_Phase1_EventManagement_Initial")]
-    partial class Phase1_EventManagement_Initial
+    [Migration("20250915180257_Phase1Start")]
+    partial class Phase1Start
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -106,6 +106,9 @@ namespace LuxfordPTAWeb.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("CleanupEndTime")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
@@ -113,8 +116,26 @@ namespace LuxfordPTAWeb.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("EstimatedAttendees")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EventCoordinatorId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("EventEndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EventStartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("EventSubTypeId")
+                        .HasColumnType("int");
+
                     b.Property<int>("EventTypeId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ExcelImportId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ImageUrl")
                         .IsRequired()
@@ -128,14 +149,48 @@ namespace LuxfordPTAWeb.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("MaxAttendees")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PublicInstructions")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RequiresCleanup")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresSetup")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresVolunteers")
+                        .HasColumnType("bit");
+
                     b.Property<int>("SchoolYearId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SetupStartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("WeatherBackupPlan")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("EventCoordinatorId");
+
+                    b.HasIndex("EventSubTypeId");
 
                     b.HasIndex("EventTypeId");
 
@@ -174,6 +229,50 @@ namespace LuxfordPTAWeb.Migrations
                     b.ToTable("EventOtherSponsors");
                 });
 
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColorClass")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EventTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventTypeId");
+
+                    b.ToTable("EventSubType");
+                });
+
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
                 {
                     b.Property<int>("Id")
@@ -201,9 +300,6 @@ namespace LuxfordPTAWeb.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
 
                     b.Property<int>("MaxEventsToShow")
@@ -243,6 +339,10 @@ namespace LuxfordPTAWeb.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrintableEventCalendar")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -414,6 +514,15 @@ namespace LuxfordPTAWeb.Migrations
 
             modelBuilder.Entity("LuxfordPTAWeb.Data.Event", b =>
                 {
+                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", "EventCoordinator")
+                        .WithMany()
+                        .HasForeignKey("EventCoordinatorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("LuxfordPTAWeb.Data.EventSubType", "EventSubType")
+                        .WithMany("Events")
+                        .HasForeignKey("EventSubTypeId");
+
                     b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
                         .WithMany("Events")
                         .HasForeignKey("EventTypeId")
@@ -425,6 +534,10 @@ namespace LuxfordPTAWeb.Migrations
                         .HasForeignKey("SchoolYearId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("EventCoordinator");
+
+                    b.Navigation("EventSubType");
 
                     b.Navigation("EventType");
 
@@ -467,6 +580,17 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("Sponsor");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
+                        .WithMany("EventSubTypes")
+                        .HasForeignKey("EventTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventType");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -527,8 +651,15 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("OtherSponsors");
                 });
 
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.Navigation("Events");
+                });
+
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
                 {
+                    b.Navigation("EventSubTypes");
+
                     b.Navigation("Events");
                 });
 
