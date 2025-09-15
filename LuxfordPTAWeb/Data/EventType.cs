@@ -19,6 +19,7 @@ public class EventType
 	public bool ShowInlineOnMainPage { get; set; } = false; // Show events directly on main page instead of category card
 
 	public ICollection<Event> Events { get; set; } = new List<Event>();
+	public ICollection<EventSubType> EventSubTypes { get; set; } = new List<EventSubType>();
 }
 
 public enum EventTypeSize

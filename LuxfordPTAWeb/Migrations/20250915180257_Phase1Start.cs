@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace LuxfordPTAWeb.Migrations
 {
     /// <inheritdoc />
-    public partial class Phase1_EventManagement_Initial : Migration
+    public partial class Phase1Start : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -61,7 +61,6 @@ namespace LuxfordPTAWeb.Migrations
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Slug = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsMandatory = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     Size = table.Column<int>(type: "int", nullable: false),
@@ -85,7 +84,8 @@ namespace LuxfordPTAWeb.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    PrintableEventCalendar = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -214,6 +214,32 @@ namespace LuxfordPTAWeb.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "EventSubType",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Slug = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DisplayOrder = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    Icon = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ColorClass = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EventTypeId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EventSubType", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_EventSubType_EventTypes_EventTypeId",
+                        column: x => x.EventTypeId,
+                        principalTable: "EventTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Events",
                 columns: table => new
                 {
@@ -225,12 +251,39 @@ namespace LuxfordPTAWeb.Migrations
                     Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Link = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EventCoordinatorId = table.Column<string>(type: "nvarchar(450)", nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    SetupStartTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    EventStartTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EventEndTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CleanupEndTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    MaxAttendees = table.Column<int>(type: "int", nullable: true),
+                    EstimatedAttendees = table.Column<int>(type: "int", nullable: true),
+                    RequiresVolunteers = table.Column<bool>(type: "bit", nullable: false),
+                    RequiresSetup = table.Column<bool>(type: "bit", nullable: false),
+                    RequiresCleanup = table.Column<bool>(type: "bit", nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PublicInstructions = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    WeatherBackupPlan = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ExcelImportId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     SchoolYearId = table.Column<int>(type: "int", nullable: false),
-                    EventTypeId = table.Column<int>(type: "int", nullable: false)
+                    EventTypeId = table.Column<int>(type: "int", nullable: false),
+                    EventSubTypeId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Events", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Events_AspNetUsers_EventCoordinatorId",
+                        column: x => x.EventCoordinatorId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Events_EventSubType_EventSubTypeId",
+                        column: x => x.EventSubTypeId,
+                        principalTable: "EventSubType",
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_Events_EventTypes_EventTypeId",
                         column: x => x.EventTypeId,
@@ -343,6 +396,16 @@ namespace LuxfordPTAWeb.Migrations
                 column: "SponsorId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Events_EventCoordinatorId",
+                table: "Events",
+                column: "EventCoordinatorId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Events_EventSubTypeId",
+                table: "Events",
+                column: "EventSubTypeId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Events_EventTypeId",
                 table: "Events",
                 column: "EventTypeId");
@@ -351,6 +414,11 @@ namespace LuxfordPTAWeb.Migrations
                 name: "IX_Events_SchoolYearId",
                 table: "Events",
                 column: "SchoolYearId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EventSubType_EventTypeId",
+                table: "EventSubType",
+                column: "EventTypeId");
         }
 
         /// <inheritdoc />
@@ -381,19 +449,22 @@ namespace LuxfordPTAWeb.Migrations
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
-
-            migrationBuilder.DropTable(
                 name: "Events");
 
             migrationBuilder.DropTable(
                 name: "Sponsors");
 
             migrationBuilder.DropTable(
-                name: "EventTypes");
+                name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "EventSubType");
 
             migrationBuilder.DropTable(
                 name: "SchoolYears");
+
+            migrationBuilder.DropTable(
+                name: "EventTypes");
         }
     }
 }

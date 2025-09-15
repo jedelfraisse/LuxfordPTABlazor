@@ -125,6 +125,9 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<DateTime>("EventStartTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("EventSubTypeId")
+                        .HasColumnType("int");
+
                     b.Property<int>("EventTypeId")
                         .HasColumnType("int");
 
@@ -184,6 +187,8 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasIndex("EventCoordinatorId");
 
+                    b.HasIndex("EventSubTypeId");
+
                     b.HasIndex("EventTypeId");
 
                     b.HasIndex("SchoolYearId");
@@ -219,6 +224,50 @@ namespace LuxfordPTAWeb.Migrations
                     b.HasIndex("SponsorId");
 
                     b.ToTable("EventOtherSponsors");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColorClass")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EventTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventTypeId");
+
+                    b.ToTable("EventSubType");
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
@@ -287,6 +336,10 @@ namespace LuxfordPTAWeb.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrintableEventCalendar")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -463,6 +516,10 @@ namespace LuxfordPTAWeb.Migrations
                         .HasForeignKey("EventCoordinatorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("LuxfordPTAWeb.Data.EventSubType", "EventSubType")
+                        .WithMany("Events")
+                        .HasForeignKey("EventSubTypeId");
+
                     b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
                         .WithMany("Events")
                         .HasForeignKey("EventTypeId")
@@ -476,6 +533,8 @@ namespace LuxfordPTAWeb.Migrations
                         .IsRequired();
 
                     b.Navigation("EventCoordinator");
+
+                    b.Navigation("EventSubType");
 
                     b.Navigation("EventType");
 
@@ -518,6 +577,17 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("Sponsor");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
+                        .WithMany("EventSubTypes")
+                        .HasForeignKey("EventTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventType");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -578,8 +648,15 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("OtherSponsors");
                 });
 
+            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+                {
+                    b.Navigation("Events");
+                });
+
             modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
                 {
+                    b.Navigation("EventSubTypes");
+
                     b.Navigation("Events");
                 });
 
