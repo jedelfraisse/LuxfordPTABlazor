@@ -6,7 +6,6 @@ public class EventType
 	public string Name { get; set; } = string.Empty; // e.g., "School Closed & Special Days"
 	public string Slug { get; set; } = string.Empty; // e.g., "school-closed-days"
 	public string Description { get; set; } = string.Empty; // e.g., "All holidays, staff days, and special schedule days for the school year."
-	public bool IsMandatory { get; set; } // true for "School Closed", false for others
 	public int DisplayOrder { get; set; } = 0; // Order for displaying in event categories
 	public bool IsActive { get; set; } = true; // Can be disabled instead of deleted
 	public EventTypeSize Size { get; set; } = EventTypeSize.Full; // Half or Full size card

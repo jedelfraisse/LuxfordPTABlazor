@@ -38,7 +38,6 @@ public class EventTypesController : ControllerBase
             Name = dto.Name,
             Slug = !string.IsNullOrEmpty(dto.Slug) ? dto.Slug : GenerateSlug(dto.Name),
             Description = dto.Description,
-            IsMandatory = dto.IsMandatory,
             DisplayOrder = dto.DisplayOrder,
             IsActive = dto.IsActive,
             Size = (EventTypeSize)dto.Size,
@@ -69,7 +68,6 @@ public class EventTypesController : ControllerBase
         eventType.Name = dto.Name;
         eventType.Slug = !string.IsNullOrEmpty(dto.Slug) ? dto.Slug : GenerateSlug(dto.Name);
         eventType.Description = dto.Description;
-        eventType.IsMandatory = dto.IsMandatory;
         eventType.DisplayOrder = dto.DisplayOrder;
         eventType.IsActive = dto.IsActive;
         eventType.Size = (EventTypeSize)dto.Size;
@@ -191,8 +189,6 @@ public class CreateEventTypeDto
     
     [StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
     public string Description { get; set; } = string.Empty;
-    
-    public bool IsMandatory { get; set; }
     
     [Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
     public int DisplayOrder { get; set; } = 0;

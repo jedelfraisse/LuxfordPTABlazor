@@ -16,6 +16,7 @@ namespace LuxfordPTAWeb.Data
         {
             base.OnModelCreating(builder);
 
+            // Event Main Sponsor relationship configuration
             builder.Entity<EventMainSponsor>()
                 .HasKey(x => new { x.EventId, x.SponsorId });
 
@@ -29,6 +30,7 @@ namespace LuxfordPTAWeb.Data
                 .WithMany(s => s.MainEvents)
                 .HasForeignKey(x => x.SponsorId);
 
+            // Event Other Sponsor relationship configuration
             builder.Entity<EventOtherSponsor>()
                 .HasKey(x => new { x.EventId, x.SponsorId });
 
@@ -42,12 +44,23 @@ namespace LuxfordPTAWeb.Data
                 .WithMany(s => s.OtherEvents)
                 .HasForeignKey(x => x.SponsorId);
 
-            // Configure EventTypeSize enum to be stored as integer
+            // Event Coordinator relationship configuration
+            builder.Entity<Event>()
+                .HasOne(e => e.EventCoordinator)
+                .WithMany()
+                .HasForeignKey(e => e.EventCoordinatorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Event Status enum configuration
+            builder.Entity<Event>()
+                .Property(e => e.Status)
+                .HasConversion<int>();
+
+            // EventType enum configurations
             builder.Entity<EventType>()
                 .Property(e => e.Size)
                 .HasConversion<int>();
 
-            // Configure EventDisplayMode enum to be stored as integer
             builder.Entity<EventType>()
                 .Property(e => e.DisplayMode)
                 .HasConversion<int>();

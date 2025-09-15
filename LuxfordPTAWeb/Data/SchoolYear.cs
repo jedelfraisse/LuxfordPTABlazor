@@ -7,5 +7,7 @@ public class SchoolYear
 	public DateTime StartDate { get; set; }
 	public DateTime EndDate { get; set; }
 
+	public string PrintableEventCalendar { get; set; } = string.Empty;
+
 	public ICollection<Event> Events { get; set; } = new List<Event>();
 }
