@@ -2,6 +2,10 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>Manage Events</PageTitle>
 
@@ -11,14 +15,53 @@
         <a href="/admin" class="btn btn-outline-secondary me-2">
             <i class="bi bi-arrow-left"></i> Back to Dashboard
         </a>
-        <a href="/admin/event-types" class="btn btn-outline-info me-2">
-            <i class="bi bi-tags"></i> Event Types
+        <a href="/admin/event-categories" class="btn btn-outline-info me-2">
+            <i class="bi bi-tags"></i> Event Categories
         </a>
         <a href="/admin/events/create" class="btn btn-primary">
             <i class="bi bi-plus"></i> Add New Event
         </a>
     </div>
 </div>
+
+<!-- Quick Filter Buttons -->
+@if (eventSummary != null)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h6 class="card-title">Quick Filters</h6>
+            <div class="btn-group flex-wrap" role="group">
+                <button type="button" class="btn @(selectedQuickFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetQuickFilter("all"))">
+                    All (@eventSummary.TotalEvents)
+                </button>
+                @if (eventSummary.PendingApproval > 0)
+                {
+                    <button type="button" class="btn @(selectedQuickFilter == "pending" ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => SetQuickFilter("pending"))">
+                        Pending Approval (@eventSummary.PendingApproval)
+                    </button>
+                }
+                @if (eventSummary.RequiringVolunteers > 0)
+                {
+                    <button type="button" class="btn @(selectedQuickFilter == "volunteers" ? "btn-info" : "btn-outline-info")" @onclick="@(() => SetQuickFilter("volunteers"))">
+                        Need Volunteers (@eventSummary.RequiringVolunteers)
+                    </button>
+                }
+                @if (eventSummary.UpcomingNext30Days > 0)
+                {
+                    <button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
+                        Upcoming (@eventSummary.UpcomingNext30Days)
+                    </button>
+                }
+                <button type="button" class="btn @(selectedQuickFilter == "active" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("active"))">
+                    Active (@eventSummary.ActiveEvents)
+                </button>
+                <button type="button" class="btn @(selectedQuickFilter == "planning" ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => SetQuickFilter("planning"))">
+                    Planning (@eventSummary.PlanningEvents)
+                </button>
+            </div>
+        </div>
+    </div>
+}
 
 <!-- Filters -->
 <div class="card mb-4">
@@ -36,22 +79,30 @@
                         @foreach (var year in schoolYears)
                         {
                             <option value="@year.Id" selected="@(selectedSchoolYearId == year.Id)">
-                                @year.Name @(year.Id == currentSchoolYearId ? "(Current)" : "")
+                                @year.Name 
+                                @if (year.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear)
+                                {
+                                    @: (Current)
+                                }
+                                @if (!year.IsVisibleToPublic)
+                                {
+                                    @: [Hidden from Public]
+                                }
                             </option>
                         }
                     }
                 </select>
             </div>
             <div class="col-md-3">
-                <label for="eventTypeFilter" class="form-label">Event Type</label>
-                <select id="eventTypeFilter" class="form-select" @onchange="FilterByEventType">
-                    <option value="0">All Event Types</option>
-                    @if (eventTypes != null)
+                <label for="eventCatFilter" class="form-label">Event Category</label>
+                <select id="eventCatFilter" class="form-select" @onchange="FilterByEventCat">
+                    <option value="0">All Event Categories</option>
+                    @if (eventCats != null)
                     {
-                        @foreach (var eventType in eventTypes)
+                        @foreach (var eventCat in eventCats)
                         {
-                            <option value="@eventType.Id" selected="@(selectedEventTypeId == eventType.Id)">
-                                @eventType.Name
+                            <option value="@eventCat.Id" selected="@(selectedEventCatId == eventCat.Id)">
+                                @eventCat.Name
                             </option>
                         }
                     }
@@ -97,10 +148,12 @@ else
             <thead class="table-dark">
                 <tr>
                     <th>Title</th>
+                    <th>Status</th>
                     <th>School Year</th>
-                    <th>Event Type</th>
+                    <th>Event Category</th>
                     <th>Date</th>
                     <th>Location</th>
+                    <th>Coordinator</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -118,25 +171,48 @@ else
                             {
                                 <span class="badge bg-warning ms-2">Soon</span>
                             }
+                            @if (evt.RequiresVolunteers && string.IsNullOrEmpty(evt.ExcelImportId))
+                            {
+                                <span class="badge bg-info ms-2">Volunteers Needed</span>
+                            }
                         </td>
                         <td>
-                            <span class="badge @(evt.SchoolYear?.Id == currentSchoolYearId ? "bg-success" : "bg-light text-dark")">
+                            <span class="badge @GetStatusBadgeClass(evt.Status)">
+                                @evt.Status.ToString().Replace("SubmittedForApproval", "Pending Approval")
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(evt.SchoolYear?.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear ? "bg-success" : "bg-light text-dark")">
                                 @evt.SchoolYear?.Name
                             </span>
                         </td>
                         <td>
-                            <span class="badge @GetEventTypeBadgeClass(evt.EventType?.IsMandatory ?? false)">
-                                @evt.EventType?.Name
-                            </span>
+                            <span class="badge">@evt.EventCat?.Name</span>
                         </td>
                         <td>@evt.Date.ToString("MMM d, yyyy")</td>
                         <td>@evt.Location</td>
+                        <td>
+                            @if (evt.EventCoordinator != null)
+                            {
+                                @evt.EventCoordinator.FirstName @evt.EventCoordinator.LastName
+                            }
+                            else
+                            {
+                                <span class="text-muted">Unassigned</span>
+                            }
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <a href="/admin/events/edit/@evt.Id" class="btn btn-outline-primary" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteEvent(evt.Id)">
+                                @if (evt.Status == EventStatus.SubmittedForApproval)
+                                {
+                                    <button type="button" class="btn btn-outline-success" title="Approve" @onclick="@(() => ApproveEvent(evt.Id))">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                }
+                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="@(() => DeleteEvent(evt.Id))">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -149,46 +225,80 @@ else
 }
 
 @code {
-    private List<EventDto>? allEvents;
-    private List<EventDto>? filteredEvents;
-    private List<EventTypeDto>? eventTypes;
-    private List<SchoolYearDto>? schoolYears;
-    private SchoolYearDto? selectedSchoolYear;
-    private int selectedEventTypeId = 0;
+    private List<Event>? allEvents;
+    private List<Event>? filteredEvents;
+    private List<EventCat>? eventCats;
+    private List<SchoolYear>? schoolYears;
+    private SchoolYear? selectedSchoolYear;
+    private EventDashboardSummary? eventSummary;
+    private int selectedEventCatId = 0;
     private int selectedSchoolYearId = 0;
-    private int currentSchoolYearId = 0;
+    private string selectedQuickFilter = "all";
 
     protected override async Task OnInitializedAsync()
     {
+        // Check for query parameters
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("filter", out var filterValue))
+        {
+            selectedQuickFilter = filterValue.ToString().ToLower();
+        }
+
         await LoadSchoolYears();
-        await LoadEventTypes();
+        await LoadEventCats();
         await LoadEvents();
-        await LoadCurrentSchoolYear();
+        await LoadEventSummary();
     }
 
     private async Task LoadEvents()
     {
         try
         {
-            allEvents = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+            // Get events with optional school year filtering
+            var url = selectedSchoolYearId > 0 
+                ? $"api/events/all-admin?schoolYearId={selectedSchoolYearId}"
+                : "api/events/all-admin";
+                
+            allEvents = await Http.GetFromJsonAsync<List<Event>>(url);
+            if (allEvents == null)
+            {
+                allEvents = new List<Event>();
+            }
             ApplyFilters();
         }
         catch (Exception)
         {
-            allEvents = new List<EventDto>();
-            filteredEvents = new List<EventDto>();
+            allEvents = new List<Event>();
+            filteredEvents = new List<Event>();
         }
     }
 
-    private async Task LoadEventTypes()
+    private async Task LoadEventSummary()
     {
         try
         {
-            eventTypes = await Http.GetFromJsonAsync<List<EventTypeDto>>("api/eventtypes");
+            var url = selectedSchoolYearId > 0 
+                ? $"api/events/dashboard-summary/{selectedSchoolYearId}"
+                : "api/events/dashboard-summary";
+                
+            eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>(url);
         }
         catch (Exception)
         {
-            eventTypes = new List<EventTypeDto>();
+            // Handle errors silently
+        }
+    }
+
+    private async Task LoadEventCats()
+    {
+        try
+        {
+            eventCats = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcategories");
+        }
+        catch (Exception)
+        {
+            eventCats = new List<EventCat>();
         }
     }
 
@@ -196,28 +306,18 @@ else
     {
         try
         {
-            schoolYears = await Http.GetFromJsonAsync<List<SchoolYearDto>>("api/schoolyears");
+            schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
         }
         catch (Exception)
         {
-            schoolYears = new List<SchoolYearDto>();
+            schoolYears = new List<SchoolYear>();
         }
     }
 
-    private async Task LoadCurrentSchoolYear()
+    private void SetQuickFilter(string filter)
     {
-        try
-        {
-            var current = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
-            if (current != null)
-            {
-                currentSchoolYearId = current.Id;
-            }
-        }
-        catch (Exception)
-        {
-            // Current school year not found - this is OK
-        }
+        selectedQuickFilter = filter;
+        ApplyFilters();
     }
 
     private async Task FilterBySchoolYear(ChangeEventArgs e)
@@ -226,15 +326,17 @@ else
         {
             selectedSchoolYearId = schoolYearId;
             selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == schoolYearId);
+            await LoadEvents(); // Reload events with new filter
+            await LoadEventSummary(); // Reload summary with new filter
             ApplyFilters();
         }
     }
 
-    private async Task FilterByEventType(ChangeEventArgs e)
+    private async Task FilterByEventCat(ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out int eventTypeId))
+        if (int.TryParse(e.Value?.ToString(), out int eventCatId))
         {
-            selectedEventTypeId = eventTypeId;
+            selectedEventCatId = eventCatId;
             ApplyFilters();
         }
     }
@@ -243,34 +345,64 @@ else
     {
         if (allEvents == null) return;
 
-        var filtered = allEvents.AsEnumerable();
+        IEnumerable<Event> filtered = allEvents;
+
+        // Apply quick filters first
+        var now = DateTime.UtcNow;
+        var next30Days = now.AddDays(30);
+
+        filtered = selectedQuickFilter switch
+        {
+            "pending" => filtered.Where(e => e.Status == EventStatus.SubmittedForApproval),
+            "volunteers" => filtered.Where(e => e.RequiresVolunteers && e.Date >= now && 
+                (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
+            "upcoming" => filtered.Where(e => e.Date >= now && e.Date <= next30Days && 
+                (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
+            "active" => filtered.Where(e => e.Status == EventStatus.Active),
+            "planning" => filtered.Where(e => e.Status == EventStatus.Planning),
+            _ => filtered
+        };
 
         if (selectedSchoolYearId > 0)
         {
             filtered = filtered.Where(e => e.SchoolYear?.Id == selectedSchoolYearId);
         }
 
-        if (selectedEventTypeId > 0)
+        if (selectedEventCatId > 0)
         {
-            filtered = filtered.Where(e => e.EventType?.Id == selectedEventTypeId);
+            filtered = filtered.Where(e => e.EventCat?.Id == selectedEventCatId);
         }
 
         filteredEvents = filtered.ToList();
     }
 
-    private void ClearFilters()
+    private async Task ClearFilters()
     {
         selectedSchoolYearId = 0;
-        selectedEventTypeId = 0;
+        selectedEventCatId = 0;
         selectedSchoolYear = null;
+        selectedQuickFilter = "all";
+        
+        // Reload data when clearing filters
+        await LoadEvents();
+        await LoadEventSummary();
         ApplyFilters();
     }
 
-    private void ShowCurrentYear()
+    private async Task ShowCurrentYear()
     {
-        selectedSchoolYearId = currentSchoolYearId;
-        selectedEventTypeId = 0;
-        selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == currentSchoolYearId);
+        var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
+        if (currentYear != null)
+        {
+            selectedSchoolYearId = currentYear.Id;
+            selectedSchoolYear = currentYear;
+        }
+        selectedEventCatId = 0;
+        selectedQuickFilter = "all";
+        
+        // Reload data when showing current year
+        await LoadEvents();
+        await LoadEventSummary();
         ApplyFilters();
     }
 
@@ -278,16 +410,53 @@ else
     {
         var parts = new List<string>();
         
+        if (selectedQuickFilter != "all")
+        {
+            parts.Add($"with filter '{selectedQuickFilter}'");
+        }
+        
         if (selectedSchoolYearId > 0)
             parts.Add($"in {selectedSchoolYear?.Name}");
             
-        if (selectedEventTypeId > 0)
+        if (selectedEventCatId > 0)
         {
-            var eventType = eventTypes?.FirstOrDefault(et => et.Id == selectedEventTypeId);
-            parts.Add($"for {eventType?.Name}");
+            var eventCat = eventCats?.FirstOrDefault(ec => ec.Id == selectedEventCatId);
+            parts.Add($"for {eventCat?.Name}");
         }
 
         return parts.Any() ? string.Join(" ", parts) : "";
+    }
+
+    private string GetStatusBadgeClass(EventStatus status) => status switch
+    {
+        EventStatus.Planning => "bg-secondary",
+        EventStatus.SubmittedForApproval => "bg-warning",
+        EventStatus.Active => "bg-success",
+        EventStatus.InProgress => "bg-primary",
+        EventStatus.WrapUp => "bg-info",
+        EventStatus.Completed => "bg-dark",
+        EventStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private async Task ApproveEvent(int eventId)
+    {
+        if (await ConfirmApproval())
+        {
+            try
+            {
+                HttpResponseMessage response = await Http.PostAsync($"api/events/{eventId}/approve", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    await LoadEvents();
+                    await LoadEventSummary();
+                }
+            }
+            catch (Exception)
+            {
+                // Handle errors
+            }
+        }
     }
 
     private async Task DeleteEvent(int eventId)
@@ -296,10 +465,11 @@ else
         {
             try
             {
-                var response = await Http.DeleteAsync($"api/events/{eventId}");
+                HttpResponseMessage response = await Http.DeleteAsync($"api/events/{eventId}");
                 if (response.IsSuccessStatusCode)
                 {
                     await LoadEvents();
+                    await LoadEventSummary();
                 }
             }
             catch (Exception)
@@ -311,40 +481,11 @@ else
 
     private async Task<bool> ConfirmDelete()
     {
-        return await Task.FromResult(true);
+        return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this event?");
     }
 
-    private string GetEventTypeBadgeClass(bool isMandatory)
+    private async Task<bool> ConfirmApproval()
     {
-        return isMandatory ? "bg-danger" : "bg-info";
-    }
-
-    public class EventDto
-    {
-        public int Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public DateTime Date { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public string Location { get; set; } = string.Empty;
-        public string ImageUrl { get; set; } = string.Empty; // Add missing properties
-        public string Link { get; set; } = string.Empty;     // Add missing properties
-        public EventTypeDto? EventType { get; set; }
-        public SchoolYearDto? SchoolYear { get; set; }
-    }
-
-    public class EventTypeDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public bool IsMandatory { get; set; }
-    }
-
-    public class SchoolYearDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
+        return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to approve this event?");
     }
 }

@@ -1,3 +1,4 @@
+using LuxfordPTAWeb.Client.Code;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 namespace LuxfordPTAWeb.Client
@@ -17,6 +18,7 @@ namespace LuxfordPTAWeb.Client
 			{
 				BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
 			});
+			builder.Services.AddScoped<SchoolYearSupport>();
 
 			await builder.Build().RunAsync();
 		}

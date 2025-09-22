@@ -1,7 +1,9 @@
 using LuxfordPTAWeb.Data;
+using LuxfordPTAWeb.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using LuxfordPTAWeb.Shared.Models;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -14,7 +16,12 @@ public class SchoolYearsController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<SchoolYear>> Get()
     {
-        return await _db.SchoolYears.OrderByDescending(sy => sy.StartDate).ToListAsync();
+        // Only return years that are not hidden, or all if user is board/admin
+        var isBoard = User.IsInRole("Admin") || User.IsInRole("BoardMember");
+        return await _db.SchoolYears
+            .Where(sy => isBoard || sy.IsVisibleToPublic)
+            .OrderByDescending(sy => sy.StartDate)
+            .ToListAsync();
     }
 
     [HttpGet("current")]
@@ -23,13 +30,42 @@ public class SchoolYearsController : ControllerBase
         var currentDate = DateTime.Now;
         var currentYear = await _db.SchoolYears
             .FirstOrDefaultAsync(sy => currentDate >= sy.StartDate && currentDate <= sy.EndDate);
-            
         if (currentYear == null)
         {
             return NotFound("No current school year found");
         }
-        
         return currentYear;
+    }
+
+    [HttpGet("last")]
+    public async Task<ActionResult<SchoolYear>> GetLastYear()
+    {
+        var currentDate = DateTime.Now;
+        var lastYear = await _db.SchoolYears
+            .Where(sy => sy.EndDate < currentDate)
+            .OrderByDescending(sy => sy.StartDate)
+            .FirstOrDefaultAsync();
+        if (lastYear == null)
+        {
+            return NotFound("No previous school year found");
+        }
+        return lastYear;
+    }
+
+    [HttpGet("next")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<ActionResult<SchoolYear>> GetNextYear()
+    {
+        var currentDate = DateTime.Now;
+        var nextYear = await _db.SchoolYears
+            .Where(sy => sy.StartDate > currentDate)
+            .OrderBy(sy => sy.StartDate)
+            .FirstOrDefaultAsync();
+        if (nextYear == null)
+        {
+            return NotFound("No future school year found");
+        }
+        return nextYear;
     }
 
     [HttpGet("{id}")]
@@ -39,6 +75,12 @@ public class SchoolYearsController : ControllerBase
         if (schoolYear == null)
         {
             return NotFound();
+        }
+        // Only allow non-board to view if visible
+        var isBoard = User.IsInRole("Admin") || User.IsInRole("BoardMember");
+        if (!isBoard && !schoolYear.IsVisibleToPublic)
+        {
+            return Forbid();
         }
         return schoolYear;
     }
@@ -58,17 +100,34 @@ public class SchoolYearsController : ControllerBase
             .AnyAsync(sy => (dto.StartDate >= sy.StartDate && dto.StartDate <= sy.EndDate) ||
                            (dto.EndDate >= sy.StartDate && dto.EndDate <= sy.EndDate) ||
                            (dto.StartDate <= sy.StartDate && dto.EndDate >= sy.EndDate));
-
         if (overlapping)
         {
             return BadRequest("Date range overlaps with an existing school year");
+        }
+
+        // Only allow creation of last year or next year
+        var today = DateTime.Today;
+        int currentYear = today.Month >= 7 ? today.Year : today.Year - 1;
+        var lastYearStart = new DateTime(currentYear - 1, 7, 1);
+        var lastYearEnd = new DateTime(currentYear, 6, 30);
+        var nextYearStart = new DateTime(currentYear + 1, 7, 1);
+        var nextYearEnd = new DateTime(currentYear + 2, 6, 30);
+
+        bool isLastYear = dto.StartDate == lastYearStart && dto.EndDate == lastYearEnd;
+        bool isNextYear = dto.StartDate == nextYearStart && dto.EndDate == nextYearEnd;
+
+        if (!isLastYear && !isNextYear)
+        {
+            return BadRequest("Can only create last year or next year.");
         }
 
         var schoolYear = new SchoolYear
         {
             Name = dto.Name,
             StartDate = dto.StartDate,
-            EndDate = dto.EndDate
+            EndDate = dto.EndDate,
+            Status = isNextYear ? SchoolYearStatus.FutureYear : SchoolYearStatus.PrevYear,
+            IsVisibleToPublic = !isNextYear // Hide future year from public by default
         };
 
         _db.SchoolYears.Add(schoolYear);
@@ -99,7 +158,6 @@ public class SchoolYearsController : ControllerBase
             .AnyAsync(sy => (dto.StartDate >= sy.StartDate && dto.StartDate <= sy.EndDate) ||
                            (dto.EndDate >= sy.StartDate && dto.EndDate <= sy.EndDate) ||
                            (dto.StartDate <= sy.StartDate && dto.EndDate >= sy.EndDate));
-
         if (overlapping)
         {
             return BadRequest("Date range overlaps with an existing school year");
@@ -108,6 +166,9 @@ public class SchoolYearsController : ControllerBase
         schoolYear.Name = dto.Name;
         schoolYear.StartDate = dto.StartDate;
         schoolYear.EndDate = dto.EndDate;
+        // Optionally allow updating status/visibility
+        // schoolYear.Status = dto.Status;
+        // schoolYear.IsVisibleToPublic = dto.IsVisibleToPublic;
 
         await _db.SaveChangesAsync();
         return NoContent();
@@ -153,7 +214,9 @@ public class SchoolYearsController : ControllerBase
             {
                 Name = dto.NewYearName,
                 StartDate = dto.StartDate,
-                EndDate = dto.EndDate
+                EndDate = dto.EndDate,
+                Status = SchoolYearStatus.FutureYear,
+                IsVisibleToPublic = false // Hide future year from public by default
             };
 
             _db.SchoolYears.Add(newYear);
@@ -181,6 +244,8 @@ public class CreateSchoolYearDto
     public string Name { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    // Optionally: public SchoolYearStatus Status { get; set; }
+    // Optionally: public bool IsVisibleToPublic { get; set; }
 }
 
 public class TransitionToNewYearDto

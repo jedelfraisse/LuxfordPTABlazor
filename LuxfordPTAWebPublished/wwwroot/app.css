@@ -111,7 +111,10 @@ h1:focus {
     border-radius: 8px 8px 0 0;
     margin-bottom: 0;
     padding: 2.5rem 1.5rem 1rem 1.5rem;
-    pta-logo box-shadow: 0 2px 8px rgba(76,185,107,0.07);
+}
+
+.pta-logo {
+    box-shadow: 0 2px 8px rgba(76,185,107,0.07);
     width: 100%;
 }
 
@@ -324,14 +327,13 @@ h1:focus {
 
 /*  tablets */
 @media (max-width: 10024px) {
-   
+
 
     .pta-header-box,
     .container-fluid,
     .row,
     .col-12,
     .col-md-10 {
-        
         width: 100%;
         margin-left: auto;
         margin-right: auto;
@@ -340,7 +342,6 @@ h1:focus {
 
     /* If you use .card or similar for content boxes, add them here */
     .card, .content-box {
-        
         width: 100%;
         margin-left: auto;
         margin-right: auto;
@@ -382,15 +383,15 @@ h1:focus {
         margin-bottom: 0.5rem;
     }
 
-    .pta-header-top > div {
-        flex: 0 1 auto; /* Allow logos to shrink as needed */
-        min-width: 0;
-        max-width: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-bottom: 0;
-    }
+        .pta-header-top > div {
+            flex: 0 1 auto; /* Allow logos to shrink as needed */
+            min-width: 0;
+            max-width: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+        }
 
     .pta-logo,
     .pta-mascot,
@@ -400,6 +401,7 @@ h1:focus {
         margin: 0 auto;
         display: block;
     }
+
     .pta-school-logo,
     .pta-school-logo-box {
         display: none !important;
@@ -415,11 +417,11 @@ h1:focus {
         margin-bottom: 0.5rem;
     }
 
-    .pta-header-nav .pta-nav-link {
-        font-size: 0.95rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 4px;
-    }
+        .pta-header-nav .pta-nav-link {
+            font-size: 0.95rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+        }
 }
 
 
@@ -440,4 +442,13 @@ img {
     max-width: 100%;
     height: auto;
     box-sizing: border-box;
+}
+
+
+.school-year-banner button:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+}
+
+.school-year-banner button:hover {
+    background-color: #e7f1ff;
 }

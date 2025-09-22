@@ -174,3 +174,14 @@ LuxfordPTAWeb is a Blazor-based portal that evolved from a static DocFX-powered 
 - **Upload published files to your hosting provider (FTP or Google Cloud) as required.**
 - **Configure database connection strings and Google Workspace API credentials.**
 - **Run Entity Framework migrations for treasurer management features.**
+
+
+# 🐉 PTA Dragon Personas by School Year
+
+| School Year | Reflections Theme         | Dragon Name         | Persona Description                                      |
+|-------------|---------------------------|----------------------|----------------------------------------------------------|
+| 2024–2025   | Accepting Imperfection     | Crinkle the Courageous 🐉 | Embraces flaws, celebrates growth, wears a patchwork cloak of “oops” moments. |
+| 2025–2026   | I Belong!                  | Kinari the Welcomer 🐉 | Builds community, celebrates inclusion, connects families and voices. |
+| 2026–2027   | *(TBD)*                    | Sage the Storykeeper 🐉 | Honors culture, diversity, and shared traditions (placeholder until theme is announced). |
+| 2027–2028   | *(TBD)*                    | Nova the Innovator 🐉 | Champions creativity, tech, and student-led exploration (theme to be adapted). |
+| 2028–2029   | *(TBD)*                    | Echo the Historian 🐉 | Archives PTA lore, preserves student art, and narrates the journey (theme to be adapted). |

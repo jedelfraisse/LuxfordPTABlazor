@@ -1,4 +1,4 @@
-using LuxfordPTAWeb.Data;
+using LuxfordPTAWeb.Shared.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace LuxfordPTAWeb.Components.Account

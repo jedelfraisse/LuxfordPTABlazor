@@ -9,12 +9,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LuxfordPTAWeb.Client", "Lux
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solutions", "Solutions", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
-		event-managment-devplan.md = event-managment-devplan.md
 		InitalSeedData.sql = InitalSeedData.sql
+		event-managment-devplan.md = event-managment-devplan.md
 		OverallDev.md = OverallDev.md
+		PTAOfficerChecklist.md = PTAOfficerChecklist.md
 		Readme.md = Readme.md
 		TreasurerCheckList.md = TreasurerCheckList.md
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LuxfordPTAWeb.Shared", "LuxfordPTAWeb.Shared\LuxfordPTAWeb.Shared.csproj", "{0542AEE3-D96A-4F0F-928D-47CA59DC61FA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,6 +33,10 @@ Global
 		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{10B38547-30FF-40BC-ADFB-F2E090C26CDF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0542AEE3-D96A-4F0F-928D-47CA59DC61FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0542AEE3-D96A-4F0F-928D-47CA59DC61FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0542AEE3-D96A-4F0F-928D-47CA59DC61FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0542AEE3-D96A-4F0F-928D-47CA59DC61FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

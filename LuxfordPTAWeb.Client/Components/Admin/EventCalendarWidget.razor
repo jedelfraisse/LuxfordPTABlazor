@@ -1,0 +1,180 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+@inject HttpClient Http
+
+<div class="card h-100">
+	<div class="card-header bg-primary text-white">
+		<h5 class="mb-0"><i class="bi bi-calendar"></i> Event Calendar - @SchoolYear?.Name</h5>
+	</div>
+	<div class="card-body p-2">
+		@if (eventSummary != null && events != null)
+		{
+			<!-- Quick Stats Row -->
+			<div class="row mb-2 text-center">
+				<div class="col-3">
+					<small class="text-primary d-block">@eventSummary.TotalEvents</small>
+					<small class="text-muted">Total</small>
+				</div>
+				<div class="col-3">
+					<small class="text-success d-block">@eventSummary.ActiveEvents</small>
+					<small class="text-muted">Active</small>
+				</div>
+				<div class="col-3">
+					<small class="text-warning d-block">@eventSummary.UpcomingNext7Days</small>
+					<small class="text-muted">Next 7d</small>
+				</div>
+				<div class="col-3">
+					@if (eventSummary.PendingApproval > 0)
+					{
+						<small class="text-danger d-block">@eventSummary.PendingApproval</small>
+						<small class="text-muted">Pending</small>
+					}
+					else
+					{
+						<small class="text-info d-block">@eventSummary.RequiringVolunteers</small>
+						<small class="text-muted">Need Vol.</small>
+					}
+				</div>
+			</div>
+
+			<!-- Month Grid -->
+			<div class="row g-1">
+				@foreach (var month in GetSchoolYearMonths())
+				{
+					var monthEvents = GetEventsForMonth(month.Year, month.Month);
+					<div class="col-4 col-lg-3">
+						<div class="card h-100 @(IsCurrentMonth(month) ? "border-primary" : "border-light")" 
+							 style="min-height: 120px;">
+							<div class="card-header p-1 @(IsCurrentMonth(month) ? "bg-primary text-white" : "bg-light")" 
+								 style="font-size: 0.75rem;">
+								<strong>@month.ToString("MMM")</strong>
+								<small class="float-end">@month.ToString("yy")</small>
+							</div>
+							<div class="card-body p-1" style="font-size: 0.65rem;">
+								@if (monthEvents.Any())
+								{
+									@foreach (var evt in monthEvents.Take(3))
+									{
+										<div class="mb-1">
+											<div class="d-flex align-items-center">
+												<span class="badge @GetEventStatusColor(evt.Status) me-1" 
+													  style="font-size: 0.5rem; padding: 1px 3px;">
+													@evt.Date.Day
+												</span>
+												<span class="text-truncate" style="font-size: 0.6rem;" 
+													  title="@evt.Title">
+													@TruncateText(evt.Title, 12)
+												</span>
+											</div>
+										</div>
+									}
+									@if (monthEvents.Count() > 3)
+									{
+										<small class="text-muted">+@(monthEvents.Count() - 3) more...</small>
+									}
+								}
+								else
+								{
+									<small class="text-muted">No events</small>
+								}
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+
+			<!-- Quick Actions -->
+			<div class="mt-2">
+				<div class="btn-group w-100" role="group">
+					<a href="/admin/events/calendar" class="btn btn-primary btn-sm">
+						<i class="bi bi-calendar-month"></i> Calendar
+					</a>
+					<a href="/admin/events" class="btn btn-outline-primary btn-sm">
+						<i class="bi bi-list"></i> List
+					</a>
+					@if (eventSummary.PendingApproval > 0)
+					{
+						<a href="/admin/events?filter=pending" class="btn btn-warning btn-sm">
+							<i class="bi bi-clock"></i> @eventSummary.PendingApproval
+						</a>
+					}
+					@if (eventSummary.RequiringVolunteers > 0)
+					{
+						<a href="/admin/events?filter=volunteers" class="btn btn-info btn-sm">
+							<i class="bi bi-people"></i> @eventSummary.RequiringVolunteers
+						</a>
+					}
+				</div>
+			</div>
+		}
+		else
+		{
+			<div class="text-center">
+				<div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+				<p class="small">Loading calendar...</p>
+			</div>
+		}
+	</div>
+</div>
+
+@code {
+	[Parameter] public SchoolYear? SchoolYear { get; set; }
+	[Parameter] public List<Event>? Events { get; set; }
+	[Parameter] public EventDashboardSummary? EventSummary { get; set; }
+	
+	// For internal use - will be set from Events parameter
+	private List<Event>? events => Events;
+	private EventDashboardSummary? eventSummary => EventSummary;
+
+	private List<DateTime> GetSchoolYearMonths()
+	{
+		if (SchoolYear == null) return new List<DateTime>();
+		
+		var months = new List<DateTime>();
+		var current = new DateTime(SchoolYear.StartDate.Year, SchoolYear.StartDate.Month, 1);
+		var end = new DateTime(SchoolYear.EndDate.Year, SchoolYear.EndDate.Month, 1);
+		
+		while (current <= end)
+		{
+			months.Add(current);
+			current = current.AddMonths(1);
+		}
+		
+		return months;
+	}
+
+	private List<Event> GetEventsForMonth(int year, int month)
+	{
+		if (events == null) return new List<Event>();
+		
+		return events
+			.Where(e => e.Date.Year == year && e.Date.Month == month)
+			.OrderBy(e => e.Date)
+			.ToList();
+	}
+
+	private bool IsCurrentMonth(DateTime month)
+	{
+		var now = DateTime.Now;
+		return month.Year == now.Year && month.Month == now.Month;
+	}
+
+	private string GetEventStatusColor(EventStatus status) => status switch
+	{
+		EventStatus.Planning => "bg-secondary",
+		EventStatus.SubmittedForApproval => "bg-warning",
+		EventStatus.Active => "bg-success",
+		EventStatus.InProgress => "bg-primary",
+		EventStatus.WrapUp => "bg-info",
+		EventStatus.Completed => "bg-dark",
+		EventStatus.Cancelled => "bg-danger",
+		_ => "bg-light text-dark"
+	};
+
+	private string TruncateText(string text, int maxLength)
+	{
+		if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+			return text;
+		return text.Substring(0, maxLength - 3) + "...";
+	}
+}

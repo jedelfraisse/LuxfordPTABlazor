@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LuxfordPTAWeb.Client\LuxfordPTAWeb.Client.csproj" />
+    <ProjectReference Include="..\LuxfordPTAWeb.Shared\LuxfordPTAWeb.Shared.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.8" />
