@@ -62,8 +62,19 @@
 					<ul class="list-group list-group-flush mb-0">
 						@foreach (var member in boardMembers)
 						{
-							<li class="list-group-item">
-								<strong>@member.Title:</strong> @member.FullName
+							<li class="list-group-item @(HasMemberDetails(member) ? "clickable-member" : "")" 
+								@onclick="() => ShowMemberDetails(member)" 
+								style="@(HasMemberDetails(member) ? "cursor: pointer;" : "")">
+								<div class="d-flex justify-content-between align-items-center">
+									<div>
+										<strong class="@(HasMemberDetails(member) ? "text-info" : "")">@member.Title:</strong> 
+										@member.FullName
+									</div>
+									@if (HasMemberDetails(member))
+									{
+										<i class="bi bi-info-circle-fill text-info" title="Click for more details"></i>
+									}
+								</div>
 							</li>
 						}
 					</ul>
@@ -137,9 +148,6 @@
 		<NavLink href="events" class="btn btn-lg btn-success px-5 fw-bold">View All Events</NavLink>
 	</div>
 
-
-
-
 	<!-- Get Involved Card -->
 	<div class="card shadow-sm mb-4">
 		<div class="card-header bg-success text-white fw-bold">Get Involved</div>
@@ -148,7 +156,6 @@
 			<NavLink href="get-involved" class="btn btn-outline-success fw-bold">Learn More & Sign Up</NavLink>
 		</div>
 	</div>
-
 }
 
 <!-- Contact Card -->
@@ -161,11 +168,68 @@
 	</div>
 </div>
 
-
 <div class="alert alert-success text-center mt-4">
 	<em>Thank you for being part of the Luxford Elementary community! Together, we're making a difference in our children's education.</em>
 </div>
 
+<!-- Board Member Details Modal -->
+@if (selectedMember != null)
+{
+	<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseModal">
+		<div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+			<div class="modal-content">
+				<div class="modal-header bg-info text-white">
+					<h5 class="modal-title">
+						<i class="bi bi-person-badge me-2"></i>@selectedMember.Title
+					</h5>
+					<button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+				</div>
+				<div class="modal-body">
+					<h6 class="mb-3">
+						<i class="bi bi-person me-2"></i>@selectedMember.FullName
+					</h6>
+					
+					@if (!string.IsNullOrWhiteSpace(selectedMember.PositionDescription))
+					{
+						<div class="mb-3">
+							<strong>Position Description:</strong>
+							<p class="mb-0 text-muted">@selectedMember.PositionDescription</p>
+						</div>
+					}
+					
+					@if (!string.IsNullOrWhiteSpace(selectedMember.Bio))
+					{
+						<div class="mb-0">
+							<strong>About @selectedMember.FullName.Split(' ')[0]:</strong>
+							<p class="mb-0">@selectedMember.Bio</p>
+						</div>
+					}
+
+					@if (string.IsNullOrWhiteSpace(selectedMember.PositionDescription) && string.IsNullOrWhiteSpace(selectedMember.Bio))
+					{
+						<p class="text-muted mb-0">
+							<em>No additional information available for this board member.</em>
+						</p>
+					}
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+<style>
+	.clickable-member:hover {
+		background-color: rgba(0, 123, 255, 0.1) !important;
+		transition: background-color 0.2s ease;
+	}
+	
+	.modal.show {
+		display: block !important;
+	}
+</style>
 
 @code {
 	private List<BoardMemberDto> boardMembers = new();
@@ -173,6 +237,7 @@
 	private bool isLoadingBoard = true;
 	private bool iselectionEvent = false;
 	private bool isCurrentYear = false;
+	private BoardMemberDto? selectedMember = null;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -187,14 +252,16 @@
 				boardYearLabel = $"{schoolYear.Name}";
 				// Get board positions for this year, only filled spots
 				var positions = await Http.GetFromJsonAsync<List<BoardPositionDto>>($"api/boardpositions/all-by-schoolyear/{schoolYear.Id}");
-				boardMembers = positions
+				boardMembers = positions?
 					.Where(bp => bp.AssignedUser != null)
 					.Select(bp => new BoardMemberDto
 					{
 						Title = bp.BoardPositionTitle?.Title ?? "Unknown",
-						FullName = bp.AssignedUser.FullName
+						FullName = bp.AssignedUser.FullName,
+						Bio = bp.AssignedUser.Bio ?? "",
+						PositionDescription = bp.BoardPositionTitle?.Description ?? ""
 					})
-					.ToList();
+					.ToList() ?? new List<BoardMemberDto>();
 			}
 		}
 		catch
@@ -204,10 +271,33 @@
 		isLoadingBoard = false;
 	}
 
+	private bool HasMemberDetails(BoardMemberDto member)
+	{
+		// Show info button if there is position description OR bio
+		return !string.IsNullOrWhiteSpace(member.PositionDescription) || !string.IsNullOrWhiteSpace(member.Bio);
+	}
+
+	private void ShowMemberDetails(BoardMemberDto member)
+	{
+		if (HasMemberDetails(member))
+		{
+			selectedMember = member;
+			StateHasChanged();
+		}
+	}
+
+	private void CloseModal()
+	{
+		selectedMember = null;
+		StateHasChanged();
+	}
+
 	public class BoardMemberDto
 	{
 		public string Title { get; set; } = "";
 		public string FullName { get; set; } = "";
+		public string Bio { get; set; } = "";
+		public string PositionDescription { get; set; } = "";
 	}
 
 	public class BoardPositionDto
@@ -222,11 +312,13 @@
 	{
 		public int Id { get; set; }
 		public string Title { get; set; } = "";
+		public string Description { get; set; } = "";
 	}
 
 	public class ApplicationUserDto
 	{
 		public string Id { get; set; } = "";
 		public string FullName { get; set; } = "";
+		public string Bio { get; set; } = "";
 	}
 }
