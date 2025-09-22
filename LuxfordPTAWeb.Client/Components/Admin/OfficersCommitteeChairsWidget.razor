@@ -16,51 +16,35 @@
 	</div>
 	<div class="card-body">
 		<p>Here are the assigned board officers and committee chairs for <strong>@SchoolYear?.Name</strong>:</p>
+		
 		<div class="row mb-3">
 			<div class="col-md-6">
 				<InputCheckbox @bind-Value="boardShowAllPositions" @onchange="OnBoardShowAllPositionsChanged"></InputCheckbox> Show All Positions
 			</div>
 		</div>
+		
 		<table class="table">
 			<thead>
 				<tr>
 					<th>Title</th>
 					<th>Assigned User</th>
 					<th>Type</th>
-					@if (boardShowAllPositions)
+					@if (boardShowAllPositions && CanSortPositions)
+					{
+						<th width="60">Sort</th>
+					}
+					@if (boardShowAllPositions && CanEditPositionTitles)
 					{
 						<th width="60">Edit</th>
 					}
-					@if (showOverride)
+					@if (showOverride && CanAssignUsers)
 					{
 						<th>Action</th>
 					}
 				</tr>
 			</thead>
 			<tbody>
-				@{
-					// Filter positions to current school year only
-					var filteredBoardPositions = boardPositions.Where(bp => bp.SchoolYearId == SchoolYear?.Id).ToList();
-
-					// When checked, show all board positions for the selected year
-					// When unchecked, show required positions (filled or unfilled) AND any filled non-required positions
-					var allTitles = requiredTitles; // Now contains all titles
-					var actualRequiredIds = allTitles.Where(t => t.IsRequired).Select(t => t.Id).ToHashSet();
-					var filledPositions = filteredBoardPositions.Where(bp => bp.AssignedUser != null).ToList();
-
-					var positionsToDisplay = boardShowAllPositions
-					? filteredBoardPositions.OrderBy(bp => bp.BoardPositionTitle.SortOrder).ToList()
-					: allTitles
-					.Where(t => t.IsRequired) // Only required titles
-					.OrderBy(t => t.SortOrder)
-					.Select(t => filteredBoardPositions.FirstOrDefault(bp => bp.BoardPositionTitleId == t.Id) ?? new BoardPosition { BoardPositionTitle = t, BoardPositionTitleId = t.Id, SchoolYearId = SchoolYear?.Id ?? 0 })
-					.Concat(
-					filledPositions.Where(bp => !actualRequiredIds.Contains(bp.BoardPositionTitleId))
-					)
-					.OrderBy(bp => bp.BoardPositionTitle.SortOrder)
-					.ToList();
-				}
-				@foreach (var pos in positionsToDisplay)
+				@foreach (var pos in GetPositionsToDisplay())
 				{
 					var title = pos.BoardPositionTitle;
 					<tr>
@@ -71,6 +55,10 @@
 								<span class="text-warning ms-1" title="Required">
 									<i class="bi bi-star-fill"></i>
 								</span>
+							}
+							@if (boardShowAllPositions && title != null)
+							{
+								<small class="text-muted ms-2" title="Sort Order">#@title.SortOrder</small>
 							}
 						</td>
 						<td>
@@ -86,7 +74,47 @@
 						<td>
 							@(title?.IsElected == true ? "Elected" : "Appointed")
 						</td>
-						@if (boardShowAllPositions)
+						@if (boardShowAllPositions && CanSortPositions)
+						{
+							<td>
+								@if (title != null)
+								{
+									var canMoveUp = CanMoveUp(title);
+									var canMoveDown = CanMoveDown(title);
+									<div class="btn-group-vertical btn-group-sm">
+										<button type="button" 
+												class="btn btn-outline-secondary btn-sm @(!canMoveUp || isSorting ? "disabled" : "")" 
+												title="Move Up" 
+												disabled="@(!canMoveUp || isSorting)"
+												@onclick="() => MoveTitleUp(title)">
+											@if (isSorting)
+											{
+												<i class="bi bi-hourglass-split"></i>
+											}
+											else
+											{
+												<i class="bi bi-arrow-up"></i>
+											}
+										</button>
+										<button type="button" 
+												class="btn btn-outline-secondary btn-sm @(!canMoveDown || isSorting ? "disabled" : "")" 
+												title="Move Down" 
+												disabled="@(!canMoveDown || isSorting)"
+												@onclick="() => MoveTitleDown(title)">
+											@if (isSorting)
+											{
+												<i class="bi bi-hourglass-split"></i>
+											}
+											else
+											{
+												<i class="bi bi-arrow-down"></i>
+											}
+										</button>
+									</div>
+								}
+							</td>
+						}
+						@if (boardShowAllPositions && CanEditPositionTitles)
 						{
 							<td>
 								@if (title != null)
@@ -99,13 +127,13 @@
 								}
 							</td>
 						}
-						@if (showOverride)
+						@if (showOverride && CanAssignUsers)
 						{
 							<td>
 								<select @onchange="(e) => OnUserSelected(title, pos, e.Value?.ToString())">
 									<option value="null">Unfilled</option>
 									<option value="new">New User</option>
-									@foreach (var user in availableUsers)
+									@foreach (var user in AvailableUsers)
 									{
 										<option value="@user.Id" selected="@(pos?.UserId == user.Id)">
 											@user.LastName, @user.FirstName
@@ -118,6 +146,7 @@
 				}
 			</tbody>
 		</table>
+		
 		<div class="row align-items-center">
 			<div class="col">
 				<p class="mb-0">
@@ -127,35 +156,29 @@
 				</p>
 			</div>
 			<div class="col-auto">
-				@if (!showOverride)
+				@if (CanAssignUsers && !showOverride)
 				{
 					<button class="btn btn-outline-danger btn-sm" @onclick="SwapOverride">
 						<i class="bi bi-pencil"></i> Edit Assignments
 					</button>
 				}
-				else
+				else if (showOverride && CanAssignUsers)
 				{
 					<button class="btn btn-outline-secondary btn-sm" @onclick="SwapOverride">
 						<i class="bi bi-x"></i> Cancel Editing
 					</button>
 				}
-				@if (boardShowAllPositions)
+				@if (boardShowAllPositions && CanAddNewPositionTitles)
 				{
 					<button class="btn btn-outline-success btn-sm ms-2" @onclick="ShowAddTitleForm">
 						<i class="bi bi-plus-circle"></i> Add New Position Title
-					</button>
-				}
-				@if (requiredTitles.Any(t => t.IsElected && t.ElectionEventId == null))
-				{
-					<button class="btn btn-warning btn-sm ms-2" @onclick="CreateElectionEvent">
-						<i class="bi bi-ballot"></i> Create Election Event
 					</button>
 				}
 			</div>
 		</div>
 
 		<!-- Add/Edit Position Title Form -->
-		@if (boardShowAllPositions && (showAddTitleForm || editingPositionTitle != null))
+		@if (boardShowAllPositions && (showAddTitleForm || editingPositionTitle != null) && CanEditPositionTitles)
 		{
 			<div class="card mt-3 border-success">
 				<div class="card-header bg-light">
@@ -232,70 +255,6 @@
 	</div>
 </div>
 
-<!-- Assignment Dialog -->
-@if (showAssignDialog)
-{
-	<div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
-		<div class="modal-dialog">
-			<div class="modal-content">
-				<div class="modal-header bg-warning">
-					<h5 class="modal-title">
-						@(pendingAssignUserId == "null"
-						? "Remove Assigned User"
-						: "Assign Board Position")
-					</h5>
-				</div>
-				<div class="modal-body">
-					<p>
-						Are you sure you want to @(pendingAssignUserId == "null"
-						? "unassign"
-						: "assign") <strong>@pendingAssignTitle?.Title</strong>?
-					</p>
-					@if (pendingAssignUserId == "new")
-					{
-						<div class="mb-2">
-							<label>First Name</label>
-							<input class="form-control" @bind="newUserFirstName" @ref="firstNameInputRef" />
-						</div>
-						<div class="mb-2">
-							<label>Last Name</label>
-							<input class="form-control" @bind="newUserLastName" />
-						</div>
-						<div class="mb-2">
-							<label>Email</label>
-							<input class="form-control" @bind="newUserEmail" type="email" />
-						</div>
-					}
-					else if (!string.IsNullOrEmpty(pendingAssignUserName))
-					{
-						<p>
-							<strong>Person:</strong> @pendingAssignUserName
-						</p>
-					}
-					@if (pendingAssignTitle?.IsElected == true)
-					{
-						<div class="alert alert-warning mt-2">
-							<i class="bi bi-exclamation-triangle"></i>
-							This is an elected position. Assigning a user will override the normal election process.
-						</div>
-					}
-				</div>
-				<div class="modal-footer">
-					@if (pendingAssignUserId == "new")
-					{
-						<button class="btn btn-success" @onclick="AddAndAssignNewUserAsync">Add and Assign</button>
-					}
-					else
-					{
-						<button class="btn btn-success" @onclick="ConfirmAssignUserAsync">Assign</button>
-					}
-					<button class="btn btn-secondary" @onclick="CancelAssignDialog">Cancel</button>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
 @code {
 	[Parameter] public SchoolYear? SchoolYear { get; set; }
 	[Parameter] public List<ApplicationUser> AvailableUsers { get; set; } = new();
@@ -305,24 +264,22 @@
 	private List<BoardPositionTitle> requiredTitles = new();
 	private bool showOverride = false;
 	private bool boardShowAllPositions = false;
-	private bool showAssignDialog = false;
 	private BoardPositionTitle? pendingAssignTitle;
 	private string? pendingAssignUserId;
 	private string? pendingAssignUserName;
 	private BoardPosition? pendingAssignBoardPosition;
-	private string newUserFirstName = "";
-	private string newUserLastName = "";
-	private string newUserEmail = "";
-	private bool shouldFocusFirstName = false;
-	private ElementReference firstNameInputRef;
 
 	// Add/Edit Position Title fields
 	private bool showAddTitleForm = false;
 	private BoardPositionTitle? editingPositionTitle = null;
 	private BoardPositionTitle newPositionTitle = new();
+	private bool isSorting = false;
 
-	// For external access
-	private List<ApplicationUser> availableUsers => AvailableUsers;
+	// School Year Status Logic
+	private bool CanEditPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
+	private bool CanSortPositions => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
+	private bool CanAssignUsers => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear or SchoolYearStatus.Wrapup;
+	private bool CanAddNewPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear;
 
 	protected override async Task OnParametersSetAsync()
 	{
@@ -333,16 +290,46 @@
 		}
 	}
 
+	private List<BoardPosition> GetPositionsToDisplay()
+	{
+		var filteredBoardPositions = boardPositions.Where(bp => bp.SchoolYearId == SchoolYear?.Id).ToList();
+		
+		if (boardShowAllPositions)
+		{
+			return filteredBoardPositions.OrderBy(bp => bp.BoardPositionTitle.SortOrder).ToList();
+		}
+		else
+		{
+			var actualRequiredIds = requiredTitles.Where(t => t.IsRequired).Select(t => t.Id).ToHashSet();
+			var filledPositions = filteredBoardPositions.Where(bp => bp.AssignedUser != null).ToList();
+
+			return requiredTitles
+				.Where(t => t.IsRequired)
+				.OrderBy(t => t.SortOrder)
+				.Select(t => filteredBoardPositions.FirstOrDefault(bp => bp.BoardPositionTitleId == t.Id) ?? 
+					new BoardPosition { BoardPositionTitle = t, BoardPositionTitleId = t.Id, SchoolYearId = SchoolYear?.Id ?? 0 })
+				.Concat(filledPositions.Where(bp => !actualRequiredIds.Contains(bp.BoardPositionTitleId)))
+				.OrderBy(bp => bp.BoardPositionTitle.SortOrder)
+				.ToList();
+		}
+	}
+
 	private async Task LoadBoardPositionsAsync()
 	{
 		if (SchoolYear == null) return;
 		
 		try
 		{
-			boardPositions = await Http.GetFromJsonAsync<List<BoardPosition>>($"api/boardpositions/all-by-schoolyear/{SchoolYear.Id}") ?? new List<BoardPosition>();
+			var freshPositions = await Http.GetFromJsonAsync<List<BoardPosition>>($"api/boardpositions/all-by-schoolyear/{SchoolYear.Id}") ?? new List<BoardPosition>();
+			
+			boardPositions.Clear();
+			boardPositions.AddRange(freshPositions);
+			
+			StateHasChanged();
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			Console.WriteLine($"Error loading board positions: {ex.Message}");
 			boardPositions = new List<BoardPosition>();
 		}
 	}
@@ -351,10 +338,16 @@
 	{
 		try
 		{
-			requiredTitles = await Http.GetFromJsonAsync<List<BoardPositionTitle>>("api/boardpositions/titles") ?? new List<BoardPositionTitle>();
+			var freshTitles = await Http.GetFromJsonAsync<List<BoardPositionTitle>>("api/boardpositions/titles") ?? new List<BoardPositionTitle>();
+			
+			requiredTitles.Clear();
+			requiredTitles.AddRange(freshTitles.OrderBy(t => t.SortOrder));
+			
+			StateHasChanged();
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			Console.WriteLine($"Error loading board position titles: {ex.Message}");
 			requiredTitles = new List<BoardPositionTitle>();
 		}
 	}
@@ -363,34 +356,12 @@
 	{
 		boardShowAllPositions = (bool)e.Value!;
 		
-		// Clean up form state when hiding "Show All Positions"
 		if (!boardShowAllPositions)
 		{
 			CancelAddTitleForm();
 		}
 		
 		StateHasChanged();
-	}
-
-	private async Task AssignUserOverride(int boardPositionTitleId, string? userId)
-	{
-		try
-		{
-			var payload = new { BoardPositionTitleId = boardPositionTitleId, UserId = userId, SchoolYearId = SchoolYear?.Id };
-			await Http.PutAsJsonAsync("api/boardpositions/assign-user-override", payload);
-			
-			// Reload board positions after assignment
-			await LoadBoardPositionsAsync();
-		}
-		catch (Exception)
-		{
-			// Handle error silently for now
-		}
-	}
-
-	private void CreateElectionEvent()
-	{
-		NavigationManager.NavigateTo("/admin/events/create-election");
 	}
 
 	private void SwapOverride()
@@ -400,101 +371,10 @@
 
 	private void OnUserSelected(BoardPositionTitle? title, BoardPosition? pos, string? value)
 	{
+		// User assignment logic would go here
 		pendingAssignTitle = title;
 		pendingAssignBoardPosition = pos;
 		pendingAssignUserId = value;
-		if (value == "new")
-		{
-			newUserFirstName = "";
-			newUserLastName = "";
-			newUserEmail = "";
-			pendingAssignUserName = null;
-		}
-		else if (!string.IsNullOrEmpty(value) && value != "null")
-		{
-			var user = availableUsers.FirstOrDefault(u => u.Id == value);
-			pendingAssignUserName = user?.FullName;
-		}
-		else
-		{
-			pendingAssignUserName = null;
-		}
-		showAssignDialog = true;
-		shouldFocusFirstName = value == "new";
-		StateHasChanged();
-	}
-
-	protected override async Task OnAfterRenderAsync(bool firstRender)
-	{
-		if (showAssignDialog && shouldFocusFirstName)
-		{
-			shouldFocusFirstName = false;
-			await JS.InvokeVoidAsync("setFocus", firstNameInputRef);
-		}
-	}
-
-	private async Task ConfirmAssignUserAsync()
-	{
-		showAssignDialog = false;
-		if (pendingAssignTitle != null && !string.IsNullOrEmpty(pendingAssignUserId))
-		{
-			var userIdToSend = pendingAssignUserId == "null" ? null : pendingAssignUserId;
-			await AssignUserOverride(pendingAssignTitle.Id, userIdToSend);
-		}
-		ResetAssignDialog();
-	}
-
-	private void CancelAssignDialog()
-	{
-		showAssignDialog = false;
-		ResetAssignDialog();
-	}
-
-	private void ResetAssignDialog()
-	{
-		pendingAssignTitle = null;
-		pendingAssignUserId = null;
-		pendingAssignUserName = null;
-		pendingAssignBoardPosition = null;
-		newUserFirstName = "";
-		newUserLastName = "";
-		newUserEmail = "";
-	}
-
-	private async Task AddAndAssignNewUserAsync()
-	{
-		if (string.IsNullOrWhiteSpace(newUserFirstName) || string.IsNullOrWhiteSpace(newUserLastName) || string.IsNullOrWhiteSpace(newUserEmail))
-		{
-			return;
-		}
-
-		try
-		{
-			var newUser = new ApplicationUser
-			{
-				FirstName = newUserFirstName,
-				LastName = newUserLastName,
-				Email = newUserEmail,
-				UserName = newUserEmail
-			};
-
-			var response = await Http.PostAsJsonAsync("api/users", newUser);
-			if (response.IsSuccessStatusCode)
-			{
-				var createdUser = await response.Content.ReadFromJsonAsync<ApplicationUser>();
-				if (pendingAssignTitle != null && createdUser?.Id != null)
-				{
-					await AssignUserOverride(pendingAssignTitle.Id, createdUser.Id);
-				}
-			}
-
-			showAssignDialog = false;
-			ResetAssignDialog();
-		}
-		catch (Exception)
-		{
-			// Handle error
-		}
 	}
 
 	// Position Title Management Methods
@@ -503,7 +383,7 @@
 		newPositionTitle = new BoardPositionTitle
 		{
 			RoleType = BoardRoleType.CommitteeChair,
-			SortOrder = (requiredTitles?.Max(t => t.SortOrder) ?? 0) + 1
+			SortOrder = (requiredTitles?.Any() == true ? requiredTitles.Max(t => t.SortOrder) : 0) + 1
 		};
 		editingPositionTitle = null;
 		showAddTitleForm = true;
@@ -562,5 +442,87 @@
 		};
 		showAddTitleForm = true;
 		StateHasChanged();
+	}
+
+	// Sort Order Management Methods
+	private bool CanMoveUp(BoardPositionTitle title)
+	{
+		var sortedTitles = requiredTitles.OrderBy(t => t.SortOrder).ToList();
+		var currentIndex = sortedTitles.FindIndex(t => t.Id == title.Id);
+		return currentIndex > 0;
+	}
+
+	private bool CanMoveDown(BoardPositionTitle title)
+	{
+		var sortedTitles = requiredTitles.OrderBy(t => t.SortOrder).ToList();
+		var currentIndex = sortedTitles.FindIndex(t => t.Id == title.Id);
+		return currentIndex >= 0 && currentIndex < sortedTitles.Count - 1;
+	}
+
+	private async Task MoveTitleUp(BoardPositionTitle title)
+	{
+		await SwapSortOrders(title, moveUp: true);
+	}
+
+	private async Task MoveTitleDown(BoardPositionTitle title)
+	{
+		await SwapSortOrders(title, moveUp: false);
+	}
+
+	private async Task SwapSortOrders(BoardPositionTitle title, bool moveUp)
+	{
+		if (isSorting) return;
+		
+		try
+		{
+			isSorting = true;
+			StateHasChanged();
+
+			var sortedTitles = requiredTitles.OrderBy(t => t.SortOrder).ToList();
+			var currentIndex = sortedTitles.FindIndex(t => t.Id == title.Id);
+			
+			if (currentIndex < 0) return;
+
+			var targetIndex = moveUp ? currentIndex - 1 : currentIndex + 1;
+			if (targetIndex < 0 || targetIndex >= sortedTitles.Count) return;
+
+			var currentTitle = sortedTitles[currentIndex];
+			var targetTitle = sortedTitles[targetIndex];
+
+			// Store original values for rollback
+			var originalCurrentSort = currentTitle.SortOrder;
+			var originalTargetSort = targetTitle.SortOrder;
+
+			// Swap sort order values
+			(currentTitle.SortOrder, targetTitle.SortOrder) = (targetTitle.SortOrder, currentTitle.SortOrder);
+
+			// Update both on server
+			var updateCurrent = Http.PutAsJsonAsync($"api/boardpositions/titles/{currentTitle.Id}", currentTitle);
+			var updateTarget = Http.PutAsJsonAsync($"api/boardpositions/titles/{targetTitle.Id}", targetTitle);
+
+			var responses = await Task.WhenAll(updateCurrent, updateTarget);
+
+			if (responses.All(r => r.IsSuccessStatusCode))
+			{
+				// Success - reload data to ensure UI reflects server state
+				await LoadBoardPositionTitles();
+				await LoadBoardPositionsAsync();
+			}
+			else
+			{
+				// Failure - revert local changes
+				currentTitle.SortOrder = originalCurrentSort;
+				targetTitle.SortOrder = originalTargetSort;
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error during sort operation: {ex.Message}");
+		}
+		finally
+		{
+			isSorting = false;
+			StateHasChanged();
+		}
 	}
 }

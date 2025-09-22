@@ -83,7 +83,6 @@ public class BoardPositionsController : ControllerBase
 					SchoolYearId = schoolYearId,
 					AssignedUser = null,
 					UserId = null,
-					Description = "",
 					IsVotingMember = false
 				});
 			}
@@ -124,7 +123,6 @@ public class BoardPositionsController : ControllerBase
 		if (bp == null) return NotFound();
 
 		bp.BoardPositionTitleId = model.BoardPositionTitleId;
-		bp.Description = model.Description;
 		bp.IsVotingMember = model.IsVotingMember;
 		bp.SchoolYearId = model.SchoolYearId;
 		bp.UserId = model.UserId;

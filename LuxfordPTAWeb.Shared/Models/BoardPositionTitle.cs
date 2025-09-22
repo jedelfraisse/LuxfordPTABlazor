@@ -17,7 +17,7 @@ public class BoardPositionTitle
 	public bool IsElected { get; set; } = false;
 	public int? ElectionEventId { get; set; } // FK to Event, nullable
 	
-	[StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
+	[StringLength(2000, ErrorMessage = "Description cannot exceed 2000 characters")]
 	public string Description { get; set; } = string.Empty;
 	
 	public ICollection<BoardPosition> BoardPositions { get; set; } = new List<BoardPosition>();
