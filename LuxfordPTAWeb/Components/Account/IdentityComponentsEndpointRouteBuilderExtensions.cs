@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using LuxfordPTAWeb.Components.Account.Pages.Manage;
-using LuxfordPTAWeb.Data;
+using LuxfordPTAWeb.Shared.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;

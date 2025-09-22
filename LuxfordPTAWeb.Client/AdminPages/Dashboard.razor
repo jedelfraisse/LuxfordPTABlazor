@@ -1,173 +1,105 @@
 ﻿@page "/admin"
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Client.Components.Admin
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+@inject IJSRuntime JS
 
 <PageTitle>Admin Dashboard</PageTitle>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-danger text-white">
-        <h1 class="mb-0"><i class="bi bi-shield-lock"></i> Admin Dashboard</h1>
-    </div>
-    <div class="card-body">
-        <p class="lead">Welcome to the PTA administration panel. Here you can manage events, content, and other administrative tasks.</p>
-    </div>
+	<div class="card-header bg-danger text-white">
+		<h1 class="mb-0"><i class="bi bi-shield-lock"></i> Admin Dashboard</h1>
+	</div>
+	<div class="card-body">
+		<p class="lead">Welcome to the PTA administration panel. Here you can manage events, content, and other administrative tasks.</p>
+	</div>
 </div>
 
-<!-- Current School Year Highlight -->
-@if (currentSchoolYear != null)
+<!-- School Year Context Header -->
+<SchoolYearContextHeader SchoolYear="@selectedSchoolYear" />
+
+@if (selectedSchoolYear != null)
 {
-    <div class="alert alert-success">
-        <h6><i class="bi bi-calendar-check"></i> Current School Year</h6>
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <strong>@currentSchoolYear.Name</strong>
-                <span class="text-muted">(@currentSchoolYear.StartDate.ToString("MMM yyyy") - @currentSchoolYear.EndDate.ToString("MMM yyyy"))</span>
-            </div>
-            <a href="/admin/school-years" class="btn btn-outline-warning me-2">
-                <i class="bi bi-calendar3"></i> School Years
-            </a>
-        </div>
-    </div>
+	<div class="row">
+		<div class="col-md-6 mb-4">
+			<OfficersCommitteeChairsWidget SchoolYear="@selectedSchoolYear" AvailableUsers="@availableUsers" />
+		</div>
+		<div class="col-md-6 mb-4">
+			<EventCalendarWidget SchoolYear="@selectedSchoolYear" Events="@filteredEvents" EventSummary="@eventSummary" />
+		</div>
+
+		<div class="col-md-6 mb-4">
+			<SponsorManagementWidget />
+		</div>
+
+		<div class="col-md-6 mb-4">
+			<ContentManagementWidget />
+		</div>
+		
+		<div class="col-md-6 mb-4">
+			<UserManagementWidget />
+		</div>
+	</div>
+}
+else
+{
+	<div class="alert alert-warning">
+		<h6><i class="bi bi-calendar-x"></i> No Current School Year</h6>
+		<p>Please create a new school year to get started.</p>
+		<a href="/admin/school-years" class="btn btn-outline-warning me-2">
+			<i class="bi bi-calendar3"></i> School Years
+		</a>
+	</div>
 }
 
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Event Management</h5>
-            </div>
-            <!-- Update the Event Management card body -->
-            <div class="card-body">
-                <p>Add, edit, and manage school and PTA events.</p>
-                <div class="d-grid gap-2">
-                    <a href="/admin/events" class="btn btn-primary">Manage Events</a>
-                    <a href="/admin/events/create" class="btn btn-outline-primary">Add New Event</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-people"></i> User Management</h5>
-            </div>
-            <div class="card-body">
-                <p>Manage user accounts and permissions.</p>
-                <div class="d-grid gap-2">
-                    <a href="/admin/users" class="btn btn-success">Manage Users</a>
-                    <a href="/admin/roles" class="btn btn-outline-success">Manage Roles</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-star"></i> Sponsor Management</h5>
-            </div>
-            <div class="card-body">
-                <p>Add and manage sponsor information and logos.</p>
-                <div class="d-grid gap-2">
-                    <a href="/admin/sponsors" class="btn btn-info">Manage Sponsors</a>
-                    <a href="/admin/sponsors/create" class="btn btn-outline-info">Add New Sponsor</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-warning text-white">
-                <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Content Management</h5>
-            </div>
-            <div class="card-body">
-                <p>Update page content, documents, and announcements.</p>
-                <div class="d-grid gap-2">
-                    <a href="/admin/content" class="btn btn-warning">Manage Content</a>
-                    <a href="/admin/documents" class="btn btn-outline-warning">Manage Documents</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="alert alert-info">
-    <h6><i class="bi bi-info-circle"></i> Quick Stats</h6>
-    <div class="row">
-        <div class="col-md-3">
-            <strong>Total Events:</strong> @totalEvents
-        </div>
-        <div class="col-md-3">
-            <strong>Upcoming Events:</strong> @upcomingEvents
-        </div>
-        <div class="col-md-3">
-            <strong>Active Users:</strong> @totalUsers
-        </div>
-        <div class="col-md-3">
-            <strong>Sponsors:</strong> @totalSponsors
-        </div>
-    </div>
-</div>
-
 @code {
-    private int totalEvents = 0;
-    private int upcomingEvents = 0;
-    private int totalUsers = 0;
-    private int totalSponsors = 0;
-    private SchoolYearDto? currentSchoolYear;
+	private SchoolYear? selectedSchoolYear;
+	private List<Event>? filteredEvents;
+	private EventDashboardSummary? eventSummary;
+	private List<ApplicationUser> availableUsers = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            // Load dashboard statistics
-            var events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
-            totalEvents = events?.Count ?? 0;
-            upcomingEvents = events?.Count(e => e.Date >= DateTime.Now) ?? 0;
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			selectedSchoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
 
-            // You can add more API calls here for users and sponsors when those endpoints are ready
-            totalUsers = 1; // Placeholder
-            totalSponsors = 5; // Placeholder
-           
-            await LoadCurrentSchoolYear();
+			if (selectedSchoolYear != null)
+			{
+				// Load all events for the selected school year
+				var events = await Http.GetFromJsonAsync<List<Event>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
+				filteredEvents = events ?? new List<Event>();
 
+				// Load event summary
+				await LoadEventSummaryAsync();
+			}
+			
+			// Load available users
+			availableUsers = (await Http.GetFromJsonAsync<List<ApplicationUser>>("api/users") ?? new List<ApplicationUser>())
+				.OrderBy(u => u.LastName)
+				.ThenBy(u => u.FirstName)
+				.ToList();
+		}
+		catch (Exception)
+		{
+			// Handle errors silently for now
+		}
+	}
 
-        }
-        catch (Exception)
-        {
-            // Handle errors silently for now
-        }
-    }
-
-    private async Task LoadCurrentSchoolYear()
-    {
-        try
-        {
-            currentSchoolYear = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
-        }
-        catch (Exception)
-        {
-            // No current school year found
-        }
-    }
-
-    public class EventDto
-    {
-        public string Title { get; set; } = string.Empty;
-        public DateTime Date { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public string Location { get; set; } = string.Empty;
-    }
-
-    // DTO Classes
-    public class SchoolYearDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
-    }
+	private async Task LoadEventSummaryAsync()
+	{
+		try
+		{
+			if (selectedSchoolYear == null) return;
+			eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>($"api/events/dashboard-summary/{selectedSchoolYear.Id}");
+		}
+		catch (Exception)
+		{
+			// Handle errors silently for now
+		}
+	}
 }

@@ -1,89 +1,175 @@
-﻿@inherits LayoutComponentBase
+﻿@using LuxfordPTAWeb.Client.Code
+@using LuxfordPTAWeb.Shared.Models
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inherits LayoutComponentBase
+@inject SchoolYearSupport SchoolYearSupport
+
 
 <div class="container-fluid p-0">
-    <div class="row justify-content-center">
-        <div class="col-12 col-md-10">
-            <!-- Header Box -->
-            <div class="pta-header-box mb-3">
-                <!-- Top Row: All elements centered as a group -->
-                <div class="pta-header-top d-flex justify-content-center align-items-end gap-5 mb-2">
-                    <!-- PTA Logo -->
-                    <div class="pta-logo-box">
-                        <a href="/">
-                        <img src="images/pta-logo.png" alt="PTA Logo" class="pta-logo" /></a>
-                    </div>
-                    <!-- School Name/Logo -->
-                    <div class="text-center pta-school-logo-box">
-                        <a href="/">
-                        <img src="images/luxford-logo.png" alt="Luxford Elementary" class="pta-school-logo mb-2" />
-                        </a>
-                    </div>
-                    <!-- Mascot -->
-                    <div class="pta-mascot-box">
-                        <a href="/">
-                        <img src="images/mascot.png" alt="Mascot" class="pta-mascot" />
-                        </a>
-                    </div>
-                    <!-- Sponsor Badge -->
-                    <div class="text-center">
-                        <NavLink href="sponsors" aria-label="Sponsors" title="Sponsors">
-                            <img src="sponsors/chuck-e-cheeses-car-design-png-logo-8.png" alt="Chuck E. Cheese's Sponsors" class="sponsor-logo" />
-                        </NavLink>
-                    </div>
-                </div>
-                <!-- Navigation Row -->
-                <nav class="pta-header-nav d-flex justify-content-center align-items-center gap-4 mb-2">
-                    <NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
-                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
-                        Get Involved
-                    </NavLink>
-                    <NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
-                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
-                        Events
-                    </NavLink>
-                  
-                    <NavLink href="givebacks" class="pta-nav-link text-warning" aria-label="Givebacks" title="Givebacks">
-                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-gift"></i></span>
-                        Givebacks
-                    </NavLink>
-                    <NavLink href="documents" class="pta-nav-link text-secondary" aria-label="Documents" title="Documents">
-                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
-                        Documents
-                    </NavLink>
-                    <NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
-                        <span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
-                        Sponsors
-                    </NavLink>
-                </nav>
-                <!-- Login Display Row - Centered after navigation -->
-                <div class="d-flex justify-content-center align-items-center mb-2">
-                    <LoginDisplay />
-                </div>
-            </div>
-            <div class="col-lg-9 mx-auto">
-                <div class="card-body">
-                    @Body
-                </div>
-            </div>
-        </div>
-    </div>
+	<div class="row justify-content-center">
+		<div class="col-12 col-md-10">
+			<!-- Header Box -->
+			<div class="pta-header-box mb-3">
+				<!-- Top Row: All elements centered as a group -->
+				<div class="pta-header-top d-flex justify-content-center align-items-end gap-5 mb-2">
+					<!-- PTA Logo -->
+					<div class="pta-logo-box">
+						<a href="/">
+							<img src="images/pta-logo.png" alt="PTA Logo" class="pta-logo" />
+						</a>
+					</div>
+					<!-- School Name/Logo -->
+					<div class="text-center pta-school-logo-box">
+						<a href="/">
+							<img src="images/luxford-logo.png" alt="Luxford Elementary" class="pta-school-logo mb-2" />
+						</a>
+					</div>
+					<!-- Mascot -->
+					<div class="pta-mascot-box">
+						<a href="/">
+							<img src="images/mascot.png" alt="Mascot" class="pta-mascot" />
+						</a>
+					</div>
+					<!-- Sponsor Badge -->
+					<div class="text-center">
+						<NavLink href="sponsors" aria-label="Sponsors" title="Sponsors">
+							<img src="sponsors/chuck-e-cheeses-car-design-png-logo-8.png" alt="Chuck E. Cheese's Sponsors" class="sponsor-logo" />
+						</NavLink>
+					</div>
+				</div>
+				<!-- Navigation Row -->
+				<nav class="pta-header-nav d-flex justify-content-center align-items-center gap-4 mb-2">
+					<NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
+						<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+						Get Involved
+					</NavLink>
+					<NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
+						<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
+						Events
+					</NavLink>
+
+					<NavLink href="givebacks" class="pta-nav-link text-warning" aria-label="Givebacks" title="Givebacks">
+						<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-gift"></i></span>
+						Givebacks
+					</NavLink>
+					<NavLink href="documents" class="pta-nav-link text-secondary" aria-label="Documents" title="Documents">
+						<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+						Documents
+					</NavLink>
+					<NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
+						<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
+						Sponsors
+					</NavLink>
+				</nav>
+				<!-- Login Display Row - Centered after navigation -->
+				<div class="d-flex justify-content-center align-items-center mb-2 gap-4">
+					<div class="school-year-banner d-flex align-items-center bg-white shadow-sm rounded-pill px-3 py-1 border border-primary" style="min-width:140px;">
+						@if (ShowPrevArrow)
+						{
+							<button class="btn btn-sm btn-outline-primary rounded-pill me-3" @onclick="PrevYear" title="Previous Year" style="width:32px;height:32px;line-height:1;">
+								<i class="bi bi-chevron-left"></i>
+							</button>
+						}
+						<span class="fw-bold text-primary mx-3" style="font-size:1.1rem;">@CurrentYearText</span>
+						@if (SelectedSchoolYearInfo != null)
+						{
+							<span class="text-muted mx-2" style="font-size:1rem;">Reflections: @SelectedSchoolYearInfo.ReflectionsTheme</span>
+						}
+						@if (ShowNextArrow)
+						{
+							<button class="btn btn-sm btn-outline-primary rounded-pill ms-3" @onclick="NextYear" title="Next Year" style="width:32px;height:32px;line-height:1;">
+								<i class="bi bi-chevron-right"></i>
+							</button>
+						}
+					</div>
+					<LoginDisplay />
+				</div>
+
+				@if (IsViewingPreviousYear)
+				{
+					<div class="alert alert-info text-center mb-2">
+						You are viewing a previous year. <a href="#" @onclick="ShowCurrentYear" class="alert-link">Click here to view the current year.</a>
+					</div>
+				}
+			</div>
+			<div class="col-lg-9 mx-auto">
+				<div class="card-body">
+					@Body
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 
 <footer class="bg-light border-top py-3 mt-auto">
-    <div class="container d-flex justify-content-center gap-3 flex-wrap">
-        <NavLink href="events" class="text-decoration-none text-primary">Events</NavLink>
-        <NavLink href="get-involved" class="text-decoration-none text-success">Get Involved</NavLink>
-        <NavLink href="sponsors" class="text-decoration-none text-info">Sponsors</NavLink>
-        <NavLink href="givebacks" class="text-decoration-none text-warning">Givebacks</NavLink>
-        <NavLink href="documents" class="text-decoration-none text-secondary">Documents</NavLink>
-    </div>
-    <div class="text-center mt-2">
-        <small>&copy; 2025 Luxford Elementary PTA</small>
-    </div>
+	<div class="container d-flex justify-content-center gap-3 flex-wrap">
+		<NavLink href="events" class="text-decoration-none text-primary">Events</NavLink>
+		<NavLink href="get-involved" class="text-decoration-none text-success">Get Involved</NavLink>
+		<NavLink href="sponsors" class="text-decoration-none text-info">Sponsors</NavLink>
+		<NavLink href="givebacks" class="text-decoration-none text-warning">Givebacks</NavLink>
+		<NavLink href="documents" class="text-decoration-none text-secondary">Documents</NavLink>
+	</div>
+	<div class="text-center mt-2">
+		<small>&copy; 2025 Luxford Elementary PTA</small>
+	</div>
 </footer>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+	An unhandled error has occurred.
+	<a href="." class="reload">Reload</a>
+	<span class="dismiss">🗙</span>
 </div>
+
+@code {
+	private int minYear = 2024;
+	private int currentYear;
+	private int selectedYear;
+	private bool _loaded = false;
+
+	private int startYear => selectedYear;
+	private int endYear => selectedYear + 1;
+	private string CurrentYearText => $"{startYear}-{endYear}";
+
+	private bool ShowPrevArrow => selectedYear > minYear;
+	private bool ShowNextArrow => selectedYear < SchoolYearSupport.GetCurrentSchoolYear().StartYear;
+	private bool IsViewingPreviousYear => selectedYear < currentYear;
+
+	private SchoolYear? SelectedSchoolYearInfo;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loaded)
+        {
+            selectedYear = await SchoolYearSupport.GetSelectedSchoolYearAsync();
+            currentYear = SchoolYearSupport.GetCurrentSchoolYear().StartYear;
+			SelectedSchoolYearInfo = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+            _loaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PrevYear()
+    {
+        if (selectedYear > minYear)
+        {
+            selectedYear--;
+            await SchoolYearSupport.SetSelectedSchoolYearAsync(selectedYear);
+            SchoolYearSupport.ReloadPage();
+        }
+    }
+
+    private async Task NextYear()
+    {
+        selectedYear++;
+        await SchoolYearSupport.SetSelectedSchoolYearAsync(selectedYear);
+        SchoolYearSupport.ReloadPage();
+    }
+
+    private async Task ShowCurrentYear()
+    {
+        selectedYear = currentYear;
+        await SchoolYearSupport.SetSelectedSchoolYearAsync(selectedYear);
+        SchoolYearSupport.ReloadPage();
+    }
+}

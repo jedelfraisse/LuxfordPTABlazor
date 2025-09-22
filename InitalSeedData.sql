@@ -21,11 +21,11 @@ VALUES
 SET IDENTITY_INSERT [SchoolYears] OFF;
 
 -- =====================================================
--- 2. EVENT TYPES (Categories)
+-- 2. EVENT Categories
 -- =====================================================
-SET IDENTITY_INSERT [EventTypes] ON;
+SET IDENTITY_INSERT [EventCats] ON;
 
-INSERT INTO [EventTypes] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Size], [Icon], [ColorClass], [DisplayMode], [MaxEventsToShow], [ShowViewEventsButton], [ShowInlineOnMainPage])
+INSERT INTO [EventCats] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Size], [Icon], [ColorClass], [DisplayMode], [MaxEventsToShow], [ShowViewEventsButton], [ShowInlineOnMainPage])
 VALUES 
     (1, 'School Calendar & Closures', 'school-calendar-closures', 'Anchor dates everyone needs to know, such as holidays, staff days, and testing days.', 0, 1, 1, 'bi-calendar-x', 'text-danger', 0, 0, 1, 1),
     (2, 'Meetings & Planning', 'meetings-planning', 'PTA, committee, and board sessions for planning and coordination.', 1, 1, 0, 'bi-people-fill', 'text-primary', 0, 0, 1, 0),
@@ -34,14 +34,14 @@ VALUES
     (5, 'Staff & School Support', 'staff-school-support', 'Events that help teachers and school operations, such as appreciation and supply drives.', 4, 1, 0, 'bi-mortarboard-fill', 'text-info', 0, 0, 1, 0),
     (6, 'Student/Family Support Projects', 'student-family-support', 'Ongoing initiatives with recurring events to support students and families.', 5, 1, 0, 'bi-hand-thumbs-up', 'text-secondary', 0, 0, 1, 0);
 
-SET IDENTITY_INSERT [EventTypes] OFF;
+SET IDENTITY_INSERT [EventCats] OFF;
 
 -- =====================================================
 -- 3. EVENT SUB-TYPES (Subcategories)
 -- =====================================================
-SET IDENTITY_INSERT [EventSubTypes] ON;
+SET IDENTITY_INSERT [EventCatSubs] ON;
 
-INSERT INTO [EventSubTypes] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Icon], [ColorClass], [EventTypeId])
+INSERT INTO [EventCatSubs] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Icon], [ColorClass], [EventTypeId])
 VALUES 
     -- School Calendar & Closures
     (1, 'Holiday', 'holiday', 'School holidays when school is closed for all students and staff.', 0, 1, 'bi-flag', 'text-danger', 1),
@@ -74,7 +74,7 @@ VALUES
     (18, 'Safety Campaign', 'safety-campaign', 'Programs to promote student and family safety.', 1, 1, 'bi-shield-check', 'text-danger', 6),
     (19, 'Wellness Workshop', 'wellness-workshop', 'Workshops focused on health and wellness for families.', 2, 1, 'bi-heart-pulse', 'text-info', 6);
 
-SET IDENTITY_INSERT [EventSubTypes] OFF;
+SET IDENTITY_INSERT [EventCatSubs] OFF;
 
 -- =====================================================
 -- 4. SPONSORS (Sample Data)

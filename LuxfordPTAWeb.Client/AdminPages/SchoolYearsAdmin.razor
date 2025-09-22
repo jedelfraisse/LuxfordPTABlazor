@@ -1,7 +1,11 @@
 ﻿@page "/admin/school-years"
+
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+
 
 <PageTitle>Manage School Years</PageTitle>
 
@@ -43,7 +47,7 @@
                 <strong>@currentSchoolYear.Name</strong> 
                 <span class="text-muted">(@currentSchoolYear.StartDate.ToString("MMM yyyy") - @currentSchoolYear.EndDate.ToString("MMM yyyy"))</span>
             </div>
-            <button type="button" class="btn btn-outline-warning btn-sm" @onclick="ShowTransitionForm">
+            <button type="button" class="btn btn-info btn-sm" @onclick="ShowTransitionForm">
                 <i class="bi bi-arrow-right-circle"></i> Transition to New Year
             </button>
         </div>
@@ -51,7 +55,7 @@
 }
 
 <!-- Year Transition Form -->
-@if (showTransitionForm)
+@if (showTransitionStep1)
 {
     <div class="card mb-4 border-warning">
         <div class="card-header bg-warning text-dark">
@@ -130,8 +134,40 @@
     </div>
 }
 
+@if (showTransitionStep2)
+{
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-dark">
+            <h5 class="mb-0"><i class="bi bi-arrow-right-circle"></i> Confirm School Year Transition</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <strong>Are you sure?</strong> This will mark <b>@currentSchoolYear?.Name</b> as  and activate <b>@nextYearCandidate?.Name</b> as the new current school year.
+            </div>
+            <ul>
+                <li>Archive current year data: <b>@(transitionModel.ArchiveCurrentYear ? "Yes" : "No")</b></li>
+                <li>Copy recurring events: <b>@(transitionModel.CopyRecurringEvents ? "Yes" : "No")</b></li>
+            </ul>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success" @onclick="ConfirmTransitionToNewYear" disabled="@isTransitioning">
+                    @if (isTransitioning)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    }
+                    <i class="bi bi-check-circle me-1"></i>
+                    Confirm Transition
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="CancelTransition">
+                    <i class="bi bi-x-circle me-1"></i>
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- Create/Edit Form -->
-@if (showForm && !showTransitionForm)
+@if (showForm && !showTransitionStep1)
 {
     <div class="card mb-4">
         <div class="card-header">
@@ -164,6 +200,13 @@
                             <InputDate id="endDate" @bind-Value="editingSchoolYear.EndDate" class="form-control" />
                             <ValidationMessage For="() => editingSchoolYear.EndDate" class="text-danger" />
                         </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="mb-3">
+                        Reflection Theme: <InputText id="ReflectionTheme" @bind-Value="editingSchoolYear.ReflectionsTheme" class="form-control"
+                        placeholder="Theme as assigned by Virginia PTA"/>
                     </div>
                 </div>
 
@@ -209,6 +252,7 @@ else
                 <thead class="table-light">
                     <tr>
                         <th>Name</th>
+                        <th>Reflections Theme</th>
                         <th>Period</th>
                         <th>Status</th>
                         <th>Events</th>
@@ -226,6 +270,7 @@ else
                                     <span class="badge bg-success ms-2">Current</span>
                                 }
                             </td>
+							<td>@(string.IsNullOrWhiteSpace(year.ReflectionsTheme) ? "<em class='text-muted'>N/A</em>" : year.ReflectionsTheme)</td>
                             <td>
                                 @year.StartDate.ToString("MMM yyyy") - @year.EndDate.ToString("MMM yyyy")
                             </td>
@@ -257,35 +302,81 @@ else
     </div>
 }
 
+
 @code {
-    private List<SchoolYearDto>? schoolYears;
-    private List<EventDto>? events;
-    private SchoolYearDto? currentSchoolYear;
+    private List<SchoolYear>? schoolYears;
+    private List<Event>? events;
+    private SchoolYear? currentSchoolYear;
     private CreateSchoolYearDto editingSchoolYear = new();
     private TransitionToNewYearDto transitionModel = new();
     private bool showForm = false;
-    private bool showTransitionForm = false;
     private bool isSaving = false;
     private bool isTransitioning = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
 
+    private bool showTransitionStep1 = false;
+    private bool showTransitionStep2 = false;
+    private SchoolYear? nextYearCandidate;
+
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("SchoolYearsAdmin: Starting OnInitializedAsync");
+        
+        // Small delay to ensure auth context is ready
+        await Task.Delay(100);
+        
         await LoadSchoolYears();
+        Console.WriteLine($"SchoolYearsAdmin: Loaded {schoolYears?.Count ?? 0} school years");
         await LoadEvents();
+        Console.WriteLine($"SchoolYearsAdmin: Loaded {events?.Count ?? 0} events");
         await LoadCurrentSchoolYear();
+        Console.WriteLine($"SchoolYearsAdmin: Current school year: {currentSchoolYear?.Name ?? "None"}");
+        StateHasChanged(); // Force a re-render after all data is loaded
+        Console.WriteLine("SchoolYearsAdmin: OnInitializedAsync completed");
     }
 
     private async Task LoadSchoolYears()
     {
         try
         {
-            schoolYears = await Http.GetFromJsonAsync<List<SchoolYearDto>>("api/schoolyears");
+            Console.WriteLine("SchoolYearsAdmin: Calling API /api/schoolyears");
+            
+            // Add authorization headers explicitly if needed
+            var request = new HttpRequestMessage(HttpMethod.Get, "api/schoolyears");
+            var response = await Http.SendAsync(request);
+            
+            Console.WriteLine($"SchoolYearsAdmin: API response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"SchoolYearsAdmin: API response content length: {content.Length}");
+                Console.WriteLine($"SchoolYearsAdmin: API response preview: {content.Take(200)}...");
+                
+                schoolYears = await response.Content.ReadFromJsonAsync<List<SchoolYear>>();
+                Console.WriteLine($"SchoolYearsAdmin: Deserialized {schoolYears?.Count ?? 0} school years");
+                
+                if (schoolYears != null)
+                {
+                    foreach (var year in schoolYears)
+                    {
+                        Console.WriteLine($"SchoolYearsAdmin: Year {year.Name} - Visible: {year.IsVisibleToPublic}");
+                    }
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"SchoolYearsAdmin: API Error Response: {error}");
+                errorMessage = $"API Error: {response.StatusCode} - {error}";
+                schoolYears = new List<SchoolYear>();
+            }
         }
         catch (Exception ex)
         {
-            schoolYears = new List<SchoolYearDto>();
+            Console.WriteLine($"SchoolYearsAdmin: Exception in LoadSchoolYears: {ex}");
+            schoolYears = new List<SchoolYear>();
             errorMessage = $"Error loading school years: {ex.Message}";
         }
     }
@@ -294,11 +385,11 @@ else
     {
         try
         {
-            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+            events = await Http.GetFromJsonAsync<List<Event>>("api/events/all-admin");
         }
         catch (Exception)
         {
-            events = new List<EventDto>();
+            events = new List<Event>();
         }
     }
 
@@ -306,7 +397,7 @@ else
     {
         try
         {
-            currentSchoolYear = await Http.GetFromJsonAsync<SchoolYearDto>("api/schoolyears/current");
+            currentSchoolYear = await Http.GetFromJsonAsync<SchoolYear>("api/schoolyears/current");
         }
         catch (Exception)
         {
@@ -317,18 +408,150 @@ else
     // Rest of the component methods...
     private void ShowCreateForm()
     {
-        editingSchoolYear = new CreateSchoolYearDto();
+        var today = DateTime.Today;
+        DateTime startDate;
+        DateTime endDate;
+
+        int currentYear = today.Month >= 7 ? today.Year : today.Year - 1;
+        var lastYearStart = new DateTime(currentYear - 1, 7, 1);
+        var lastYearEnd = new DateTime(currentYear, 6, 30);
+        var nextYearStart = new DateTime(currentYear + 1, 7, 1);
+        var nextYearEnd = new DateTime(currentYear + 2, 6, 30);
+
+        bool canCreateLastYear = !schoolYears?.Any(sy => sy.StartDate == lastYearStart && sy.EndDate == lastYearEnd) ?? true;
+        bool canCreateNextYear = !schoolYears?.Any(sy => sy.StartDate == nextYearStart && sy.EndDate == nextYearEnd) ?? true;
+
+        if (canCreateLastYear)
+        {
+            startDate = lastYearStart;
+            endDate = lastYearEnd;
+        }
+        else if (canCreateNextYear)
+        {
+            startDate = nextYearStart;
+            endDate = nextYearEnd;
+        }
+        else
+        {
+            errorMessage = "Only last year or next year can be created.";
+            return;
+        }
+
+        editingSchoolYear = new CreateSchoolYearDto
+        {
+            Name = $"{startDate.Year}-{endDate.Year}",
+            StartDate = startDate,
+            EndDate = endDate
+        };
         showForm = true;
-        showTransitionForm = false;
+        showTransitionStep1 = false;
+        showTransitionStep2 = false;
         ClearMessages();
     }
 
-    private void ShowTransitionForm()
+    private async Task ShowTransitionForm()
     {
-        transitionModel = new TransitionToNewYearDto();
-        showTransitionForm = true;
+        var today = DateTime.Today;
+        int currentYear = today.Month >= 7 ? today.Year : today.Year - 1;
+        var nextYearStart = new DateTime(currentYear + 1, 7, 1);
+        var nextYearEnd = new DateTime(currentYear + 2, 6, 30);
+
+        nextYearCandidate = schoolYears?.FirstOrDefault(sy => sy.StartDate == nextYearStart && sy.EndDate == nextYearEnd);
         showForm = false;
+        if (nextYearCandidate == null)
+        {
+            // Prompt to create new year
+            transitionModel = new TransitionToNewYearDto
+            {
+                NewYearName = $"{nextYearStart.Year}-{nextYearEnd.Year}",
+                StartDate = nextYearStart,
+                EndDate = nextYearEnd,
+                ArchiveCurrentYear = true,
+                CopyRecurringEvents = true
+            };
+            showTransitionStep1 = true;
+            showTransitionStep2 = false;
+        }
+        else
+        {
+            // Prompt to confirm transition
+            showTransitionStep1 = false;
+            showTransitionStep2 = true;
+        }
         ClearMessages();
+    }
+
+    private async Task CreateAndProceedToTransition()
+    {
+        // Validate dates
+        if (schoolYears?.Any(sy =>
+            (transitionModel.StartDate < sy.EndDate && transitionModel.EndDate > sy.StartDate)) ?? false)
+        {
+            errorMessage = "The new school year dates overlap with an existing year.";
+            return;
+        }
+        if (transitionModel.StartDate >= transitionModel.EndDate)
+        {
+            errorMessage = "Start date must be before end date.";
+            return;
+        }
+
+        // Create new year
+        var newYearDto = new CreateSchoolYearDto
+        {
+            Name = transitionModel.NewYearName,
+            StartDate = transitionModel.StartDate,
+            EndDate = transitionModel.EndDate
+        };
+        var response = await Http.PostAsJsonAsync("api/schoolyears", newYearDto);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadSchoolYears();
+            nextYearCandidate = schoolYears?.FirstOrDefault(sy => sy.StartDate == newYearDto.StartDate && sy.EndDate == newYearDto.EndDate);
+            showTransitionStep1 = false;
+            showTransitionStep2 = true;
+            successMessage = "New school year created. Please confirm transition.";
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            errorMessage = $"Error creating new year: {error}";
+        }
+    }
+
+    private async Task ConfirmTransitionToNewYear()
+    {
+        if (currentSchoolYear == null || nextYearCandidate == null)
+        {
+            errorMessage = "Current or next school year not found.";
+            return;
+        }
+
+        isTransitioning = true;
+        ClearMessages();
+
+        // Call API to close current year and activate next year
+        var transitionPayload = new
+        {
+            NextYearId = nextYearCandidate.Id,
+            ArchiveCurrentYear = transitionModel.ArchiveCurrentYear,
+            CopyRecurringEvents = transitionModel.CopyRecurringEvents
+        };
+        var response = await Http.PostAsJsonAsync($"api/schoolyears/{currentSchoolYear.Id}/close-and-activate", transitionPayload);
+
+        if (response.IsSuccessStatusCode)
+        {
+            successMessage = "Transitioned to new school year!";
+            showTransitionStep2 = false;
+            await LoadSchoolYears();
+            await LoadCurrentSchoolYear();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            errorMessage = $"Error during transition: {error}";
+        }
+        isTransitioning = false;
     }
 
     private void CancelForm()
@@ -339,7 +562,8 @@ else
 
     private void CancelTransition()
     {
-        showTransitionForm = false;
+        showTransitionStep1 = false;
+        showTransitionStep2 = false;
         transitionModel = new TransitionToNewYearDto();
     }
 
@@ -357,7 +581,7 @@ else
         try
         {
             HttpResponseMessage response;
-            
+
             if (editingSchoolYear.Id > 0)
             {
                 response = await Http.PutAsJsonAsync($"api/schoolyears/{editingSchoolYear.Id}", editingSchoolYear);
@@ -407,11 +631,12 @@ else
         try
         {
             var response = await Http.PostAsJsonAsync($"api/schoolyears/{currentSchoolYear.Id}/transition", transitionModel);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 successMessage = "Successfully transitioned to new school year!";
-                showTransitionForm = false;
+                showTransitionStep1 = false;
+                showTransitionStep2 = false;
                 await LoadSchoolYears();
                 await LoadCurrentSchoolYear();
             }
@@ -431,17 +656,22 @@ else
         }
     }
 
-    private void EditSchoolYear(SchoolYearDto schoolYear)
+    private void EditSchoolYear(SchoolYear schoolYear)
     {
         editingSchoolYear = new CreateSchoolYearDto
         {
             Id = schoolYear.Id,
             Name = schoolYear.Name,
             StartDate = schoolYear.StartDate,
-            EndDate = schoolYear.EndDate
+            EndDate = schoolYear.EndDate,
+            PrintableEventCalendar = schoolYear.PrintableEventCalendar,
+            ReflectionsTheme = schoolYear.ReflectionsTheme,
+            Status = schoolYear.Status,
+            IsVisibleToPublic = schoolYear.IsVisibleToPublic
         };
         showForm = true;
-        showTransitionForm = false;
+        showTransitionStep1 = false;
+        showTransitionStep2 = false;
         ClearMessages();
     }
 
@@ -476,10 +706,10 @@ else
 
     private int GetEventCount(int schoolYearId)
     {
-        return events?.Count(e => e.SchoolYear?.Id == schoolYearId) ?? 0;
+        return events?.Count(e => e.SchoolYearId == schoolYearId) ?? 0;
     }
 
-    private string GetYearStatus(SchoolYearDto year)
+    private string GetYearStatus(SchoolYear year)
     {
         var now = DateTime.Now;
         if (now < year.StartDate) return "Future";
@@ -487,7 +717,7 @@ else
         return "Active";
     }
 
-    private string GetStatusBadgeClass(SchoolYearDto year)
+    private string GetStatusBadgeClass(SchoolYear year)
     {
         var status = GetYearStatus(year);
         return status switch
@@ -499,33 +729,17 @@ else
         };
     }
 
-    // DTO Classes
-    public class SchoolYearDto
+    // DTO Classes for form binding
+    public class CreateSchoolYearDto
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-    }
-
-    public class EventDto
-    {
-        public int Id { get; set; }
-        public SchoolYearDto? SchoolYear { get; set; }
-    }
-
-    public class CreateSchoolYearDto
-    {
-        public int Id { get; set; }
-        
-        [System.ComponentModel.DataAnnotations.Required]
-        public string Name { get; set; } = string.Empty;
-        
-        [System.ComponentModel.DataAnnotations.Required]
-        public DateTime StartDate { get; set; } = DateTime.Now.Date;
-        
-        [System.ComponentModel.DataAnnotations.Required]
-        public DateTime EndDate { get; set; } = DateTime.Now.AddYears(1).Date;
+        public string PrintableEventCalendar { get; set; } = string.Empty;
+        public string ReflectionsTheme { get; set; } = string.Empty;
+        public bool IsVisibleToPublic { get; set; } = false;
+        public SchoolYearStatus Status { get; set; } = SchoolYearStatus.FutureYear;
     }
 
     public class TransitionToNewYearDto
@@ -542,4 +756,5 @@ else
         public bool ArchiveCurrentYear { get; set; } = true;
         public bool CopyRecurringEvents { get; set; } = true;
     }
- }
+
+}

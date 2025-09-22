@@ -1,0 +1,605 @@
+@page "/admin/event-categories"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage Event Types</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-tags"></i> Manage Event Types</h1>
+    <div>
+        <a href="/admin/events" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+        <button type="button" class="btn btn-primary" @onclick="ShowCreateForm">
+            <i class="bi bi-plus"></i> Add New Event Type
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+<!-- Create/Edit Form -->
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingEventCat?.Id > 0 ? "Edit" : "Create") Event Type</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingEventCat" OnValidSubmit="SaveEventType">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name *</label>
+                            <InputText id="name" @bind-Value="editingEventCat.Name" @onblur="GenerateSlugFromName" class="form-control" maxlength="100" />
+                            <ValidationMessage For="() => editingEventCat.Name" class="text-danger" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="slug" class="form-label">URL Slug *</label>
+                            <InputText id="slug" @bind-Value="editingEventCat.Slug" class="form-control" maxlength="100" />
+                            <ValidationMessage For="() => editingEventCat.Slug" class="text-danger" />
+                            <div class="form-text">Used in URLs: /events/category/<strong>@(editingEventCat.Slug ?? "slug")</strong></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" @bind-Value="editingEventCat.Description" class="form-control" rows="3" maxlength="500" />
+                    <ValidationMessage For="() => editingEventCat.Description" class="text-danger" />
+                    <div class="form-text">Description shown on event category cards</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="icon" class="form-label">Icon Class</label>
+                            <InputText id="icon" @bind-Value="editingEventCat.Icon" class="form-control" placeholder="bi-calendar-event" />
+                            <ValidationMessage For="() => editingEventCat.Icon" class="text-danger" />
+                            <div class="form-text">Bootstrap Icons class (e.g., bi-calendar-event)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="colorClass" class="form-label">Color Class</label>
+                            <InputSelect id="colorClass" @bind-Value="editingEventCat.ColorClass" class="form-select">
+                                <option value="">Default</option>
+                                <option value="text-primary">Blue</option>
+                                <option value="text-success">Green</option>
+                                <option value="text-danger">Red</option>
+                                <option value="text-warning">Yellow</option>
+                                <option value="text-info">Cyan</option>
+                                <option value="text-secondary">Gray</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="size" class="form-label">Card Size</label>
+                            <InputSelect id="size" @bind-Value="editingEventCat.Size" class="form-select">
+                                <option value="0">Half Size</option>
+                                <option value="1">Full Size</option>
+                            </InputSelect>
+                            <div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
+                        </div>
+                    </div>
+                </div>
+                
+               
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3 d-flex align-items-center" style="height: 38px;">
+                            <InputCheckbox id="isActive" @bind-Value="editingEventCat.IsActive" class="form-check-input" />
+                            <label for="isActive" class="form-check-label">
+                                Active
+                                <small class="text-muted d-block">Inactive types are hidden from public view</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-check-circle me-1"></i>
+                        Save Event Type
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (eventTypes == null)
+{
+    <div class="alert alert-info">
+        <em>Loading event types...</em>
+    </div>
+}
+else if (!eventTypes.Any())
+{
+    <div class="alert alert-warning">
+        <em>No event types found. Create your first event type above!</em>
+    </div>
+}
+else
+{
+    <!-- Event Types Management -->
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Event Types (@eventTypes.Count)</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="80">Order</th>
+                                <th>Name</th>
+                                <th width="80">Size</th>
+                                <th width="80">Status</th>
+                                <th width="100">Events</th>
+                                <th width="150">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var eventType in eventTypes.OrderBy(et => et.DisplayOrder))
+                            {
+                                <tr class="@(eventType.IsActive ? "" : "table-secondary")">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="badge bg-light text-dark">@eventType.DisplayOrder</span>
+                                            <div class="btn-group-vertical" style="width: 20px;">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" 
+                                                        title="Move Up" @onclick="() => MoveEventTypeUp(eventType.Id)"
+                                                        disabled="@(!CanMoveUp(eventType) || isReordering)"
+                                                        style="font-size: 10px; line-height: 1;">
+                                                    <i class="bi bi-chevron-up"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" 
+                                                        title="Move Down" @onclick="() => MoveEventTypeDown(eventType.Id)"
+                                                        disabled="@(!CanMoveDown(eventType) || isReordering)"
+                                                        style="font-size: 10px; line-height: 1;">
+                                                    <i class="bi bi-chevron-down"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            @if (!string.IsNullOrEmpty(eventType.Icon))
+                                            {
+                                                <i class="@eventType.Icon @eventType.ColorClass me-2"></i>
+                                            }
+                                            <div>
+                                                <strong>@eventType.Name</strong>
+                                                @if (!eventType.IsActive)
+                                                {
+                                                    <span class="badge bg-secondary ms-2">Inactive</span>
+                                                }
+                                                <div class="small text-muted">@TruncateText(eventType.Description, 50)</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info")">
+                                            @(eventType.Size == 1 ? "Full" : "Half")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(eventType.IsActive ? "bg-success" : "bg-secondary")">
+                                            @(eventType.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">@GetEventCount(eventType.Id)</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditEventType(eventType)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" title="Delete" 
+                                                    @onclick="() => DeleteEventType(eventType.Id)"
+                                                    disabled="@(GetEventCount(eventType.Id) > 0)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-eye"></i> Live Preview</h5>
+                    <small class="text-muted">How the event types will appear on the main page</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @foreach (var eventType in eventTypes.Where(et => et.IsActive).OrderBy(et => et.DisplayOrder))
+                        {
+                            <div class="@(eventType.Size == 1 ? "col-12" : "col-6") mb-3">
+                                <div class="card border @(eventType.Size == 1 ? "border-primary" : "border-secondary")" style="height: 120px;">
+                                    <div class="card-body p-3 d-flex flex-column">
+                                        <div class="d-flex align-items-center mb-2">
+                                            @if (!string.IsNullOrEmpty(eventType.Icon))
+                                            {
+                                                <i class="@eventType.Icon @eventType.ColorClass me-2" style="font-size: 1.2rem;"></i>
+                                            }
+                                            <h6 class="mb-0 @eventType.ColorClass" style="font-size: 0.9rem; line-height: 1.2;">@eventType.Name</h6>
+                                        </div>
+                                        <p class="text-muted small mb-2 flex-grow-1" style="font-size: 0.75rem; line-height: 1.2;">
+                                            @TruncateText(eventType.Description, eventType.Size == 1 ? 80 : 50)
+                                        </p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-light text-dark small">Order: @eventType.DisplayOrder</span>
+                                            <span class="badge @(eventType.Size == 1 ? "bg-primary" : "bg-info") small">
+                                                @(eventType.Size == 1 ? "Full" : "Half")
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    @if (!eventTypes.Any(et => et.IsActive))
+                    {
+                        <div class="text-center text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            <p>No active event types to preview</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EventCatDto>? eventTypes;
+    private List<EventDto>? events; // For counting events per type
+    private CreateEventCatDto editingEventCat = new();
+    private bool showForm = false;
+    private bool isSaving = false;
+    private bool isReordering = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventTypes();
+        await LoadEvents();
+    }
+
+    private async Task LoadEventTypes()
+    {
+        try
+        {
+            eventTypes = await Http.GetFromJsonAsync<List<EventCatDto>>("api/eventtypes");
+        }
+        catch (Exception ex)
+        {
+            eventTypes = new List<EventCatDto>();
+            errorMessage = $"Error loading event types: {ex.Message}";
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        try
+        {
+            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+        }
+        catch (Exception)
+        {
+            events = new List<EventDto>();
+        }
+    }
+
+    private bool CanMoveUp(EventCatDto eventType)
+    {
+        if (eventTypes == null) return false;
+        return eventTypes.OrderBy(et => et.DisplayOrder).First().Id != eventType.Id;
+    }
+
+    private bool CanMoveDown(EventCatDto eventType)
+    {
+        if (eventTypes == null) return false;
+        return eventTypes.OrderBy(et => et.DisplayOrder).Last().Id != eventType.Id;
+    }
+
+    private async Task MoveEventTypeUp(int id)
+    {
+        isReordering = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/eventtypes/{id}/move-up", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadEventTypes();
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder event type.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering event type: {ex.Message}";
+        }
+        finally
+        {
+            isReordering = false;
+        }
+    }
+
+    private async Task MoveEventTypeDown(int id)
+    {
+        isReordering = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/eventtypes/{id}/move-down", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadEventTypes();
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder event type.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering event type: {ex.Message}";
+        }
+        finally
+        {
+            isReordering = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        // Set the display order to the next available number
+        var nextOrder = eventTypes?.Any() == true ? eventTypes.Max(et => et.DisplayOrder) + 1 : 0;
+        
+        editingEventCat = new CreateEventCatDto
+        {
+            DisplayOrder = nextOrder,
+            IsActive = true,
+            Size = 1 // Default to Full size
+        };
+        showForm = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void EditEventType(EventCatDto eventType)
+    {
+        editingEventCat = new CreateEventCatDto
+        {
+            Id = eventType.Id,
+            Name = eventType.Name,
+            Description = eventType.Description,
+            DisplayOrder = eventType.DisplayOrder,
+            IsActive = eventType.IsActive,
+            Size = eventType.Size,
+            Icon = eventType.Icon,
+            ColorClass = eventType.ColorClass,
+            Slug = eventType.Slug
+        };
+        showForm = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        editingEventCat = new CreateEventCatDto();
+    }
+
+    private async Task SaveEventType()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            HttpResponseMessage response;
+            
+            if (editingEventCat.Id > 0)
+            {
+                // Update existing
+                response = await Http.PutAsJsonAsync($"api/eventtypes/{editingEventCat.Id}", editingEventCat);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Event type updated successfully!";
+                }
+            }
+            else
+            {
+                // Create new
+                response = await Http.PostAsJsonAsync("api/eventtypes", editingEventCat);
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Event type created successfully!";
+                }
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                showForm = false;
+                await LoadEventTypes();
+                editingEventCat = new CreateEventCatDto();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error saving event type: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving event type: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteEventType(int id)
+    {
+        if (!await ConfirmDelete()) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/eventtypes/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Event type deleted successfully!";
+                await LoadEventTypes();
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error deleting event type: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting event type: {ex.Message}";
+        }
+    }
+
+    private async Task<bool> ConfirmDelete()
+    {
+        // In a real application, you'd use a JavaScript confirm dialog or a modal
+        return await Task.FromResult(true);
+    }
+
+    private int GetEventCount(int eventTypeId)
+    {
+        return events?.Count(e => e.EventType?.Id == eventTypeId) ?? 0;
+    }
+
+    private string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        
+        return text.Substring(0, maxLength - 3) + "...";
+    }
+
+    private void GenerateSlugFromName()
+    {
+        if (!string.IsNullOrEmpty(editingEventCat.Name) && string.IsNullOrEmpty(editingEventCat.Slug))
+        {
+            editingEventCat.Slug = GenerateSlug(editingEventCat.Name);
+        }
+    }
+
+    private string GenerateSlug(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return string.Empty;
+            
+        return name.ToLowerInvariant()
+                   .Replace(" ", "-")
+                   .Replace("&", "and")
+                   .Replace("/", "-")
+                   .Replace("'", "")
+                   .Replace("\"", "")
+                   .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                   .Aggregate("", (current, c) => current + c);
+    }
+
+    public class EventCatDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public int Size { get; set; } // 0 = Half, 1 = Full
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
+    }
+
+    public class EventDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public EventCatDto? EventType { get; set; }
+    }
+
+    public class CreateEventCatDto
+    {
+        public int Id { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required")]
+        public string Name { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Slug is required")]
+        public string Slug { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
+        public string Description { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
+        public int DisplayOrder { get; set; } = 0;
+        
+        public bool IsActive { get; set; } = true;
+        
+        [System.ComponentModel.DataAnnotations.Range(0, 1, ErrorMessage = "Size must be Half (0) or Full (1)")]
+        public int Size { get; set; } = 1; // Default to Full
+        
+        [System.ComponentModel.DataAnnotations.StringLength(50, ErrorMessage = "Icon class cannot be longer than 50 characters")]
+        public string Icon { get; set; } = string.Empty;
+        
+        [System.ComponentModel.DataAnnotations.StringLength(30, ErrorMessage = "Color class cannot be longer than 30 characters")]
+        public string ColorClass { get; set; } = string.Empty;
+    }
+}

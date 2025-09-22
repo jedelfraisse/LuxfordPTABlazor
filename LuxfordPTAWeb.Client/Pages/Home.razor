@@ -1,4 +1,6 @@
 ﻿@page "/"
+@inject HttpClient Http
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
 
 <PageTitle>Home</PageTitle>
 
@@ -29,85 +31,125 @@
 			</div>
 		</div>
 	</div>
-	<div class="col-md-6">
+	<!-- PTA Board Card -->
+	<div class="col-md-6 mb-3 mb-md-0">
 		<div class="card h-100">
-			<div class="card-header bg-primary text-white fw-bold">Announcements & Reminders</div>
+			<div class="card-header bg-info text-white fw-bold">
+				PTA Board Members
+				<span class="fw-normal">@boardYearLabel</span>
+			</div>
 			<div class="card-body">
-				<div class="mb-3">
-					<h5 class="mb-1">📸 Picture Day</h5>
-					<div>
-						<strong>Date:</strong> September 18, 2025<br />
-						<strong>Picture Day ID:</strong> EVTB9GRC4
+				@if (isLoadingBoard)
+				{
+					<div class="alert alert-info text-center">
+						<em>Loading board members...</em>
 					</div>
-					<small class="text-muted">Don't forget to order your school pictures! Check your email for instructions.</small>
+				}
+				else if (boardMembers == null || !boardMembers.Any())
+				{
+					<div class="alert alert-warning text-center">
+						<em>No board members found for this year.</em>
+					</div>
+					if (iselectionEvent)
+					{
+						<div>
+							Click here for the election details.
+						</div>
+					}
+				}
+				else
+				{
+					<ul class="list-group list-group-flush mb-0">
+						@foreach (var member in boardMembers)
+						{
+							<li class="list-group-item">
+								<strong>@member.Title:</strong> @member.FullName
+							</li>
+						}
+					</ul>
+				}
+			</div>
+		</div>
+	</div>
+</div>
+
+@if (isCurrentYear)
+{
+	<!-- Announcements & Reminders: Full Width Row -->
+	<div class="row mb-4">
+		<div class="col-12">
+			<div class="card shadow-sm">
+				<div class="card-header bg-primary text-white fw-bold">Announcements & Reminders</div>
+				<div class="card-body">
+					<div class="row">
+						<div class="col-md-6 mb-3 mb-md-0">
+							<h5 class="mb-1">📸 Picture Day</h5>
+							<div>
+								<strong>Date:</strong> September 18, 2025<br />
+								<strong>Picture Day ID:</strong> EVTB9GRC4
+							</div>
+							<small class="text-muted">Don't forget to order your school pictures! Check your email for instructions.</small>
+						</div>
+						<div class="col-md-6">
+							<h6 class="mb-1">Other Reminders</h6>
+							<ul class="mb-0">
+								<li>First PTA Meeting: October 7, 2025 5:00 PM Back Playground</li>
+								<li>Volunteer Signups Open!</li>
+							</ul>
+						</div>
+					</div>
 				</div>
-				<div>
-					<h6 class="mb-1">Other Reminders</h6>
-					<ul class="mb-0">
-						<li>First PTA Meeting: September 25, 2025</li>
-						<li>Volunteer Signups Open!</li>
+			</div>
+		</div>
+	</div>
+
+	<!-- Events Row -->
+	<div class="row mb-4">
+		<div class="col-md-6 mb-3 mb-md-0">
+			<div class="card h-100">
+				<div class="card-header bg-secondary text-white fw-bold">Previous Events</div>
+				<div class="card-body">
+					<ul class="list-unstyled mb-0">
+						<li><strong>5th Grade Airshow Field Trip</strong> - Sep 19, 2025</li>
+						<li><strong>Chuck E. Cheese Night</strong> – Sep 19, 2025</li>
+						<li><strong>Picture Day</strong> – Sep 18, 2025</li>
+						<li><strong>Back to School Night</strong> – Aug 21, 2025</li>
+						<li><strong>PTA Board Election</strong> – Aug 20, 2025</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-6">
+			<div class="card h-100">
+				<div class="card-header bg-info text-white fw-bold">Upcoming Events</div>
+				<div class="card-body">
+					<ul class="list-unstyled mb-0">
+						<li><strong>Skate Night</strong> – Sep 30, 2025</li>
+						<li><strong>PTA Meeting and Ice cream social</strong> – Oct 7, 2025</li>
+						<li><strong>Trunk or Treat Fall Festival</strong> - Oct 24, 2025</li>
+						<li><strong>Bingo Night</strong> - Nov 7th, 2025</li>
 					</ul>
 				</div>
 			</div>
 		</div>
 	</div>
-</div>
+	<div class="d-flex justify-content-center mb-4">
+		<NavLink href="events" class="btn btn-lg btn-success px-5 fw-bold">View All Events</NavLink>
+	</div>
 
-<!-- Events Row -->
-<div class="row mb-4">
-	<div class="col-md-6 mb-3 mb-md-0">
-		<div class="card h-100">
-			<div class="card-header bg-secondary text-white fw-bold">Previous Events</div>
-			<div class="card-body">
-				<ul class="list-unstyled mb-0">
-					<li><strong>Back to School Night</strong> – Aug 21, 2025</li>
-					<li><strong>PTA Board Election</strong> – Aug 20, 2025</li>
-					<li><strong>Spring Carnival</strong> – Apr 2025</li>
-				</ul>
-			</div>
+
+
+
+	<!-- Get Involved Card -->
+	<div class="card shadow-sm mb-4">
+		<div class="card-header bg-success text-white fw-bold">Get Involved</div>
+		<div class="card-body">
+			<p>We're always looking for volunteers and supporters! Help us make a difference for our students and school community.</p>
+			<NavLink href="get-involved" class="btn btn-outline-success fw-bold">Learn More & Sign Up</NavLink>
 		</div>
 	</div>
-	<div class="col-md-6">
-		<div class="card h-100">
-			<div class="card-header bg-info text-white fw-bold">Upcoming Events</div>
-			<div class="card-body">
-				<ul class="list-unstyled mb-0">
-					<li><strong>Picture Day</strong> – Sep 18, 2025</li>
-					<li><strong>First PTA Meeting</strong> – Sep 25, 2025</li>
-					<li><strong>Chuck E. Cheese Night</strong> – Sep 18, 2025</li>
-					<li><strong>Skate Night</strong> – Sep 30, 2025</li>
-				</ul>
-			</div>
-		</div>
-	</div>
-</div>
-<div class="d-flex justify-content-center mb-4">
-	<NavLink href="events" class="btn btn-lg btn-success px-5 fw-bold">View All Events</NavLink>
-</div>
 
-<!-- PTA Board Card -->
-<div class="card shadow-sm mb-4">
-	<div class="card-header bg-light fw-bold">PTA Board Members <span class="fw-normal">2025–2026</span></div>
-	<div class="card-body">
-		<ul class="list-group list-group-flush mb-0">
-			<li class="list-group-item"><strong>President:</strong> Ashley Watkinson</li>
-			<li class="list-group-item"><strong>Vice President:</strong> Katie Delfraisse</li>
-			<li class="list-group-item"><strong>Treasurer:</strong> Jonathan Delfraisse</li>
-			<li class="list-group-item"><strong>Secretary:</strong> Ashley Weidrick</li>
-			<li class="list-group-item"><strong>Volunteer Coordinator:</strong> Alyssa Pentz</li>
-			<li class="list-group-item"><strong>Events Chair:</strong> Ashley Threadgill</li>
-		</ul>
-	</div>
-</div>
-
-<!-- Get Involved Card -->
-<div class="card shadow-sm mb-4">
-	<div class="card-header bg-success text-white fw-bold">Get Involved</div>
-	<div class="card-body">
-		<p>We're always looking for volunteers and supporters! Help us make a difference for our students and school community.</p>
-		<NavLink href="get-involved" class="btn btn-outline-success fw-bold">Learn More & Sign Up</NavLink>
-	</div>
-</div>
+}
 
 <!-- Contact Card -->
 <div class="card shadow-sm mb-4">
@@ -123,3 +165,68 @@
 <div class="alert alert-success text-center mt-4">
 	<em>Thank you for being part of the Luxford Elementary community! Together, we're making a difference in our children's education.</em>
 </div>
+
+
+@code {
+	private List<BoardMemberDto> boardMembers = new();
+	private string boardYearLabel = "";
+	private bool isLoadingBoard = true;
+	private bool iselectionEvent = false;
+	private bool isCurrentYear = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		isLoadingBoard = true;
+		try
+		{
+			// Get the current school year
+			var schoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+			if (schoolYear != null)
+			{
+				isCurrentYear = schoolYear.Status == Shared.Enums.SchoolYearStatus.CurrentYear;
+				boardYearLabel = $"{schoolYear.Name}";
+				// Get board positions for this year, only filled spots
+				var positions = await Http.GetFromJsonAsync<List<BoardPositionDto>>($"api/boardpositions/all-by-schoolyear/{schoolYear.Id}");
+				boardMembers = positions
+					.Where(bp => bp.AssignedUser != null)
+					.Select(bp => new BoardMemberDto
+					{
+						Title = bp.BoardPositionTitle?.Title ?? "Unknown",
+						FullName = bp.AssignedUser.FullName
+					})
+					.ToList();
+			}
+		}
+		catch
+		{
+			boardMembers = new();
+		}
+		isLoadingBoard = false;
+	}
+
+	public class BoardMemberDto
+	{
+		public string Title { get; set; } = "";
+		public string FullName { get; set; } = "";
+	}
+
+	public class BoardPositionDto
+	{
+		public int Id { get; set; }
+		public BoardPositionTitleDto? BoardPositionTitle { get; set; }
+		public int BoardPositionTitleId { get; set; }
+		public ApplicationUserDto? AssignedUser { get; set; }
+	}
+
+	public class BoardPositionTitleDto
+	{
+		public int Id { get; set; }
+		public string Title { get; set; } = "";
+	}
+
+	public class ApplicationUserDto
+	{
+		public string Id { get; set; } = "";
+		public string FullName { get; set; } = "";
+	}
+}

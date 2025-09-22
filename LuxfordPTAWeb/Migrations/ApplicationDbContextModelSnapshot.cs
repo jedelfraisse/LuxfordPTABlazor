@@ -22,7 +22,7 @@ namespace LuxfordPTAWeb.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.ApplicationUser", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -95,7 +95,78 @@ namespace LuxfordPTAWeb.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.Event", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.BoardPosition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BoardPositionTitleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsVotingMember")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SchoolYearId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BoardPositionTitleId");
+
+                    b.HasIndex("SchoolYearId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("BoardPositions");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.BoardPositionTitle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ElectionEventId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsElected")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RoleType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BoardPositionTitles");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.Event", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -116,6 +187,12 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<int?>("EstimatedAttendees")
                         .HasColumnType("int");
 
+                    b.Property<int>("EventCatId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EventCatSubId")
+                        .HasColumnType("int");
+
                     b.Property<string>("EventCoordinatorId")
                         .HasColumnType("nvarchar(450)");
 
@@ -126,9 +203,6 @@ namespace LuxfordPTAWeb.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("EventSubTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EventTypeId")
                         .HasColumnType("int");
 
                     b.Property<string>("ExcelImportId")
@@ -185,92 +259,18 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EventCatId");
+
+                    b.HasIndex("EventCatSubId");
+
                     b.HasIndex("EventCoordinatorId");
-
-                    b.HasIndex("EventSubTypeId");
-
-                    b.HasIndex("EventTypeId");
 
                     b.HasIndex("SchoolYearId");
 
                     b.ToTable("Events");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventMainSponsor", b =>
-                {
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SponsorId")
-                        .HasColumnType("int");
-
-                    b.HasKey("EventId", "SponsorId");
-
-                    b.HasIndex("SponsorId");
-
-                    b.ToTable("EventMainSponsors");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventOtherSponsor", b =>
-                {
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SponsorId")
-                        .HasColumnType("int");
-
-                    b.HasKey("EventId", "SponsorId");
-
-                    b.HasIndex("SponsorId");
-
-                    b.ToTable("EventOtherSponsors");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ColorClass")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EventTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Icon")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventTypeId");
-
-                    b.ToTable("EventSubType");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventCat", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -321,10 +321,84 @@ namespace LuxfordPTAWeb.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("EventTypes");
+                    b.ToTable("EventCats");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.SchoolYear", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventCatSub", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColorClass")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EventTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventTypeId");
+
+                    b.ToTable("EventCatSubs");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventMainSponsor", b =>
+                {
+                    b.Property<int>("EventId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SponsorId")
+                        .HasColumnType("int");
+
+                    b.HasKey("EventId", "SponsorId");
+
+                    b.HasIndex("SponsorId");
+
+                    b.ToTable("EventMainSponsors");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventOtherSponsor", b =>
+                {
+                    b.Property<int>("EventId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SponsorId")
+                        .HasColumnType("int");
+
+                    b.HasKey("EventId", "SponsorId");
+
+                    b.HasIndex("SponsorId");
+
+                    b.ToTable("EventOtherSponsors");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SchoolYear", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -335,6 +409,9 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsVisibleToPublic")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -343,15 +420,22 @@ namespace LuxfordPTAWeb.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ReflectionsTheme")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.ToTable("SchoolYears");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.Sponsor", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.Sponsor", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -374,6 +458,67 @@ namespace LuxfordPTAWeb.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Sponsors");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SponsorAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("EventId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SchoolYearId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SponsorId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SponsorLevelId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("SchoolYearId");
+
+                    b.HasIndex("SponsorId");
+
+                    b.HasIndex("SponsorLevelId");
+
+                    b.ToTable("SponsorAssignments");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SponsorLevel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ColorCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SponsorLevel");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -509,47 +654,84 @@ namespace LuxfordPTAWeb.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.Event", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.BoardPosition", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", "EventCoordinator")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.BoardPositionTitle", "BoardPositionTitle")
+                        .WithMany("BoardPositions")
+                        .HasForeignKey("BoardPositionTitleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "SchoolYear")
+                        .WithMany("BoardPositions")
+                        .HasForeignKey("SchoolYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", "AssignedUser")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssignedUser");
+
+                    b.Navigation("BoardPositionTitle");
+
+                    b.Navigation("SchoolYear");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.Event", b =>
+                {
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.EventCat", "EventCat")
+                        .WithMany("Events")
+                        .HasForeignKey("EventCatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.EventCatSub", "EventCatSub")
+                        .WithMany("Events")
+                        .HasForeignKey("EventCatSubId");
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", "EventCoordinator")
                         .WithMany()
                         .HasForeignKey("EventCoordinatorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("LuxfordPTAWeb.Data.EventSubType", "EventSubType")
-                        .WithMany("Events")
-                        .HasForeignKey("EventSubTypeId");
-
-                    b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
-                        .WithMany("Events")
-                        .HasForeignKey("EventTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("LuxfordPTAWeb.Data.SchoolYear", "SchoolYear")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "SchoolYear")
                         .WithMany("Events")
                         .HasForeignKey("SchoolYearId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("EventCat");
+
+                    b.Navigation("EventCatSub");
+
                     b.Navigation("EventCoordinator");
-
-                    b.Navigation("EventSubType");
-
-                    b.Navigation("EventType");
 
                     b.Navigation("SchoolYear");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventMainSponsor", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventCatSub", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.Event", "Event")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.EventCat", "EventType")
+                        .WithMany("EventCatSub")
+                        .HasForeignKey("EventTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventType");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventMainSponsor", b =>
+                {
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Event", "Event")
                         .WithMany("MainSponsors")
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LuxfordPTAWeb.Data.Sponsor", "Sponsor")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Sponsor", "Sponsor")
                         .WithMany("MainEvents")
                         .HasForeignKey("SponsorId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -560,15 +742,15 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("Sponsor");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventOtherSponsor", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventOtherSponsor", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.Event", "Event")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Event", "Event")
                         .WithMany("OtherSponsors")
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LuxfordPTAWeb.Data.Sponsor", "Sponsor")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Sponsor", "Sponsor")
                         .WithMany("OtherEvents")
                         .HasForeignKey("SponsorId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -579,15 +761,37 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("Sponsor");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SponsorAssignment", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.EventType", "EventType")
-                        .WithMany("EventSubTypes")
-                        .HasForeignKey("EventTypeId")
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Event", "Event")
+                        .WithMany("SponsorAssignments")
+                        .HasForeignKey("EventId");
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "SchoolYear")
+                        .WithMany("SponsorAssignments")
+                        .HasForeignKey("SchoolYearId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("EventType");
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.Sponsor", "Sponsor")
+                        .WithMany("SponsorAssignments")
+                        .HasForeignKey("SponsorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.SponsorLevel", "SponsorLevel")
+                        .WithMany("SponsorAssignments")
+                        .HasForeignKey("SponsorLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("SchoolYear");
+
+                    b.Navigation("Sponsor");
+
+                    b.Navigation("SponsorLevel");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -601,7 +805,7 @@ namespace LuxfordPTAWeb.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", null)
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -610,7 +814,7 @@ namespace LuxfordPTAWeb.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", null)
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -625,7 +829,7 @@ namespace LuxfordPTAWeb.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", null)
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -634,42 +838,60 @@ namespace LuxfordPTAWeb.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("LuxfordPTAWeb.Data.ApplicationUser", null)
+                    b.HasOne("LuxfordPTAWeb.Shared.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.Event", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.BoardPositionTitle", b =>
+                {
+                    b.Navigation("BoardPositions");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.Event", b =>
                 {
                     b.Navigation("MainSponsors");
 
                     b.Navigation("OtherSponsors");
+
+                    b.Navigation("SponsorAssignments");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventSubType", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventCat", b =>
+                {
+                    b.Navigation("EventCatSub");
+
+                    b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.EventCatSub", b =>
                 {
                     b.Navigation("Events");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.EventType", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SchoolYear", b =>
                 {
-                    b.Navigation("EventSubTypes");
+                    b.Navigation("BoardPositions");
 
                     b.Navigation("Events");
+
+                    b.Navigation("SponsorAssignments");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Data.SchoolYear", b =>
-                {
-                    b.Navigation("Events");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Data.Sponsor", b =>
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.Sponsor", b =>
                 {
                     b.Navigation("MainEvents");
 
                     b.Navigation("OtherEvents");
+
+                    b.Navigation("SponsorAssignments");
+                });
+
+            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SponsorLevel", b =>
+                {
+                    b.Navigation("SponsorAssignments");
                 });
 #pragma warning restore 612, 618
         }

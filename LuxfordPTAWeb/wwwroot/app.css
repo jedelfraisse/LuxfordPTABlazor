@@ -443,3 +443,12 @@ img {
     height: auto;
     box-sizing: border-box;
 }
+
+
+.school-year-banner button:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+}
+
+.school-year-banner button:hover {
+    background-color: #e7f1ff;
+}

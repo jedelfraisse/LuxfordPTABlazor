@@ -1,0 +1,38 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+
+@if (SchoolYear != null)
+{
+	<div class="alert alert-success mb-4">
+		<div class="row align-items-center">
+			<div class="col">
+				<h6 class="mb-1"><i class="bi bi-calendar-check"></i> Admin Dashboard Context</h6>
+				<div class="d-flex align-items-center">
+					<div class="me-4">
+						<strong class="text-dark">@SchoolYear.Name School Year</strong>
+						<div class="small text-muted">@SchoolYear.StartDate.ToString("MMM yyyy") - @SchoolYear.EndDate.ToString("MMM yyyy")</div>
+					</div>
+					@if (!string.IsNullOrWhiteSpace(SchoolYear.ReflectionsTheme))
+					{
+						<div class="me-4">
+							<strong class="small text-dark">Reflections Theme:</strong>
+							<div class="small text-muted">@SchoolYear.ReflectionsTheme</div>
+						</div>
+					}
+				</div>
+			</div>
+			<div class="col-auto">
+				<a href="/admin/school-years" class="btn btn-info btn-sm me-2">
+					<i class="bi bi-calendar3"></i> Change Year
+				</a>
+				<span class="badge @(SchoolYear.Status == SchoolYearStatus.CurrentYear ? "bg-primary" : "bg-secondary")">
+					@SchoolYear.Status
+				</span>
+			</div>
+		</div>
+	</div>
+}
+
+@code {
+	[Parameter] public SchoolYear? SchoolYear { get; set; }
+}

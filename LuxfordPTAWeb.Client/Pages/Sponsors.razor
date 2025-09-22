@@ -1,5 +1,7 @@
 ﻿@page "/sponsors"
 
+@using System.Collections.Generic
+
 <PageTitle>Sponsors</PageTitle>
 
 <!-- 1. Thank You & Sponsor Logos Section -->
@@ -10,38 +12,58 @@
             We are deeply grateful to our sponsors for supporting Luxford Elementary PTA and making a difference in our school community.
         </p>
         <div class="row justify-content-center mb-3">
-            <!-- Current Sponsors -->
             <div class="col-12 col-md-6">
-                <h5 class="text-success text-center mb-2">Current Sponsors</h5>
                 <div class="d-flex flex-wrap justify-content-center gap-4">
                     <!-- Example: Direct Event Sponsor (Spirit Night) -->
                     <div class="card text-center p-2" style="width: 160px;">
                         <a href="/events" class="text-decoration-none">
                             <img src="sponsors/chuck-e-cheeses-car-design-png-logo-8.png" alt="Chuck E. Cheese's" class="sponsor-logo mb-1" />
                             <div class="fw-bold small">Chuck E. Cheese's</div>
+                            <div class="fw-bold small">09/19/25 and 03/06/25</div>
+                            
                             <span class="badge bg-info text-dark mt-1">Spirit Night</span>
                         </a>
                     </div>
-                    <!-- Example: Sponsor with their own page -->
                     <div class="card text-center p-2" style="width: 160px;">
-                        <a href="/sponsors/sample-sponsor" class="text-decoration-none">
-                            <img src="sponsors/sample-sponsor-logo.png" alt="Sample Sponsor" class="sponsor-logo mb-1" />
-                            <div class="fw-bold small">Sample Sponsor</div>
-                            <span class="badge bg-secondary mt-1">PTA Partner</span>
+                        <a href="/events" class="text-decoration-none">
+                            <img src="sponsors/hsc.png" alt="Haygood Skating Center" class="sponsor-logo mb-1" />
+                            <div class="fw-bold small">Haygood Skating Center</div>
+                            <div class="fw-bold small">09/30/25 and 04/27/26</div>
+                            <span class="badge bg-info text-dark mt-1">Spirit Night</span>
                         </a>
                     </div>
-                    <!-- Add more current sponsors here -->
-                </div>
-            </div>
-            <!-- Past Sponsors -->
-            <div class="col-12 col-md-6 mt-4 mt-md-0">
-                <h5 class="text-secondary text-center mb-2">Past Sponsors</h5>
-                <div class="d-flex flex-wrap justify-content-center gap-4">
-                    <div class="card text-center p-2 opacity-50" style="width: 160px;">
-                        <img src="sponsors/sample-past-sponsor.png" alt="Sample Past Sponsor" class="sponsor-logo mb-1" />
-                        <div class="small">Sample Past Sponsor</div>
+                    <div class="card text-center p-2" style="width: 160px;">
+                        <a href="/events" class="text-decoration-none">
+                            <img src="sponsors/D&B_Logo.png" alt="Dave & Buster's" class="sponsor-logo mb-1" />
+                            <div class="fw-bold small">Dave & Buster's</div>
+                            <div class="fw-bold small">10/19/25</div>
+                            <span class="badge bg-info text-dark mt-1">Spirit Night</span>
+                        </a>
                     </div>
-                    <!-- Add more past sponsors here -->
+                    <div class="card text-center p-2" style="width: 160px;">
+                        <a href="/events" class="text-decoration-none">
+                            <img src="sponsors/village-inn-logo.png" alt="Village Inn" class="sponsor-logo mb-1" />
+                            <div class="fw-bold small">Village Inn</div>
+                            <div class="fw-bold small">12/07/25 and 03/29/26</div>
+                            <span class="badge bg-info text-dark mt-1">Spirit Night</span>
+                        </a>
+                    </div>
+                    <div class="card text-center p-2" style="width: 160px;">
+                        <a href="/events" class="text-decoration-none">
+                            <img src="sponsors/superheroes_icecream.png" alt="Superhero Ice Cream" class="sponsor-logo mb-1" />
+                            <div class="fw-bold small">Superhero Ice Cream</div>
+                            <div class="fw-bold small">01/16/26</div>
+                            <span class="badge bg-info text-dark mt-1">Spirit Night</span>
+                        </a>
+                    </div>
+                    <div class="card text-center p-2" style="width: 160px;">
+                        <a href="/events" class="text-decoration-none">
+                            <img src="sponsors/Mission-Laser-Tag-Logo.png" alt="Mission Laser Tag" class="sponsor-logo mb-1" />
+                            <div class="fw-bold small">Mission Laser</div>
+                            <div class="fw-bold small">02/05/26</div>
+                            <span class="badge bg-info text-dark mt-1">Spirit Night</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -83,8 +105,29 @@
 <!-- 3. Become a Sponsor Section -->
 <div class="card mb-4">
     <div class="card-header bg-success text-white fw-bold">🚀 Become a Sponsor</div>
-    <div class="card-body text-center">
-        <p class="mb-3">Interested in supporting Luxford Elementary? We’d love to partner with you!</p>
+    <div class="card-body">
+        <p class="mb-3 text-center">Interested in supporting Luxford Elementary? We’d love to partner with you!</p>
+        <div class="row justify-content-center mb-4">
+            @foreach (var level in SponsorshipLevels)
+            {
+                <div class="col-12 col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100 border-2" style="border-color:@level.ColorCode;">
+                        <div class="card-header fw-bold" style="color:@level.ColorCode;">
+                            $@level.Amount @level.Name
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2">@level.Description</p>
+                            <ul class="mb-0">
+                                @foreach (var benefit in level.Benefits)
+                                {
+                                    <li>@benefit</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
         <div class="row justify-content-center">
             <div class="col-md-6 mb-3">
                 <a href="mailto:luxfordpta1@gmail.com" class="btn btn-primary btn-lg w-100 mb-2">
@@ -141,10 +184,76 @@
 </div>
 
 @code {
-	// TODO: Add properties and methods for sponsor management with EF
-	// - Sponsor list from database
-	// - Sponsor levels and benefits
-	// - Logo display functionality
-	// - Sponsorship tracking and reporting
-	// - Integration with contact forms
+    public class SponsorshipLevelDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ColorCode { get; set; } = "#000";
+        public int Amount { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public List<string> Benefits { get; set; } = new();
+    }
+
+    private List<SponsorshipLevelDto> SponsorshipLevels = new()
+    {
+        new SponsorshipLevelDto
+        {
+            Name = "Magenta Sponsor",
+            ColorCode = "#d5008f",
+            Amount = 500,
+            Description = "Receive LARGE logo/company name on a vinyl banner to be displayed at all events and field trips.",
+            Benefits = new()
+            {
+                "Large logo on vinyl banner at all events and field trips",
+                "Thank you and logo/company name on PTA website, Facebook page, emails, and flyers",
+                "Opportunity to set up a table at events"
+            }
+        },
+        new SponsorshipLevelDto
+        {
+            Name = "Purple Sponsor",
+            ColorCode = "#6a1b9a",
+            Amount = 250,
+            Description = "Receive SMALL logo/company name on a vinyl banner to be displayed at all events and field trips.",
+            Benefits = new()
+            {
+                "Small logo on vinyl banner at all events and field trips",
+                "Thank you and logo/company name on PTA website, Facebook page, emails, and flyers"
+            }
+        },
+        new SponsorshipLevelDto
+        {
+            Name = "Aqua Sponsor",
+            ColorCode = "#0097a7",
+            Amount = 100,
+            Description = "Receive thank you and logo/company name on PTA website, Facebook page, emails, and event flyer.",
+            Benefits = new()
+            {
+                "Thank you and logo/company name on PTA website, Facebook page, emails, and event flyer"
+            }
+        },
+        new SponsorshipLevelDto
+        {
+            Name = "Green Sponsor",
+            ColorCode = "#43a047",
+            Amount = 50,
+            Description = "Receive thank you and logo/company name on event flyer.",
+            Benefits = new()
+            {
+                "Thank you and logo/company name on event flyer"
+            }
+        },
+        new SponsorshipLevelDto
+        {
+            Name = "Spirit Night Sponsor",
+            ColorCode = "#d5008f",
+            Amount = 0,
+            Description = "Host a Spirit Night and receive the same benefits as Magenta Sponsor.",
+            Benefits = new()
+            {
+                "Large logo on vinyl banner at all events and field trips",
+                "Thank you and logo/company name on PTA website, Facebook page, emails, and flyers",
+                "Opportunity to set up a table at events"
+            }
+        }
+    };
 }
