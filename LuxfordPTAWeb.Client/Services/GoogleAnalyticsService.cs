@@ -12,7 +12,6 @@ public class GoogleAnalyticsService : IAsyncDisposable
     private readonly IJSRuntime _jsRuntime;
     private readonly ICookieConsentService _cookieConsentService;
     private readonly GoogleAnalyticsOptions _options;
-    private readonly Lazy<Task<IJSObjectReference>> _moduleTask;
     private bool _isInitialized;
     
     public GoogleAnalyticsService(
@@ -23,8 +22,6 @@ public class GoogleAnalyticsService : IAsyncDisposable
         _jsRuntime = jsRuntime;
         _cookieConsentService = cookieConsentService;
         _options = options;
-        _moduleTask = new(() => _jsRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/LuxfordPTAWeb.Client/js/googleAnalytics.js").AsTask());
         
         // Subscribe to consent changes
         _cookieConsentService.ConsentChanged += OnConsentChanged;
@@ -36,7 +33,7 @@ public class GoogleAnalyticsService : IAsyncDisposable
     private bool IsJSAvailable => _jsRuntime is IJSInProcessRuntime;
     
     /// <summary>
-    /// Initialize Google Analytics if consent is given and configuration is valid
+    /// Initialize Google Analytics consent management (gtag is already loaded in HTML)
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -45,26 +42,39 @@ public class GoogleAnalyticsService : IAsyncDisposable
             
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("initializeGA", _options.MeasurementId, _options.Debug);
+            // Check if gtag is available (loaded from HTML head)
+            var hasGtag = await _jsRuntime.InvokeAsync<bool>("eval", "typeof window.gtag !== 'undefined'");
+            
+            if (!hasGtag)
+            {
+                Console.WriteLine("Google Analytics gtag not found - may not be loaded yet");
+                return;
+            }
+            
             _isInitialized = true;
             
-            // Check if we already have analytics consent and grant it
-            var hasConsent = await _cookieConsentService.IsAnalyticsAllowedAsync();
-            if (hasConsent)
+            // Check current consent level and apply it
+            var currentLevel = await _cookieConsentService.GetConsentLevelAsync();
+            if (currentLevel >= LuxfordPTAWeb.Shared.Enums.CookieConsentLevel.Analytics)
             {
-                await module.InvokeVoidAsync("grantAnalyticsConsent");
+                // Already granted by default in HTML, no action needed
+                Console.WriteLine("Google Analytics consent already granted");
+            }
+            else
+            {
+                // User has opted out, revoke consent
+                await RevokeConsentAsync();
             }
         }
         catch (Exception ex)
         {
             // Log error but don't throw - analytics is not critical
-            Console.WriteLine($"Failed to initialize Google Analytics: {ex.Message}");
+            Console.WriteLine($"Failed to initialize Google Analytics consent: {ex.Message}");
         }
     }
     
     /// <summary>
-    /// Track a page view
+    /// Track a page view using the global gtag function
     /// </summary>
     public async Task TrackPageViewAsync(string pageName, string pageTitle = "")
     {
@@ -73,8 +83,12 @@ public class GoogleAnalyticsService : IAsyncDisposable
             
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("trackPageView", pageName, pageTitle);
+            await _jsRuntime.InvokeVoidAsync("gtag", "event", "page_view", new
+            {
+                page_title = pageTitle ?? pageName,
+                page_location = await _jsRuntime.InvokeAsync<string>("eval", "window.location.href"),
+                page_path = pageName
+            });
         }
         catch
         {
@@ -83,7 +97,7 @@ public class GoogleAnalyticsService : IAsyncDisposable
     }
     
     /// <summary>
-    /// Track a custom event
+    /// Track a custom event using the global gtag function
     /// </summary>
     public async Task TrackEventAsync(string eventName, object? eventData = null)
     {
@@ -92,8 +106,14 @@ public class GoogleAnalyticsService : IAsyncDisposable
             
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("trackEvent", eventName, eventData);
+            if (eventData != null)
+            {
+                await _jsRuntime.InvokeVoidAsync("gtag", "event", eventName, eventData);
+            }
+            else
+            {
+                await _jsRuntime.InvokeVoidAsync("gtag", "event", eventName);
+            }
         }
         catch
         {
@@ -111,8 +131,10 @@ public class GoogleAnalyticsService : IAsyncDisposable
             
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("setUserId", userId);
+            await _jsRuntime.InvokeVoidAsync("gtag", "config", _options.MeasurementId, new
+            {
+                user_id = userId
+            });
         }
         catch
         {
@@ -121,7 +143,7 @@ public class GoogleAnalyticsService : IAsyncDisposable
     }
     
     /// <summary>
-    /// Grant analytics consent
+    /// Grant analytics consent using global gtag
     /// </summary>
     private async Task GrantConsentAsync()
     {
@@ -129,8 +151,11 @@ public class GoogleAnalyticsService : IAsyncDisposable
         
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("grantAnalyticsConsent");
+            await _jsRuntime.InvokeVoidAsync("gtag", "consent", "update", new
+            {
+                analytics_storage = "granted"
+            });
+            Console.WriteLine("Analytics consent granted");
         }
         catch
         {
@@ -139,7 +164,7 @@ public class GoogleAnalyticsService : IAsyncDisposable
     }
     
     /// <summary>
-    /// Revoke analytics consent
+    /// Revoke analytics consent using global gtag
     /// </summary>
     private async Task RevokeConsentAsync()
     {
@@ -147,8 +172,11 @@ public class GoogleAnalyticsService : IAsyncDisposable
         
         try
         {
-            var module = await _moduleTask.Value;
-            await module.InvokeVoidAsync("revokeAnalyticsConsent");
+            await _jsRuntime.InvokeVoidAsync("gtag", "consent", "update", new
+            {
+                analytics_storage = "denied"
+            });
+            Console.WriteLine("Analytics consent revoked");
         }
         catch
         {
@@ -160,7 +188,7 @@ public class GoogleAnalyticsService : IAsyncDisposable
     {
         if (!IsJSAvailable) return;
         
-        // Initialize GA if not already done
+        // Initialize if not already done
         if (!_isInitialized)
         {
             await InitializeAsync();
@@ -180,19 +208,6 @@ public class GoogleAnalyticsService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _cookieConsentService.ConsentChanged -= OnConsentChanged;
-        
-        // Only dispose JS module if JS runtime is available
-        if (_moduleTask.IsValueCreated && IsJSAvailable)
-        {
-            try
-            {
-                var module = await _moduleTask.Value;
-                await module.DisposeAsync();
-            }
-            catch
-            {
-                // Silently fail during disposal - service might be disposing during prerendering
-            }
-        }
+        // No JavaScript module to dispose since we're using global gtag
     }
 }
