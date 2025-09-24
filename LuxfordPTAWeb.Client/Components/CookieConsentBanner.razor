@@ -1,0 +1,254 @@
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Shared.Services
+@inject ICookieConsentService CookieConsentService
+@implements IDisposable
+
+@if (showBanner)
+{
+    <div class="cookie-consent-banner position-fixed bottom-0 start-0 end-0 bg-dark text-white p-3 shadow-lg" 
+         style="z-index: 9999; border-top: 3px solid #28a745;">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-lg-8 col-md-7 col-12 mb-3 mb-md-0">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-shield-check text-success me-3 fs-4 flex-shrink-0 mt-1"></i>
+                        <div>
+                            <h6 class="mb-1 fw-bold text-success">Cookie Notice</h6>
+                            <p class="mb-0 small">
+                                We use cookies to improve your experience and understand how our website is used. 
+                                Analytics cookies are enabled by default, but you can customize your preferences.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-5 col-12">
+                    <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                        <button class="btn btn-outline-light btn-sm" @onclick="ShowDetails">
+                            <i class="bi bi-gear me-1"></i>Customize
+                        </button>
+                        <button class="btn btn-success btn-sm" @onclick="AcceptAll">
+                            <i class="bi bi-check-circle me-1"></i>Accept All
+                        </button>
+                        <button class="btn btn-warning btn-sm" @onclick="AcceptEssential">
+                            <i class="bi bi-x-circle me-1"></i>Opt Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDetailsModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseDetails">
+        <div class="modal-dialog modal-lg modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-shield-check me-2"></i>Cookie Preferences
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseDetails"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Default Setting:</strong> Analytics cookies are enabled by default to help us improve our website. 
+                        You can opt out at any time using the settings below.
+                    </div>
+                    
+                    <!-- Essential Cookies -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">
+                                        <i class="bi bi-shield-fill-check text-success me-2"></i>Essential Cookies
+                                    </h6>
+                                    <p class="card-text small text-muted mb-0">
+                                        These cookies are necessary for the website to function and cannot be switched off.
+                                        They're usually only set in response to actions made by you.
+                                    </p>
+                                </div>
+                                <div class="form-check form-switch ms-3">
+                                    <input class="form-check-input" type="checkbox" checked disabled>
+                                    <label class="form-check-label small text-muted">Always Active</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Analytics Cookies -->
+                    <div class="card mb-3 @(allowAnalytics ? "border-success" : "")">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">
+                                        <i class="bi bi-graph-up text-info me-2"></i>Analytics Cookies
+                                        @if (allowAnalytics)
+                                        {
+                                            <span class="badge bg-success ms-2 small">Enabled by Default</span>
+                                        }
+                                    </h6>
+                                    <p class="card-text small text-muted mb-2">
+                                        These cookies help us understand how visitors interact with our website by collecting 
+                                        and reporting information anonymously. This helps us improve the site for everyone.
+                                    </p>
+                                    <small class="text-muted">
+                                        <strong>Provider:</strong> Google Analytics 4
+                                        <br><strong>Purpose:</strong> Website analytics and performance monitoring
+                                        <br><strong>Data:</strong> Anonymous usage statistics, no personal information
+                                    </small>
+                                </div>
+                                <div class="form-check form-switch ms-3">
+                                    <input class="form-check-input" type="checkbox" @bind="allowAnalytics" id="analyticsSwitch">
+                                    <label class="form-check-label small" for="analyticsSwitch">
+                                        @(allowAnalytics ? "Enabled" : "Disabled")
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success d-flex align-items-start">
+                        <i class="bi bi-shield-check me-2 mt-1 flex-shrink-0"></i>
+                        <div>
+                            <strong>Your privacy is protected:</strong> We never collect personally identifiable information 
+                            through cookies. All analytics data is anonymized and used solely to improve our website experience.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="RejectAll">
+                        <i class="bi bi-x-circle me-1"></i>Essential Only
+                    </button>
+                    <button type="button" class="btn btn-success" @onclick="SavePreferences">
+                        <i class="bi bi-check-circle me-1"></i>Save Preferences
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .cookie-consent-banner {
+        animation: slideUp 0.3s ease-out;
+    }
+    
+    @@keyframes slideUp {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    .modal.show {
+        display: block !important;
+    }
+    
+    .form-switch .form-check-input {
+        width: 2em;
+        height: 1em;
+    }
+    
+    .form-switch .form-check-input:disabled {
+        opacity: 0.5;
+    }
+    
+    .card.border-success {
+        border-color: #28a745 !important;
+    }
+</style>
+
+@code {
+    private bool showBanner = false;
+    private bool showDetailsModal = false;
+    private bool allowAnalytics = true; // Default to true since analytics are now enabled by default
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if consent has been explicitly given before
+        var hasConsent = await CookieConsentService.HasConsentBeenGivenAsync();
+        showBanner = !hasConsent;
+        
+        // Get current consent level for modal (will default to Analytics if no explicit consent given)
+        var currentLevel = await CookieConsentService.GetConsentLevelAsync();
+        allowAnalytics = currentLevel >= CookieConsentLevel.Analytics;
+        
+        // Subscribe to consent changes
+        CookieConsentService.ConsentChanged += OnConsentChanged;
+    }
+    
+    private async Task AcceptAll()
+    {
+        await CookieConsentService.SetConsentLevelAsync(CookieConsentLevel.All);
+        showBanner = false;
+        StateHasChanged();
+    }
+    
+    private async Task AcceptEssential()
+    {
+        // This is now the "Opt Out" button - sets to Essential only
+        await CookieConsentService.SetConsentLevelAsync(CookieConsentLevel.Essential);
+        showBanner = false;
+        StateHasChanged();
+    }
+    
+    private void ShowDetails()
+    {
+        showDetailsModal = true;
+        StateHasChanged();
+    }
+    
+    private void CloseDetails()
+    {
+        showDetailsModal = false;
+        StateHasChanged();
+    }
+    
+    private async Task SavePreferences()
+    {
+        var level = allowAnalytics ? CookieConsentLevel.Analytics : CookieConsentLevel.Essential;
+        await CookieConsentService.SetConsentLevelAsync(level);
+        showBanner = false;
+        showDetailsModal = false;
+        StateHasChanged();
+    }
+    
+    private async Task RejectAll()
+    {
+        await CookieConsentService.SetConsentLevelAsync(CookieConsentLevel.Essential);
+        allowAnalytics = false;
+        showBanner = false;
+        showDetailsModal = false;
+        StateHasChanged();
+    }
+    
+    private void OnConsentChanged(CookieConsentLevel level)
+    {
+        allowAnalytics = level >= CookieConsentLevel.Analytics;
+        InvokeAsync(StateHasChanged);
+    }
+    
+    /// <summary>
+    /// Public method to show the cookie settings modal from external components
+    /// </summary>
+    public void ShowSettings()
+    {
+        showDetailsModal = true;
+        StateHasChanged();
+    }
+    
+    public void Dispose()
+    {
+        if (CookieConsentService != null)
+        {
+            CookieConsentService.ConsentChanged -= OnConsentChanged;
+        }
+    }
+}

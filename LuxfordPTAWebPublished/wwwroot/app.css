@@ -3,6 +3,63 @@
     overflow-x: hidden;
 }
 
+/* Board Member Modal Scrolling Styles */
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar for better appearance */
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Ensure modal content doesn't break out of container */
+.modal-dialog {
+    max-height: 90vh;
+    margin: 1.75rem auto;
+    display: flex;
+    align-items: center;
+}
+
+.modal-content {
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header,
+.modal-footer {
+    flex-shrink: 0;
+}
+
+/* Responsive modal adjustments */
+@media (max-width: 576px) {
+    .modal-dialog {
+        max-height: 95vh;
+        margin: 0.5rem;
+    }
+    
+    .modal-body {
+        max-height: 60vh;
+    }
+}
+
 h1:focus {
     outline: none;
 }
@@ -43,6 +100,52 @@ h1:focus {
     text-align: start;
 }
 
+/* Fix Bootstrap row gutters on mobile */
+.row.g-0 {
+    --bs-gutter-x: 0;
+    --bs-gutter-y: 0;
+}
+
+/* Ensure no horizontal scroll */
+.container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+/* Top Banner Styles */
+.pta-top-banner {
+    background: #f8f9fa;
+    color: #0056b3;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0.5rem 0;
+}
+
+.pta-banner-line1 {
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+.pta-banner-line2 {
+    font-size: 0.9rem;
+    line-height: 1.2;
+    font-weight: 500;
+}
+
+/* Mobile: Stack banner lines */
+@media (max-width: 576px) {
+    .pta-banner-line1 {
+        font-size: 0.85rem;
+    }
+    
+    .pta-banner-line2 {
+        font-size: 0.8rem;
+    }
+}
+
 .pta-header {
     border-bottom: none;
     margin-bottom: 0;
@@ -52,15 +155,6 @@ h1:focus {
 
 .pta-header-left {
     min-width: 170px;
-}
-
-.pta-logo {
-    height: 150px;
-    width: 150px;
-    object-fit: contain;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .pta-nav {
@@ -110,21 +204,59 @@ h1:focus {
     border: none;
     border-radius: 8px 8px 0 0;
     margin-bottom: 0;
-    padding: 2.5rem 1.5rem 1rem 1.5rem;
+    padding: .5rem 1.5rem .5rem 1.5rem;
 }
 
-.pta-logo {
-    box-shadow: 0 2px 8px rgba(76,185,107,0.07);
-    width: 100%;
+/* Content wrapper with responsive padding */
+.content-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
 }
 
+@media (max-width: 768px) {
+    .content-wrapper {
+        padding: 0 0.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .content-wrapper {
+        padding: 0 0.25rem;
+    }
+}
+
+/* Header Top Section - Image Alignment with Responsive Sizing */
 .pta-header-top {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     justify-content: center;
-    align-items: end;
-    gap: 3rem; /* Adjust gap as needed for spacing between items */
+    align-items: center;
+    gap: 3rem;
+}
+
+.pta-logo-box, .pta-mascot-box, .pta-sponsor-box {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Responsive Image Sizing - Bigger on large screens */
+.pta-logo, .pta-mascot, .sponsor-logo {
+    height: 180px;
+    width: 180px;
+    object-fit: contain;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.sponsor-logo {
+    border-radius: 50%;
+    border: 2px solid #4CAF50;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .pta-header-logo,
@@ -145,87 +277,236 @@ h1:focus {
     height: 125px;
 }
 
-.pta-mascot {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.sponsor-logo {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    border-radius: 50%;
-    border: 2px solid #4CAF50;
-    background: #fff;
-}
-
 .pta-header-sponsor div {
     margin-top: 0.25rem;
     font-weight: 500;
 }
 
-.pta-header-nav {
-    margin-bottom: 1.5rem;
+/* Hamburger Menu Button */
+.hamburger-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    margin: 0 auto;
+    background: transparent;
+    border: 2px solid #0d6efd;
+    color: #0d6efd;
+    transition: all 0.2s;
 }
 
-    .pta-header-nav .pta-nav-link {
-        font-size: 1.2rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.25rem 0.75rem;
-        border-radius: 4px;
-        transition: background 0.2s;
-    }
+.hamburger-btn:hover, .hamburger-btn:focus {
+    background: #0d6efd;
+    color: white;
+}
 
-        .pta-header-nav .pta-nav-link:focus {
-            box-shadow: 0 0 0 3px #4CAF50;
-            background: #e8f5e9;
-        }
+.hamburger-icon {
+    display: flex;
+    flex-direction: column;
+    width: 18px;
+    height: 12px;
+    justify-content: space-between;
+}
 
-    .pta-header-nav .pta-nav-icon {
-        font-size: 1.3em;
-        line-height: 1;
-        display: flex;
-        align-items: center;
-    }
+.hamburger-icon span {
+    display: block;
+    height: 2px;
+    width: 100%;
+    background: currentColor;
+    border-radius: 1px;
+    transition: all 0.2s;
+}
 
-    /* General active nav link box */
-    .pta-header-nav .pta-nav-link.active {
-        border: 2.5px solid;
-        border-radius: 8px;
-        background: #f8f9fa;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        font-weight: 700;
-    }
+/* Horizontal Navigation for Desktop */
+.pta-nav-horizontal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 1.5rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
 
-        /* Color-specific borders for each nav link */
-        .pta-header-nav .pta-nav-link.active.text-success {
-            border-color: #198754;
-            background: #eaf6ea;
-        }
+/* Navigation Link Styles */
+.pta-header-nav .pta-nav-link {
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+}
 
-        .pta-header-nav .pta-nav-link.active.text-primary {
-            border-color: #0d6efd;
-            background: #eaf1fa;
-        }
+.pta-header-nav .pta-nav-link:focus {
+    box-shadow: 0 0 0 3px #4CAF50;
+    background: #e8f5e9;
+}
 
-        .pta-header-nav .pta-nav-link.active.text-info {
-            border-color: #0dcaf0;
-            background: #eaf7fa;
-        }
+.pta-header-nav .pta-nav-icon {
+    font-size: 1.2em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
 
-        .pta-header-nav .pta-nav-link.active.text-warning {
-            border-color: #ffc107;
-            background: #fffbe6;
-        }
+/* General active nav link box */
+.pta-header-nav .pta-nav-link.active {
+    border: 2.5px solid;
+    border-radius: 8px;
+    background: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    font-weight: 700;
+}
 
-        .pta-header-nav .pta-nav-link.active.text-secondary {
-            border-color: #6c757d;
-            background: #f3f3f3;
-        }
+/* Color-specific borders for each nav link */
+.pta-header-nav .pta-nav-link.active.text-success {
+    border-color: #198754;
+    background: #eaf6ea;
+}
+
+.pta-header-nav .pta-nav-link.active.text-primary {
+    border-color: #0d6efd;
+    background: #eaf1fa;
+}
+
+.pta-header-nav .pta-nav-link.active.text-info {
+    border-color: #0dcaf0;
+    background: #eaf7fa;
+}
+
+.pta-header-nav .pta-nav-link.active.text-warning {
+    border-color: #ffc107;
+    background: #fffbe6;
+}
+
+.pta-header-nav .pta-nav-link.active.text-secondary {
+    border-color: #6c757d;
+    background: #f3f3f3;
+}
+
+/* Mobile Menu Overlay */
+.mobile-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+
+.mobile-menu-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.mobile-menu-content {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 280px;
+    max-width: 85vw;
+    background: white;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-menu-overlay.show .mobile-menu-content {
+    transform: translateX(0);
+}
+
+.mobile-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #0d6efd;
+    color: white;
+}
+
+.mobile-menu-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.mobile-menu-close {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    background: transparent;
+    padding: 0.25rem 0.5rem;
+}
+
+.mobile-menu-close:hover, .mobile-menu-close:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+}
+
+.mobile-menu-items {
+    flex: 1;
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.mobile-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s;
+}
+
+.mobile-nav-link:hover {
+    background: #f8f9fa;
+    text-decoration: none;
+}
+
+.mobile-nav-link.active {
+    background: #e3f2fd;
+    border-left: 4px solid #0d6efd;
+}
+
+.mobile-nav-icon {
+    font-size: 1.3em;
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Compact Year Selection */
+.school-year-banner {
+    font-size: 0.9rem;
+    min-width: auto !important;
+}
+
+.login-display-container {
+    display: flex;
+    align-items: center;
+}
 
 /* Sponsor Badge Styles */
 .sponsor-badge-container {
@@ -278,18 +559,6 @@ h1:focus {
     animation-play-state: paused;
 }
 
-.sponsor-logo {
-    width: 125px;
-    height: 125px;
-    border-radius: 50%;
-    margin-top: 15px;
-    z-index: 2;
-    position: relative;
-    background: #fff;
-    object-fit: cover;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-
 .sponsor-label.visually-hidden {
     position: absolute;
     width: 1px;
@@ -325,105 +594,94 @@ h1:focus {
     }
 }
 
-/*  tablets */
-@media (max-width: 10024px) {
-
-
-    .pta-header-box,
-    .container-fluid,
-    .row,
-    .col-12,
-    .col-md-10 {
-        width: 100%;
-        margin-left: auto;
-        margin-right: auto;
-        box-sizing: border-box;
+/* Large Desktop Styles */
+@media (min-width: 1200px) {
+    .pta-logo, .pta-mascot, .sponsor-logo {
+        height: 200px;
+        width: 200px;
     }
-
-    /* If you use .card or similar for content boxes, add them here */
-    .card, .content-box {
-        width: 100%;
-        margin-left: auto;
-        margin-right: auto;
-        box-sizing: border-box;
+    
+    .pta-header-top {
+        gap: 4rem;
+    }
+    
+    .pta-nav-horizontal {
+        gap: 2rem;
     }
 }
 
-@media (max-width: 376px) {
-    .container-fluid,
-    .row,
-    .col-12,
-    .col-md-10,
-    .pta-header-box {
-        width: 100% !important;
-        max-width: 100vw !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box;
-    }
-
-    /* If you have a card or content box class, add it here */
-    .card, .content-box {
-        width: 100% !important;
-        max-width: 100vw !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box;
-    }
-
+/* Tablet and Mobile Styles */
+@media (max-width: 991px) {
     .pta-header-top {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap; /* Prevent wrapping */
-        justify-content: center;
-        align-items: center;
-        gap: 0.15rem;
-        width: 100%;
-        max-width: 100vw;
-        margin-bottom: 0.5rem;
+        gap: 2rem;
     }
-
-        .pta-header-top > div {
-            flex: 0 1 auto; /* Allow logos to shrink as needed */
-            min-width: 0;
-            max-width: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 0;
-        }
-
-    .pta-logo,
-    .pta-mascot,
-    .sponsor-logo {
-        width: 56px;
-        height: 56px;
-        margin: 0 auto;
-        display: block;
+    
+    .pta-logo, .pta-mascot, .sponsor-logo {
+        height: 140px;
+        width: 140px;
     }
-
-    .pta-school-logo,
-    .pta-school-logo-box {
+    
+    /* Hide desktop navigation, show hamburger */
+    .pta-nav-horizontal {
         display: none !important;
     }
-
-    .pta-header-nav {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
+    
+    .hamburger-btn {
+        display: flex !important;
     }
-
-        .pta-header-nav .pta-nav-link {
-            font-size: 0.95rem;
-            padding: 0.15rem 0.5rem;
-            border-radius: 4px;
-        }
 }
 
+@media (max-width: 768px) {
+    .pta-header-top {
+        gap: 1.5rem;
+    }
+    
+    .pta-logo, .pta-mascot, .sponsor-logo {
+        height: 120px;
+        width: 120px;
+    }
+}
+
+/* Mobile Styles */
+@media (max-width: 576px) {
+    .pta-header-box {
+        padding: 0.5rem 0.25rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .pta-header-top {
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .pta-logo, .pta-mascot, .sponsor-logo {
+        height: 80px;
+        width: 80px;
+    }
+    
+    /* Year selection and login stack vertically */
+    .d-flex.justify-content-center.align-items-center.flex-wrap.gap-3 {
+        flex-direction: column;
+        gap: 1rem !important;
+    }
+    
+    .mobile-menu-content {
+        width: 100%;
+        max-width: 100vw;
+    }
+}
+
+/* Very small mobile */
+@media (max-width: 375px) {
+    .pta-header-top {
+        gap: 0.5rem;
+    }
+    
+    .pta-logo, .pta-mascot, .sponsor-logo {
+        height: 70px;
+        width: 70px;
+    }
+}
 
 .pta-header-box,
 .container-fluid,
@@ -443,7 +701,6 @@ img {
     height: auto;
     box-sizing: border-box;
 }
-
 
 .school-year-banner button:focus {
     box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);

@@ -1,5 +1,6 @@
 ﻿using LuxfordPTAWeb.Data;
 using LuxfordPTAWeb.Shared.Models;
+using LuxfordPTAWeb.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,49 @@ public class BoardPositionsController : ControllerBase
 	private readonly ApplicationDbContext _db;
 	public BoardPositionsController(ApplicationDbContext db) => _db = db;
 
+	// ===== PUBLIC ENDPOINTS (return DTOs with safe information only) =====
+
+	/// <summary>
+	/// Gets public-safe board member information for a specific school year
+	/// Only returns assigned positions with safe user information
+	/// </summary>
+	[HttpGet("public/by-schoolyear/{schoolYearId}")]
+	public async Task<IEnumerable<AssignedUserDTO>> GetPublicBySchoolYear(int schoolYearId)
+	{
+		var positions = await _db.BoardPositions
+			.Include(bp => bp.BoardPositionTitle)
+			.Include(bp => bp.AssignedUser)
+			.Include(bp => bp.SchoolYear)
+			.Where(bp => bp.SchoolYearId == schoolYearId && bp.AssignedUser != null)
+			.ToListAsync();
+
+		return positions.ToAssignedUserDTOs();
+	}
+
+	/// <summary>
+	/// Gets public-safe board member information for the current school year
+	/// Only returns assigned positions with safe user information
+	/// </summary>
+	[HttpGet("public/current")]
+	public async Task<IEnumerable<AssignedUserDTO>> GetPublicCurrent()
+	{
+		var currentDate = DateTime.Now;
+		var positions = await _db.BoardPositions
+			.Include(bp => bp.BoardPositionTitle)
+			.Include(bp => bp.AssignedUser)
+			.Include(bp => bp.SchoolYear)
+			.Where(bp => currentDate >= bp.SchoolYear.StartDate && 
+			            currentDate <= bp.SchoolYear.EndDate && 
+			            bp.AssignedUser != null)
+			.ToListAsync();
+
+		return positions.ToAssignedUserDTOs();
+	}
+
+	// ===== ADMIN ENDPOINTS (return full models with all information) =====
+
 	[HttpGet("by-schoolyear/{schoolYearId}")]
+	[Authorize(Roles = "Admin,BoardMember")]
 	public async Task<IEnumerable<BoardPosition>> GetBySchoolYear(int schoolYearId)
 	{
 		return await _db.BoardPositions
@@ -24,6 +67,7 @@ public class BoardPositionsController : ControllerBase
 	}
 
 	[HttpGet("{id}")]
+	[Authorize(Roles = "Admin,BoardMember")]
 	public async Task<ActionResult<BoardPosition>> Get(int id)
 	{
 		var bp = await _db.BoardPositions
@@ -52,6 +96,7 @@ public class BoardPositionsController : ControllerBase
 	}
 
 	[HttpGet("all-by-schoolyear/{schoolYearId}")]
+	[Authorize(Roles = "Admin,BoardMember")]
 	public async Task<IEnumerable<BoardPosition>> GetAllBySchoolYear(int schoolYearId)
 	{
 		var titles = await _db.BoardPositionTitles
@@ -104,7 +149,7 @@ public class BoardPositionsController : ControllerBase
 			.ToListAsync();
 	}
 
-	// --- SECURE ENDPOINTS BELOW ---
+	// ===== WRITE ENDPOINTS (Admin only) =====
 
 	[HttpPost]
 	[Authorize(Roles = "Admin,BoardMember")]
