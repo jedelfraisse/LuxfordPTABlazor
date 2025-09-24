@@ -12,12 +12,12 @@
 *.env
 
 # Ignore environment-specific files app settings
-*.appsettings.Development.json
-*.appsettings.Local.json
-*.appsettings.Testing.json
-*.appsettings.Staging.json
-*.appsettings.Production.json
-*.appsettings.*.json
+**.appsettings.Development.json
+**.appsettings.Local.json
+**.appsettings.Testing.json
+**.appsettings.Staging.json
+**.appsettings.Production.json
+**.appsettings.*.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
