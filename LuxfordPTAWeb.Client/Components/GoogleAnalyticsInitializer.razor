@@ -3,10 +3,16 @@
 @implements IDisposable
 
 @code {
-    protected override async Task OnInitializedAsync()
+    private bool hasInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Initialize Google Analytics when the component loads
-        await GoogleAnalyticsService.InitializeAsync();
+        if (firstRender && !hasInitialized)
+        {
+            hasInitialized = true;
+            // Initialize Google Analytics after first render when JS runtime is available
+            await GoogleAnalyticsService.InitializeAsync();
+        }
     }
     
     public void Dispose()

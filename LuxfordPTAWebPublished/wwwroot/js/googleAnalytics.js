@@ -24,9 +24,9 @@ export function initializeGA(measurementIdParam, debug = false) {
     
     gtag('js', new Date());
     
-    // Set default consent state (denied by default for GDPR compliance)
+    // Set default consent state (GRANTED by default for opt-out approach)
     gtag('consent', 'default', {
-        'analytics_storage': 'denied',
+        'analytics_storage': 'granted', // Changed to granted for opt-out approach
         'ad_storage': 'denied',
         'functionality_storage': 'denied',
         'personalization_storage': 'denied',
