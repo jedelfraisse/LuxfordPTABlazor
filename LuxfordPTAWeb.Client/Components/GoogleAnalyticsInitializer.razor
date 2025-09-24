@@ -10,7 +10,7 @@
         if (firstRender && !hasInitialized)
         {
             hasInitialized = true;
-            // Initialize Google Analytics after first render when JS runtime is available
+            // Initialize consent management for Google Analytics (gtag already loaded in HTML)
             await GoogleAnalyticsService.InitializeAsync();
         }
     }
