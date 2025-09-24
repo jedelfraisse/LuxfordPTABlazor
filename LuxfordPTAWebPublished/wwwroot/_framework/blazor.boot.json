@@ -1,9 +1,9 @@
 {
   "mainAssemblyName": "LuxfordPTAWeb.Client",
   "resources": {
-    "hash": "sha256-Uh1toDT9OmYxZuPb93Jgj5lunwMUBztq2Da0aak+b7Y=",
+    "hash": "sha256-7OUp8se9O+Y6GOUhtTPUbaBGXe4z4U5tPE4Y4GDCHQQ=",
     "fingerprinting": {
-      "LuxfordPTAWeb.Client.1vyk5bwoys.wasm": "LuxfordPTAWeb.Client.wasm",
+      "LuxfordPTAWeb.Client.oniariul4v.wasm": "LuxfordPTAWeb.Client.wasm",
       "LuxfordPTAWeb.Shared.tkeqer8ucz.wasm": "LuxfordPTAWeb.Shared.wasm",
       "Microsoft.AspNetCore.Authentication.Abstractions.teru10q8m9.wasm": "Microsoft.AspNetCore.Authentication.Abstractions.wasm",
       "Microsoft.AspNetCore.Authentication.Cookies.5hwk0bo7dn.wasm": "Microsoft.AspNetCore.Authentication.Cookies.wasm",
@@ -118,7 +118,7 @@
       "System.Runtime.InteropServices.JavaScript.f7txb1es0b.wasm": "sha256-5X6FWiZE4NSx4s9iNjfVim2lWQpcbVIsorx1vB6lyno="
     },
     "assembly": {
-      "LuxfordPTAWeb.Client.1vyk5bwoys.wasm": "sha256-g+EB7SkdPhawxdm2561HjxvuapzCykK68mCgfxLw1lQ=",
+      "LuxfordPTAWeb.Client.oniariul4v.wasm": "sha256-9B8q/7XXwfsxaaVciBcd82iakR+exI9Of1nD4R6PJNo=",
       "LuxfordPTAWeb.Shared.tkeqer8ucz.wasm": "sha256-sxnLGkSJxavoWjM6TqqxMimBovztDfh2K4YyjW8S2nw=",
       "Microsoft.AspNetCore.Authentication.Abstractions.teru10q8m9.wasm": "sha256-u9iMOIltdEH1f+auTSi7mcb4SBt2memdjfBRiDl2cNE=",
       "Microsoft.AspNetCore.Authentication.Cookies.5hwk0bo7dn.wasm": "sha256-l9JFTlQeou24it5z/wN5pLncCEvGXIhHTExQWTO548U=",

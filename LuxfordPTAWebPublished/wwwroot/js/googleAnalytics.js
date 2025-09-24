@@ -8,13 +8,14 @@ export function initializeGA(measurementIdParam, debug = false) {
     
     measurementId = measurementIdParam;
     
-    // Load gtag script
+    // Use Google's standard installation format
+    // Load gtag script - Google's recommended way
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
     document.head.appendChild(script);
     
-    // Initialize gtag
+    // Standard Google Analytics initialization - exactly as Google recommends
     window.dataLayer = window.dataLayer || [];
     function gtag() {
         dataLayer.push(arguments);
@@ -24,24 +25,21 @@ export function initializeGA(measurementIdParam, debug = false) {
     
     gtag('js', new Date());
     
-    // Set default consent state (GRANTED by default for opt-out approach)
+    // For opt-out approach: Set consent to granted by default, then configure GA
     gtag('consent', 'default', {
-        'analytics_storage': 'granted', // Changed to granted for opt-out approach
+        'analytics_storage': 'granted', // Opt-out approach - granted by default
         'ad_storage': 'denied',
         'functionality_storage': 'denied',
         'personalization_storage': 'denied',
-        'security_storage': 'granted' // Required for basic functionality
+        'security_storage': 'granted'
     });
     
-    // Configure GA4 with privacy settings
+    // Standard Google Analytics config - Google's recommended format
     gtag('config', measurementId, {
-        // Privacy settings
         'anonymize_ip': true,
         'allow_google_signals': false,
         'allow_ad_personalization_signals': false,
-        // Debug mode
         'debug_mode': debug,
-        // Respect consent mode
         'ads_data_redaction': true
     });
     
@@ -49,6 +47,7 @@ export function initializeGA(measurementIdParam, debug = false) {
     
     if (debug) {
         console.log('Google Analytics 4 initialized with measurement ID:', measurementId);
+        console.log('Standard Google Tag format used for maximum compatibility');
     }
 }
 
@@ -75,6 +74,7 @@ export function revokeAnalyticsConsent() {
 export function trackPageView(pageName, pageTitle = '') {
     if (!isInitialized || !window.gtag) return;
     
+    // Standard Google Analytics page_view event
     window.gtag('event', 'page_view', {
         'page_title': pageTitle || pageName,
         'page_location': window.location.href,
@@ -85,25 +85,15 @@ export function trackPageView(pageName, pageTitle = '') {
 export function trackEvent(eventName, eventData = {}) {
     if (!isInitialized || !window.gtag) return;
     
+    // Standard Google Analytics custom event
     window.gtag('event', eventName, eventData);
 }
 
 export function setUserId(userId) {
     if (!isInitialized || !window.gtag || !measurementId) return;
     
+    // Standard Google Analytics user ID setting
     window.gtag('config', measurementId, {
         'user_id': userId
     });
-}
-
-export function disableGA(measurementIdParam) {
-    if (!isInitialized) return;
-    
-    // Revoke consent
-    revokeAnalyticsConsent();
-    
-    // Disable Google Analytics
-    window['ga-disable-' + measurementIdParam] = true;
-    
-    console.log('Google Analytics disabled');
 }
