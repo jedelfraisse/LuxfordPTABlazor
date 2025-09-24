@@ -1,6 +1,8 @@
 ﻿@page "/"
+@using LuxfordPTAWeb.Client.Services
 @inject HttpClient Http
 @inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+@inject GoogleAnalyticsService GoogleAnalytics
 
 <PageTitle>Home</PageTitle>
 
@@ -9,7 +11,7 @@
 	<div class="card-body">
 		<h1 class="card-title text-center mb-3">Welcome to Luxford Elementary PTA</h1>
 		<p class="lead text-center mb-0">
-			Welcome to the official website of the Luxford Elementary Parent Teacher Association! We're a dedicated group of parents, teachers, and community members working together to enhance the educational experience for all students at Luxford Elementary School.
+			Welcome to the Luxford Elementary PTA, a proud local unit of the Virginia Congress of Parents and Teachers. We're dedicated to building a strong, inclusive school community through collaboration, creativity, and care.
 		</p>
 	</div>
 </div>
@@ -21,13 +23,22 @@
 			<div class="card-header bg-success text-white fw-bold">About Our PTA</div>
 			<div class="card-body">
 				<p>
-					The Luxford Elementary PTA is committed to fostering a strong partnership between families and our school. Through fundraising, volunteer efforts, and community building, we support our students, teachers, and educational programs.
+					The Luxford Elementary PTA is dedicated to supporting our school's students, families, and teachers through meaningful programs, events, and initiatives. We strive to create a welcoming environment where everyone can contribute to enhancing educational opportunities and community spirit.
 				</p>
-				<ul class="list-unstyled mb-0">
+				<ul class="list-unstyled mb-3">
 					<li><strong>Our School:</strong> Luxford Elementary School</li>
 					<li><strong>Address:</strong> 4808 Haygood Rd, Virginia Beach, VA 23455</li>
 					<li><strong>Website:</strong> <a href="https://luxfordes.vbschools.com/" target="_blank">luxfordes.vbschools.com</a></li>
 				</ul>
+				<div class="border-top pt-3">
+					<h6 class="mb-2 text-success">Non-Profit Information</h6>
+					<ul class="list-unstyled small mb-0">
+						<li><strong>Tax Status:</strong> 501(c)(3) Tax-Exempt Organization</li>
+						<li><strong>EIN:</strong> 54-1539539</li>
+						<li><strong>Virginia PTA Unit:</strong> Local Unit of Virginia Congress of PTA</li>
+						<li><strong>National Affiliation:</strong> National PTA</li>
+					</ul>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -62,15 +73,15 @@
 					<ul class="list-group list-group-flush mb-0">
 						@foreach (var member in boardMembers)
 						{
-							<li class="list-group-item @(HasMemberDetails(member) ? "clickable-member" : "")" 
+							<li class="list-group-item @(member.HasAdditionalDetails ? "clickable-member" : "")" 
 								@onclick="() => ShowMemberDetails(member)" 
-								style="@(HasMemberDetails(member) ? "cursor: pointer;" : "")">
+								style="@(member.HasAdditionalDetails ? "cursor: pointer;" : "")">
 								<div class="d-flex justify-content-between align-items-center">
 									<div>
-										<strong class="@(HasMemberDetails(member) ? "text-info" : "")">@member.Title:</strong> 
-										@member.FullName
+										<strong class="@(member.HasAdditionalDetails ? "text-info" : "")">@member.RoleTitle:</strong> 
+										@member.DisplayName
 									</div>
-									@if (HasMemberDetails(member))
+									@if (member.HasAdditionalDetails)
 									{
 										<i class="bi bi-info-circle-fill text-info" title="Click for more details"></i>
 									}
@@ -176,44 +187,118 @@
 @if (selectedMember != null)
 {
 	<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseModal">
-		<div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
-			<div class="modal-content">
-				<div class="modal-header bg-info text-white">
-					<h5 class="modal-title">
-						<i class="bi bi-person-badge me-2"></i>@selectedMember.Title
-					</h5>
+		<div class="modal-dialog modal-dialog-centered modal-lg" @onclick:stopPropagation="true" style="max-height: 90vh; display: flex; flex-direction: column;">
+			<div class="modal-content d-flex flex-column" style="max-height: 100%; overflow: hidden;">
+				<!-- Fixed Header -->
+				<div class="modal-header bg-info text-white flex-shrink-0">
+					<div class="flex-grow-1">
+						<h5 class="modal-title mb-1">
+							<i class="bi bi-person-badge me-2"></i>@selectedMember.RoleTitle
+						</h5>
+						<h6 class="mb-0 opacity-75">
+							<i class="bi bi-person me-2"></i>@selectedMember.DisplayName
+						</h6>
+					</div>
 					<button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
 				</div>
-				<div class="modal-body">
-					<h6 class="mb-3">
-						<i class="bi bi-person me-2"></i>@selectedMember.FullName
-					</h6>
-					
-					@if (!string.IsNullOrWhiteSpace(selectedMember.PositionDescription))
-					{
-						<div class="mb-3">
-							<strong>Position Description:</strong>
-							<p class="mb-0 text-muted">@selectedMember.PositionDescription</p>
-						</div>
+				
+				<!-- Modal Body with Tabs or Single Content -->
+				<div class="modal-body p-0 flex-grow-1 overflow-hidden d-flex flex-column">
+					@{
+						bool hasPositionDescription = !string.IsNullOrWhiteSpace(selectedMember.RoleDescription);
+						bool hasBio = !string.IsNullOrWhiteSpace(selectedMember.Bio);
+						bool showTabs = hasPositionDescription && hasBio;
 					}
 					
-					@if (!string.IsNullOrWhiteSpace(selectedMember.Bio))
+					@if (showTabs)
 					{
-						<div class="mb-0">
-							<strong>About @selectedMember.FullName.Split(' ')[0]:</strong>
-							<p class="mb-0">@selectedMember.Bio</p>
+						<!-- Tab Navigation -->
+						<ul class="nav nav-tabs nav-fill flex-shrink-0" id="memberDetailsTabs" role="tablist">
+							<li class="nav-item" role="presentation">
+								<button class="nav-link @(activeTab == "position" ? "active" : "")" 
+										type="button" 
+										@onclick="@(() => SetActiveTab("position"))"
+										aria-selected="@(activeTab == "position")">
+									<i class="bi bi-briefcase me-1"></i>
+									Position Details
+								</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link @(activeTab == "bio" ? "active" : "")" 
+										type="button" 
+										@onclick="@(() => SetActiveTab("bio"))"
+										aria-selected="@(activeTab == "bio")">
+									<i class="bi bi-person-lines-fill me-1"></i>
+									About @selectedMember.DisplayName.Split(' ')[0]
+								</button>
+							</li>
+						</ul>
+						
+						<!-- Tab Content with Scrollable Area -->
+						<div class="tab-content flex-grow-1 overflow-hidden">
+							@if (activeTab == "position" && hasPositionDescription)
+							{
+								<div class="tab-pane fade show active p-3 h-100 d-flex flex-column">
+									<h6 class="text-muted mb-2 flex-shrink-0">Position Responsibilities:</h6>
+									<div class="scrollable-content flex-grow-1">
+										<p class="mb-0">@selectedMember.RoleDescription</p>
+									</div>
+								</div>
+							}
+							
+							@if (activeTab == "bio" && hasBio)
+							{
+								<div class="tab-pane fade show active p-3 h-100 d-flex flex-column">
+									<h6 class="text-muted mb-2 flex-shrink-0">About @selectedMember.DisplayName.Split(' ')[0]:</h6>
+									<div class="scrollable-content flex-grow-1">
+										<p class="mb-0">@selectedMember.Bio</p>
+									</div>
+								</div>
+							}
 						</div>
 					}
-
-					@if (string.IsNullOrWhiteSpace(selectedMember.PositionDescription) && string.IsNullOrWhiteSpace(selectedMember.Bio))
+					else
 					{
-						<p class="text-muted mb-0">
-							<em>No additional information available for this board member.</em>
-						</p>
+						<!-- Single Content View -->
+						<div class="p-3 h-100 d-flex flex-column">
+							@if (hasPositionDescription)
+							{
+								<div class="mb-3 flex-grow-1 d-flex flex-column">
+									<h6 class="text-muted mb-2 flex-shrink-0">Position Responsibilities:</h6>
+									<div class="scrollable-content flex-grow-1">
+										<p class="mb-0">@selectedMember.RoleDescription</p>
+									</div>
+								</div>
+							}
+							
+							@if (hasBio)
+							{
+								<div class="@(hasPositionDescription ? "border-top pt-3" : "") @(hasPositionDescription ? "" : "flex-grow-1 d-flex flex-column")">
+									<h6 class="text-muted mb-2 flex-shrink-0">About @selectedMember.DisplayName.Split(' ')[0]:</h6>
+									<div class="scrollable-content @(hasPositionDescription ? "" : "flex-grow-1")">
+										<p class="mb-0">@selectedMember.Bio</p>
+									</div>
+								</div>
+							}
+							
+							@if (!hasPositionDescription && !hasBio)
+							{
+								<p class="text-muted mb-0 text-center py-4 flex-grow-1 d-flex align-items-center justify-content-center">
+									<span>
+										<i class="bi bi-info-circle me-2"></i>
+										<em>No additional information available for this board member.</em>
+									</span>
+								</p>
+							}
+						</div>
 					}
 				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+				
+				<!-- Fixed Footer -->
+				<div class="modal-footer flex-shrink-0">
+					<button type="button" class="btn btn-secondary" @onclick="CloseModal">
+						<i class="bi bi-x-circle me-1"></i>Close
+					</button>
 				</div>
 			</div>
 		</div>
@@ -229,15 +314,98 @@
 	.modal.show {
 		display: block !important;
 	}
+	
+	/* Enhanced scrollable content styling for proper scrolling */
+	.scrollable-content {
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding-right: 8px;
+		/* Ensure scrolling always works by setting a minimum height */
+		min-height: 50px;
+		/* Custom scrollbar styling */
+		scrollbar-width: thin;
+		scrollbar-color: #6c757d #f8f9fa;
+	}
+	
+	.scrollable-content::-webkit-scrollbar {
+		width: 8px;
+	}
+	
+	.scrollable-content::-webkit-scrollbar-track {
+		background: #f8f9fa;
+		border-radius: 4px;
+	}
+	
+	.scrollable-content::-webkit-scrollbar-thumb {
+		background: #6c757d;
+		border-radius: 4px;
+	}
+	
+	.scrollable-content::-webkit-scrollbar-thumb:hover {
+		background: #495057;
+	}
+	
+	/* Ensure the modal uses full available height properly */
+	.modal-dialog {
+		margin: 1rem;
+	}
+	
+	@@media (min-width: 576px) {
+		.modal-dialog {
+			margin: 1.75rem auto;
+		}
+	}
+	
+	/* Tab styling improvements */
+	.nav-tabs .nav-link {
+		color: #495057;
+		border: 1px solid transparent;
+		border-bottom-color: #dee2e6;
+	}
+	
+	.nav-tabs .nav-link:hover {
+		border-color: #e9ecef #e9ecef #dee2e6;
+		isolation: isolate;
+	}
+	
+	.nav-tabs .nav-link.active {
+		color: #0d6efd;
+		background-color: #fff;
+		border-color: #dee2e6 #dee2e6 #fff;
+	}
+	
+	/* Force scroll on mobile devices */
+	@@media (max-height: 600px) {
+		.modal-dialog {
+			max-height: 95vh;
+		}
+		
+		.scrollable-content {
+			max-height: 200px;
+		}
+	}
+	
+	/* Additional mobile responsiveness */
+	@@media (max-width: 768px) {
+		.modal-lg {
+			max-width: 95vw;
+		}
+		
+		.scrollable-content {
+			max-height: 250px;
+		}
+	}
 </style>
 
 @code {
-	private List<BoardMemberDto> boardMembers = new();
+	private List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO> boardMembers = new();
 	private string boardYearLabel = "";
 	private bool isLoadingBoard = true;
 	private bool iselectionEvent = false;
 	private bool isCurrentYear = false;
-	private BoardMemberDto? selectedMember = null;
+	private LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO? selectedMember = null;
+	private string activeTab = "position"; // Default to position tab
+	private bool hasRendered = false;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -250,18 +418,10 @@
 			{
 				isCurrentYear = schoolYear.Status == Shared.Enums.SchoolYearStatus.CurrentYear;
 				boardYearLabel = $"{schoolYear.Name}";
-				// Get board positions for this year, only filled spots
-				var positions = await Http.GetFromJsonAsync<List<BoardPositionDto>>($"api/boardpositions/all-by-schoolyear/{schoolYear.Id}");
-				boardMembers = positions?
-					.Where(bp => bp.AssignedUser != null)
-					.Select(bp => new BoardMemberDto
-					{
-						Title = bp.BoardPositionTitle?.Title ?? "Unknown",
-						FullName = bp.AssignedUser.FullName,
-						Bio = bp.AssignedUser.Bio ?? "",
-						PositionDescription = bp.BoardPositionTitle?.Description ?? ""
-					})
-					.ToList() ?? new List<BoardMemberDto>();
+
+				// Use the new public endpoint that returns AssignedUserDTO
+				boardMembers = await Http.GetFromJsonAsync<List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO>>($"api/boardpositions/public/by-schoolyear/{schoolYear.Id}") 
+					?? new List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO>();
 			}
 		}
 		catch
@@ -271,17 +431,46 @@
 		isLoadingBoard = false;
 	}
 
-	private bool HasMemberDetails(BoardMemberDto member)
+	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
-		// Show info button if there is position description OR bio
-		return !string.IsNullOrWhiteSpace(member.PositionDescription) || !string.IsNullOrWhiteSpace(member.Bio);
+		if (firstRender && !hasRendered)
+		{
+			hasRendered = true;
+			// Track page view only after rendering is complete
+			await GoogleAnalytics.TrackPageViewAsync("/", "Home - Luxford Elementary PTA");
+		}
 	}
 
-	private void ShowMemberDetails(BoardMemberDto member)
+	private async Task ShowMemberDetails(LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO member)
 	{
-		if (HasMemberDetails(member))
+		if (member.HasAdditionalDetails)
 		{
 			selectedMember = member;
+
+			// Track board member modal view (safe to call after render)
+			if (hasRendered)
+			{
+				await GoogleAnalytics.TrackEventAsync("board_member_details", new 
+				{ 
+					member_name = member.DisplayName,
+					member_role = member.RoleTitle,
+					page = "home"
+				});
+			}
+
+			// Set default active tab based on available content
+			bool hasPositionDescription = !string.IsNullOrWhiteSpace(member.RoleDescription);
+			bool hasBio = !string.IsNullOrWhiteSpace(member.Bio);
+
+			if (hasPositionDescription)
+			{
+				activeTab = "position";
+			}
+			else if (hasBio)
+			{
+				activeTab = "bio";
+			}
+
 			StateHasChanged();
 		}
 	}
@@ -289,36 +478,13 @@
 	private void CloseModal()
 	{
 		selectedMember = null;
+		activeTab = "position";
 		StateHasChanged();
 	}
 
-	public class BoardMemberDto
+	private void SetActiveTab(string tab)
 	{
-		public string Title { get; set; } = "";
-		public string FullName { get; set; } = "";
-		public string Bio { get; set; } = "";
-		public string PositionDescription { get; set; } = "";
-	}
-
-	public class BoardPositionDto
-	{
-		public int Id { get; set; }
-		public BoardPositionTitleDto? BoardPositionTitle { get; set; }
-		public int BoardPositionTitleId { get; set; }
-		public ApplicationUserDto? AssignedUser { get; set; }
-	}
-
-	public class BoardPositionTitleDto
-	{
-		public int Id { get; set; }
-		public string Title { get; set; } = "";
-		public string Description { get; set; } = "";
-	}
-
-	public class ApplicationUserDto
-	{
-		public string Id { get; set; } = "";
-		public string FullName { get; set; } = "";
-		public string Bio { get; set; } = "";
+		activeTab = tab;
+		StateHasChanged();
 	}
 }

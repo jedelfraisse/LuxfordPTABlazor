@@ -17,9 +17,25 @@
 	<div class="card-body">
 		<p>Here are the assigned board officers and committee chairs for <strong>@SchoolYear?.Name</strong>:</p>
 		
+		<!-- Enhanced Show All Positions Toggle -->
 		<div class="row mb-3">
-			<div class="col-md-6">
-				<InputCheckbox @bind-Value="boardShowAllPositions" @onchange="OnBoardShowAllPositionsChanged"></InputCheckbox> Show All Positions
+			<div class="col-md-8">
+				<div class="form-check form-switch">
+					<InputCheckbox @bind-Value="boardShowAllPositions" @onchange="OnBoardShowAllPositionsChanged" 
+								   id="showAllPositions" class="form-check-input"></InputCheckbox>
+					<label for="showAllPositions" class="form-check-label fw-bold">
+						Show All Positions & Management Options
+					</label>
+					<div class="form-text">Enable to view all positions and access editing features</div>
+				</div>
+			</div>
+			<div class="col-md-4 text-end">
+				@if (boardShowAllPositions && CanAddNewPositionTitles)
+				{
+					<button class="btn btn-success btn-sm" @onclick="ShowAddTitleForm">
+						<i class="bi bi-plus-circle"></i> Add New Position
+					</button>
+				}
 			</div>
 		</div>
 		
@@ -168,12 +184,6 @@
 						<i class="bi bi-x"></i> Cancel Editing
 					</button>
 				}
-				@if (boardShowAllPositions && CanAddNewPositionTitles)
-				{
-					<button class="btn btn-outline-success btn-sm ms-2" @onclick="ShowAddTitleForm">
-						<i class="bi bi-plus-circle"></i> Add New Position Title
-					</button>
-				}
 			</div>
 		</div>
 
@@ -275,11 +285,11 @@
 	private BoardPositionTitle newPositionTitle = new();
 	private bool isSorting = false;
 
-	// School Year Status Logic
+	// School Year Status Logic - Enhanced to allow adding positions for current year too
 	private bool CanEditPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
 	private bool CanSortPositions => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
 	private bool CanAssignUsers => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear or SchoolYearStatus.Wrapup;
-	private bool CanAddNewPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear;
+	private bool CanAddNewPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
 
 	protected override async Task OnParametersSetAsync()
 	{

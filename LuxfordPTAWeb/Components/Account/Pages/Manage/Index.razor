@@ -13,33 +13,172 @@
 <PageTitle>Profile</PageTitle>
 
 <h3>Profile</h3>
+<p class="text-muted">Manage your personal information and PTA preferences.</p>
 <StatusMessage />
 
 <div class="row">
-    <div class="col-xl-6">
+    <div class="col-xl-8">
         <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <input type="text" value="@username" id="username" class="form-control" placeholder="Choose your username." disabled />
-                <label for="username" class="form-label">Username</label>
+            
+            <!-- Basic Information Section -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <input type="text" value="@username" id="username" class="form-control" placeholder="Choose your username." disabled />
+                                <label for="username" class="form-label">Username</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.PhoneNumber" id="Input.PhoneNumber" class="form-control" placeholder="Enter your phone number" />
+                                <label for="Input.PhoneNumber" class="form-label">Phone number</label>
+                                <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" placeholder="Enter your first name" />
+                                <label for="Input.FirstName" class="form-label">First name</label>
+                                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" placeholder="Enter your last name" />
+                                <label for="Input.LastName" class="form-label">Last name</label>
+                                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <InputText @bind-Value="Input.PreferredName" id="Input.PreferredName" class="form-control" placeholder="How you'd like to be addressed publicly" />
+                            <label for="Input.PreferredName" class="form-label">Preferred Name (Public Display)</label>
+                            <ValidationMessage For="() => Input.PreferredName" class="text-danger" />
+                        </div>
+                        <div class="form-text mt-1">This is how your name will appear on the website (leave blank to use your full name).</div>
+                    </div>
+                </div>
             </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" placeholder="Enter your first name" />
-                <label for="Input.FirstName" class="form-label">First name</label>
-                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+
+            <!-- Public Bio & PTA Information Section -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-card-text me-2"></i>Public Bio & PTA Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="Input.Bio" class="form-label">Bio</label>
+                        <InputTextArea @bind-Value="Input.Bio" id="Input.Bio" class="form-control" rows="4" 
+                                     placeholder="Tell the PTA community a bit about yourself (optional)..." />
+                        <ValidationMessage For="() => Input.Bio" class="text-danger" />
+                        <div class="form-text">This will be visible to other PTA members if you serve on the board.</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-3 col-md-4 col-sm-6">
+                            <div class="form-check mb-3">
+                                <InputCheckbox @bind-Value="Input.IsParent" id="Input.IsParent" class="form-check-input" />
+                                <label for="Input.IsParent" class="form-check-label">Parent/Guardian</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-sm-6">
+                            <div class="form-check mb-3">
+                                <InputCheckbox @bind-Value="Input.IsTeacher" id="Input.IsTeacher" class="form-check-input" />
+                                <label for="Input.IsTeacher" class="form-check-label">Teacher</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-sm-6">
+                            <div class="form-check mb-3">
+                                <InputCheckbox @bind-Value="Input.IsStaff" id="Input.IsStaff" class="form-check-input" />
+                                <label for="Input.IsStaff" class="form-check-label">School Staff</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-4 col-sm-6">
+                            <div class="form-check mb-3">
+                                <InputCheckbox @bind-Value="Input.IsSponsor" id="Input.IsSponsor" class="form-check-input" />
+                                <label for="Input.IsSponsor" class="form-check-label">Sponsor Representative</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-text text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Select all roles that apply to you. This information helps the PTA community understand your connection to the school.
+                    </div>
+                </div>
             </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" placeholder="Enter your last name" />
-                <label for="Input.LastName" class="form-label">Last name</label>
-                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+
+            <!-- Contact Information Section -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Contact Information</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-shield-lock me-1"></i>
+                        This information is private and only visible to PTA administrators.
+                    </p>
+                    
+                    <div class="form-floating mb-3">
+                        <InputText @bind-Value="Input.Address" id="Input.Address" class="form-control" placeholder="Enter your street address" />
+                        <label for="Input.Address" class="form-label">Address</label>
+                        <ValidationMessage For="() => Input.Address" class="text-danger" />
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.City" id="Input.City" class="form-control" placeholder="Enter city" />
+                                <label for="Input.City" class="form-label">City</label>
+                                <ValidationMessage For="() => Input.City" class="text-danger" />
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.State" id="Input.State" class="form-control" placeholder="State" />
+                                <label for="Input.State" class="form-label">State</label>
+                                <ValidationMessage For="() => Input.State" class="text-danger" />
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-floating mb-3">
+                                <InputText @bind-Value="Input.ZipCode" id="Input.ZipCode" class="form-control" placeholder="ZIP" />
+                                <label for="Input.ZipCode" class="form-label">ZIP Code</label>
+                                <ValidationMessage For="() => Input.ZipCode" class="text-danger" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.PhoneNumber" id="Input.PhoneNumber" class="form-control" placeholder="Enter your phone number" />
-                <label for="Input.PhoneNumber" class="form-label">Phone number</label>
-                <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+
+            <!-- Email & Communication Link -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-envelope-gear me-2"></i>Email & Communication Settings</h5>
+                </div>
+                <div class="card-body text-center">
+                    <p class="mb-3">Manage your email address, verification status, and communication preferences.</p>
+                    <a href="/Account/Manage/Email" class="btn btn-warning">
+                        <i class="bi bi-gear me-2"></i>Manage Email & Notifications
+                    </a>
+                </div>
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Save</button>
+
+            <!-- Save Button -->
+            <button type="submit" class="w-100 btn btn-lg btn-primary">
+                <i class="bi bi-check-circle me-2"></i>Save Profile
+            </button>
         </EditForm>
     </div>
 </div>
@@ -68,23 +207,108 @@
         Input.PhoneNumber ??= phoneNumber;
         Input.FirstName ??= firstName;
         Input.LastName ??= lastName;
+        Input.PreferredName ??= user.PreferredName;
+        Input.Bio ??= user.Bio;
+        Input.Address ??= user.Address;
+        Input.City ??= user.City;
+        Input.State ??= user.State;
+        Input.ZipCode ??= user.ZipCode;
+        
+        // Fix for boolean fields - only set if not already set by form submission
+        // Check if this is a fresh load (no form data) vs. a postback with form data
+        if (!HasFormData())
+        {
+            Input.IsParent = user.IsParent;
+            Input.IsTeacher = user.IsTeacher;
+            Input.IsStaff = user.IsStaff;
+            Input.IsSponsor = user.IsSponsor;
+        }
+    }
+
+    // Helper method to detect if we have form data (checkbox values)
+    private bool HasFormData()
+    {
+        // In a postback scenario with form data, HttpContext.Request.HasFormContentType will be true
+        // and we should preserve the form values instead of overwriting with database values
+        return HttpContext.Request.Method == "POST" && HttpContext.Request.HasFormContentType;
     }
 
     private async Task OnValidSubmitAsync()
     {
         bool hasChanges = false;
 
-        // Check and update first name
+        // Check and update basic information
         if (Input.FirstName != firstName)
         {
             user.FirstName = Input.FirstName ?? string.Empty;
             hasChanges = true;
         }
 
-        // Check and update last name
         if (Input.LastName != lastName)
         {
             user.LastName = Input.LastName ?? string.Empty;
+            hasChanges = true;
+        }
+
+        if (Input.PreferredName != user.PreferredName)
+        {
+            user.PreferredName = Input.PreferredName ?? string.Empty;
+            hasChanges = true;
+        }
+
+        if (Input.Bio != user.Bio)
+        {
+            user.Bio = Input.Bio ?? string.Empty;
+            hasChanges = true;
+        }
+
+        // Check and update contact information
+        if (Input.Address != user.Address)
+        {
+            user.Address = Input.Address ?? string.Empty;
+            hasChanges = true;
+        }
+
+        if (Input.City != user.City)
+        {
+            user.City = Input.City ?? string.Empty;
+            hasChanges = true;
+        }
+
+        if (Input.State != user.State)
+        {
+            user.State = Input.State ?? string.Empty;
+            hasChanges = true;
+        }
+
+        if (Input.ZipCode != user.ZipCode)
+        {
+            user.ZipCode = Input.ZipCode ?? string.Empty;
+            hasChanges = true;
+        }
+
+        // Check and update PTA-specific information
+        if (Input.IsParent != user.IsParent)
+        {
+            user.IsParent = Input.IsParent;
+            hasChanges = true;
+        }
+
+        if (Input.IsTeacher != user.IsTeacher)
+        {
+            user.IsTeacher = Input.IsTeacher;
+            hasChanges = true;
+        }
+
+        if (Input.IsStaff != user.IsStaff)
+        {
+            user.IsStaff = Input.IsStaff;
+            hasChanges = true;
+        }
+
+        if (Input.IsSponsor != user.IsSponsor)
+        {
+            user.IsSponsor = Input.IsSponsor;
             hasChanges = true;
         }
 
@@ -100,8 +324,8 @@
             hasChanges = true;
         }
 
-        // Update user if first/last name changed
-        if (hasChanges && (Input.FirstName != firstName || Input.LastName != lastName))
+        // Update user if any changes were made
+        if (hasChanges)
         {
             var updateResult = await UserManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -112,21 +336,52 @@
         }
 
         await SignInManager.RefreshSignInAsync(user);
-        RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
+        RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated successfully!", HttpContext);
     }
 
     private sealed class InputModel
     {
         [Display(Name = "First name")]
+        [Required(ErrorMessage = "First name is required.")]
         [StringLength(50, ErrorMessage = "First name cannot be longer than 50 characters.")]
         public string? FirstName { get; set; }
 
         [Display(Name = "Last name")]
+        [Required(ErrorMessage = "Last name is required.")]
         [StringLength(50, ErrorMessage = "Last name cannot be longer than 50 characters.")]
         public string? LastName { get; set; }
+
+        [Display(Name = "Preferred name")]
+        [StringLength(50, ErrorMessage = "Preferred name cannot be longer than 50 characters.")]
+        public string? PreferredName { get; set; }
 
         [Phone]
         [Display(Name = "Phone number")]
         public string? PhoneNumber { get; set; }
+
+        [Display(Name = "Bio")]
+        [StringLength(1000, ErrorMessage = "Bio cannot be longer than 1000 characters.")]
+        public string? Bio { get; set; }
+
+        [Display(Name = "Address")]
+        [StringLength(200, ErrorMessage = "Address cannot be longer than 200 characters.")]
+        public string? Address { get; set; }
+
+        [Display(Name = "City")]
+        [StringLength(50, ErrorMessage = "City cannot be longer than 50 characters.")]
+        public string? City { get; set; }
+
+        [Display(Name = "State")]
+        [StringLength(2, MinimumLength = 2, ErrorMessage = "State must be 2 characters.")]
+        public string? State { get; set; }
+
+        [Display(Name = "ZIP Code")]
+        [StringLength(10, ErrorMessage = "ZIP code cannot be longer than 10 characters.")]
+        public string? ZipCode { get; set; }
+
+        public bool IsParent { get; set; } = true;
+        public bool IsTeacher { get; set; } = false;
+        public bool IsStaff { get; set; } = false;
+        public bool IsSponsor { get; set; } = false;
     }
 }

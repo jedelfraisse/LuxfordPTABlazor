@@ -21,6 +21,7 @@ public class ApplicationUser : IdentityUser
 	public bool IsParent { get; set; } = true;
 	public bool IsTeacher { get; set; } = false;
 	public bool IsStaff { get; set; } = false;
+	public bool IsSponsor { get; set; } = false; // Sponsor representative
 	
 	// Profile & Activity
 	public string ProfilePictureUrl { get; set; } = string.Empty;

@@ -1,0 +1,16 @@
+@using LuxfordPTAWeb.Client.Services
+@inject GoogleAnalyticsService GoogleAnalyticsService
+@implements IDisposable
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize Google Analytics when the component loads
+        await GoogleAnalyticsService.InitializeAsync();
+    }
+    
+    public void Dispose()
+    {
+        // The GoogleAnalyticsService will handle its own disposal
+    }
+}

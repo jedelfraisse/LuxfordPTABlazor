@@ -78,6 +78,9 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<bool>("IsParent")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsSponsor")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsStaff")
                         .HasColumnType("bit");
 
