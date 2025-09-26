@@ -8,6 +8,7 @@ namespace LuxfordPTAWeb.Data;
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
 	public DbSet<Event> Events { get; set; }
+	public DbSet<EventDay> EventDays { get; set; }
 	public DbSet<Sponsor> Sponsors { get; set; }
 	public DbSet<EventMainSponsor> EventMainSponsors { get; set; }
 	public DbSet<EventOtherSponsor> EventOtherSponsors { get; set; }
@@ -58,6 +59,29 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.HasForeignKey(e => e.EventCoordinatorId)
 			.OnDelete(DeleteBehavior.SetNull);
 
+		// Event copy/source relationship configuration
+		builder.Entity<Event>()
+			.HasOne(e => e.SourceEvent)
+			.WithMany(e => e.CopiedEvents)
+			.HasForeignKey(e => e.SourceEventId)
+			.OnDelete(DeleteBehavior.Restrict)
+			.HasConstraintName("FK_Events_SourceEvent");
+
+		// Event approval relationship configuration
+		builder.Entity<Event>()
+			.HasOne(e => e.ApprovedBy)
+			.WithMany()
+			.HasForeignKey(e => e.ApprovedByUserId)
+			.OnDelete(DeleteBehavior.NoAction)
+			.HasConstraintName("FK_Events_ApprovedBy");
+
+		// EventDay relationship configuration
+		builder.Entity<EventDay>()
+			.HasOne(ed => ed.Event)
+			.WithMany(e => e.EventDays)
+			.HasForeignKey(ed => ed.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
 		// Event Status enum configuration
 		builder.Entity<Event>()
 			.Property(e => e.Status)
@@ -93,6 +117,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.WithMany(bpt => bpt.BoardPositions)
 			.HasForeignKey(bp => bp.BoardPositionTitleId)
 			.OnDelete(DeleteBehavior.Restrict);
+
+		// Indexes for better performance
+		builder.Entity<Event>()
+			.HasIndex(e => e.Slug);
+
+		builder.Entity<Event>()
+			.HasIndex(e => new { e.SchoolYearId, e.Status });
+
+		builder.Entity<EventDay>()
+			.HasIndex(ed => new { ed.EventId, ed.DayNumber })
+			.IsUnique();
 	}
 
 	public static async Task SeedBoardPositionTitlesAsync(ApplicationDbContext db)

@@ -1,0 +1,10 @@
+@page "/admin/events/create-multiday"
+@page "/admin/events/edit-multiday/{eventId:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+
+@* This page is now merged into EventsCreate.razor. All event creation (single and multi-day) is handled there. *@

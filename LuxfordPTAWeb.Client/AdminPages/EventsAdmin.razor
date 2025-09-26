@@ -24,53 +24,53 @@
     </div>
 </div>
 
-<!-- Quick Filter Buttons -->
-@if (eventSummary != null)
-{
-    <div class="card mb-4">
-        <div class="card-body">
-            <h6 class="card-title">Quick Filters</h6>
-            <div class="btn-group flex-wrap" role="group">
-                <button type="button" class="btn @(selectedQuickFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetQuickFilter("all"))">
-                    All (@eventSummary.TotalEvents)
-                </button>
-                @if (eventSummary.PendingApproval > 0)
-                {
-                    <button type="button" class="btn @(selectedQuickFilter == "pending" ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => SetQuickFilter("pending"))">
-                        Pending Approval (@eventSummary.PendingApproval)
-                    </button>
-                }
-                @if (eventSummary.RequiringVolunteers > 0)
-                {
-                    <button type="button" class="btn @(selectedQuickFilter == "volunteers" ? "btn-info" : "btn-outline-info")" @onclick="@(() => SetQuickFilter("volunteers"))">
-                        Need Volunteers (@eventSummary.RequiringVolunteers)
-                    </button>
-                }
-                @if (eventSummary.UpcomingNext30Days > 0)
-                {
-                    <button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
-                        Upcoming (@eventSummary.UpcomingNext30Days)
-                    </button>
-                }
-                <button type="button" class="btn @(selectedQuickFilter == "active" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("active"))">
-                    Active (@eventSummary.ActiveEvents)
-                </button>
-                <button type="button" class="btn @(selectedQuickFilter == "planning" ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => SetQuickFilter("planning"))">
-                    Planning (@eventSummary.PlanningEvents)
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- Filters -->
+<!-- Combined Filters Card -->
 <div class="card mb-4">
     <div class="card-header">
         <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Events</h6>
     </div>
     <div class="card-body">
+        <!-- Quick Filter Buttons -->
+        @if (eventSummary != null)
+        {
+            <div class="mb-3">
+                <h6 class="mb-2">Quick Filters</h6>
+                <div class="btn-group flex-wrap" role="group">
+                    <button type="button" class="btn @(selectedQuickFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetQuickFilter("all"))">
+                        All (@eventSummary.TotalEvents)
+                    </button>
+                    @if (eventSummary.PendingApproval > 0)
+                    {
+                        <button type="button" class="btn @(selectedQuickFilter == "pending" ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => SetQuickFilter("pending"))">
+                            Pending Approval (@eventSummary.PendingApproval)
+                        </button>
+                    }
+                    @if (eventSummary.RequiringVolunteers > 0)
+                    {
+                        <button type="button" class="btn @(selectedQuickFilter == "volunteers" ? "btn-info" : "btn-outline-info")" @onclick="@(() => SetQuickFilter("volunteers"))">
+                            Need Volunteers (@eventSummary.RequiringVolunteers)
+                        </button>
+                    }
+                    @if (eventSummary.UpcomingNext30Days > 0)
+                    {
+                        <button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
+                            Upcoming (@eventSummary.UpcomingNext30Days)
+                        </button>
+                    }
+                    <button type="button" class="btn @(selectedQuickFilter == "active" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("active"))">
+                        Active (@eventSummary.ActiveEvents)
+                    </button>
+                    <button type="button" class="btn @(selectedQuickFilter == "planning" ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => SetQuickFilter("planning"))">
+                        Planning (@eventSummary.PlanningEvents)
+                    </button>
+                </div>
+            </div>
+            <hr>
+        }
+
+        <!-- Advanced Filters -->
         <div class="row align-items-end">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="schoolYearFilter" class="form-label">School Year</label>
                 <select id="schoolYearFilter" class="form-select" @onchange="FilterBySchoolYear">
                     <option value="0">All School Years</option>
@@ -93,16 +93,31 @@
                     }
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="eventCatFilter" class="form-label">Event Category</label>
                 <select id="eventCatFilter" class="form-select" @onchange="FilterByEventCat">
-                    <option value="0">All Event Categories</option>
+                    <option value="0">All Categories</option>
                     @if (eventCats != null)
                     {
                         @foreach (var eventCat in eventCats)
                         {
                             <option value="@eventCat.Id" selected="@(selectedEventCatId == eventCat.Id)">
                                 @eventCat.Name
+                            </option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="eventSubCatFilter" class="form-label">Sub Category</label>
+                <select id="eventSubCatFilter" class="form-select" @onchange="FilterByEventSubCat" disabled="@(selectedEventCatId == 0)">
+                    <option value="0">All Sub Categories</option>
+                    @if (availableSubCats != null)
+                    {
+                        @foreach (var subCat in availableSubCats)
+                        {
+                            <option value="@subCat.Id" selected="@(selectedEventSubCatId == subCat.Id)">
+                                @subCat.Name
                             </option>
                         }
                     }
@@ -151,6 +166,7 @@ else
                     <th>Status</th>
                     <th>School Year</th>
                     <th>Event Category</th>
+                    <th>Sub Category</th>
                     <th>Date</th>
                     <th>Location</th>
                     <th>Coordinator</th>
@@ -163,6 +179,10 @@ else
                     <tr class="@(evt.Date < DateTime.Now ? "table-secondary" : "")">
                         <td>
                             <strong>@evt.Title</strong>
+                            @if (evt.IsMultiDay)
+                            {
+                                <span class="badge bg-info ms-2">Multi-Day (@evt.DayCount days)</span>
+                            }
                             @if (evt.Date < DateTime.Now)
                             {
                                 <span class="badge bg-secondary ms-2">Past</span>
@@ -189,7 +209,26 @@ else
                         <td>
                             <span class="badge">@evt.EventCat?.Name</span>
                         </td>
-                        <td>@evt.Date.ToString("MMM d, yyyy")</td>
+                        <td>
+                            @if (evt.EventCatSub != null)
+                            {
+                                <span class="badge bg-light text-dark">@evt.EventCatSub.Name</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        </td>
+                        <td>@evt.Date.ToString("MMM d, yyyy")
+                            @if (evt.IsMultiDay && evt.EventDays.Any())
+                            {
+                                var endDate = evt.EventDays.Max(d => d.Date);
+                                if (endDate != evt.Date)
+                                {
+                                    <br><small class="text-muted">to @endDate.ToString("MMM d, yyyy")</small>
+                                }
+                            }
+                        </td>
                         <td>@evt.Location</td>
                         <td>
                             @if (evt.EventCoordinator != null)
@@ -228,10 +267,13 @@ else
     private List<Event>? allEvents;
     private List<Event>? filteredEvents;
     private List<EventCat>? eventCats;
+    private List<EventCatSub>? allEventSubCats;
+    private List<EventCatSub>? availableSubCats;
     private List<SchoolYear>? schoolYears;
     private SchoolYear? selectedSchoolYear;
     private EventDashboardSummary? eventSummary;
     private int selectedEventCatId = 0;
+    private int selectedEventSubCatId = 0;
     private int selectedSchoolYearId = 0;
     private string selectedQuickFilter = "all";
 
@@ -247,6 +289,7 @@ else
 
         await LoadSchoolYears();
         await LoadEventCats();
+        await LoadEventSubCats();
         await LoadEvents();
         await LoadEventSummary();
     }
@@ -294,11 +337,47 @@ else
     {
         try
         {
-            eventCats = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcategories");
+            eventCats = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
         }
         catch (Exception)
         {
             eventCats = new List<EventCat>();
+        }
+    }
+
+    private async Task LoadEventSubCats()
+    {
+        try
+        {
+            allEventSubCats = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
+            UpdateAvailableSubCats();
+        }
+        catch (Exception)
+        {
+            allEventSubCats = new List<EventCatSub>();
+            availableSubCats = new List<EventCatSub>();
+        }
+    }
+
+    private void UpdateAvailableSubCats()
+    {
+        if (allEventSubCats == null)
+        {
+            availableSubCats = new List<EventCatSub>();
+            return;
+        }
+
+        if (selectedEventCatId > 0)
+        {
+            availableSubCats = allEventSubCats
+                .Where(sc => sc.EventTypeId == selectedEventCatId && sc.IsActive)
+                .OrderBy(sc => sc.DisplayOrder)
+                .ThenBy(sc => sc.Name)
+                .ToList();
+        }
+        else
+        {
+            availableSubCats = new List<EventCatSub>();
         }
     }
 
@@ -314,9 +393,23 @@ else
         }
     }
 
-    private void SetQuickFilter(string filter)
+    private async Task SetQuickFilter(string filter)
     {
         selectedQuickFilter = filter;
+        
+        // Auto-select current school year when applying quick filters
+        if (filter != "all" && selectedSchoolYearId == 0)
+        {
+            var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
+            if (currentYear != null)
+            {
+                selectedSchoolYearId = currentYear.Id;
+                selectedSchoolYear = currentYear;
+                await LoadEvents(); // Reload events with new school year filter
+                await LoadEventSummary(); // Reload summary with new filter
+            }
+        }
+        
         ApplyFilters();
     }
 
@@ -337,6 +430,17 @@ else
         if (int.TryParse(e.Value?.ToString(), out int eventCatId))
         {
             selectedEventCatId = eventCatId;
+            selectedEventSubCatId = 0; // Reset subcategory selection
+            UpdateAvailableSubCats();
+            ApplyFilters();
+        }
+    }
+
+    private async Task FilterByEventSubCat(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int eventSubCatId))
+        {
+            selectedEventSubCatId = eventSubCatId;
             ApplyFilters();
         }
     }
@@ -373,6 +477,11 @@ else
             filtered = filtered.Where(e => e.EventCat?.Id == selectedEventCatId);
         }
 
+        if (selectedEventSubCatId > 0)
+        {
+            filtered = filtered.Where(e => e.EventCatSub?.Id == selectedEventSubCatId);
+        }
+
         filteredEvents = filtered.ToList();
     }
 
@@ -380,8 +489,10 @@ else
     {
         selectedSchoolYearId = 0;
         selectedEventCatId = 0;
+        selectedEventSubCatId = 0;
         selectedSchoolYear = null;
         selectedQuickFilter = "all";
+        availableSubCats = new List<EventCatSub>();
         
         // Reload data when clearing filters
         await LoadEvents();
@@ -398,7 +509,9 @@ else
             selectedSchoolYear = currentYear;
         }
         selectedEventCatId = 0;
+        selectedEventSubCatId = 0;
         selectedQuickFilter = "all";
+        availableSubCats = new List<EventCatSub>();
         
         // Reload data when showing current year
         await LoadEvents();
@@ -422,6 +535,12 @@ else
         {
             var eventCat = eventCats?.FirstOrDefault(ec => ec.Id == selectedEventCatId);
             parts.Add($"for {eventCat?.Name}");
+            
+            if (selectedEventSubCatId > 0)
+            {
+                var eventSubCat = allEventSubCats?.FirstOrDefault(esc => esc.Id == selectedEventSubCatId);
+                parts.Add($"in {eventSubCat?.Name}");
+            }
         }
 
         return parts.Any() ? string.Join(" ", parts) : "";

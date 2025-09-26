@@ -1,14 +1,378 @@
 ﻿@page "/admin/events/create"
-
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
 
 <PageTitle>New Event</PageTitle>
 
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="bi bi-calendar-week"></i> Create Event
+    </h1>
+    <div>
+        <a href="/admin/events" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+    </div>
+</div>
 
+@if (isLoading)
+{
+    <div class="alert alert-info">
+        <em>Loading...</em>
+    </div>
+}
+else if (eventModel != null)
+{
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Basic Event Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Event Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="title" class="form-label">Event Title *</label>
+                            <input type="text" class="form-control" id="title" @bind="eventModel.Title" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" @bind="eventModel.Status">
+                                <option value="@EventStatus.Planning">Planning</option>
+                                <option value="@EventStatus.SubmittedForApproval">Submit for Approval</option>
+                                <option value="@EventStatus.Active">Active</option>
+                                <option value="@EventStatus.InProgress">In Progress</option>
+                                <option value="@EventStatus.Completed">Completed</option>
+                                <option value="@EventStatus.Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
 
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" rows="4" @bind="eventModel.Description"></textarea>
+                    </div>
 
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="schoolYear" class="form-label">School Year *</label>
+                            <select class="form-select" id="schoolYear" @bind="eventModel.SchoolYearId">
+                                <option value="0">Select School Year</option>
+                                @if (schoolYears != null)
+                                {
+                                    @foreach (var year in schoolYears)
+                                    {
+                                        <option value="@year.Id">@year.Name</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eventCategory" class="form-label">Event Category *</label>
+                            <select class="form-select" id="eventCategory" @bind="eventModel.EventCatId">
+                                <option value="0">Select Category</option>
+                                @if (eventCategories != null)
+                                {
+                                    @foreach (var category in eventCategories)
+                                    {
+                                        <option value="@category.Id">@category.Name</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="eventSubCategory" class="form-label">Event Sub-Category</label>
+                            <select class="form-select" id="eventSubCategory" @bind="eventModel.EventSubTypeId">
+                                <option value="0">Select Sub-Category</option>
+                                @if (eventSubcategories != null)
+                                {
+                                    @foreach (var subcat in eventSubcategories.Where(sc => sc.EventTypeId == eventModel.EventCatId && sc.IsActive).OrderBy(sc => sc.DisplayOrder))
+                                    {
+                                        <option value="@subcat.Id">@subcat.Name</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" @bind="eventModel.Location" />
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="multiDay" @bind="eventModel.IsMultiDay">
+                        <label class="form-check-label" for="multiDay">
+                            Multi-Day Event
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
+                        <label class="form-check-label" for="requiresVolunteers">
+                            Requires Volunteers
+                        </label>
+                    </div>
+                </div>
+            </div>
 
+            @if (eventModel.IsMultiDay)
+            {
+                <!-- Multi-Day Management -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Event Days</h5>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddDay">
+                            <i class="bi bi-plus"></i> Add Day
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if (eventDays.Any())
+                        {
+                            <div class="row">
+                                @foreach (var day in eventDays.OrderBy(d => d.DayNumber))
+                                {
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-left-primary">
+                                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                <small class="text-muted">Day @day.DayNumber</small>
+                                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveDay(day)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                            <div class="card-body py-2">
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Day Title</label>
+                                                    <input type="text" class="form-control form-control-sm" @bind="day.DayTitle" placeholder="e.g., 'Fire Safety Demo'" />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Date *</label>
+                                                    <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Location (optional)</label>
+                                                    <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Description</label>
+                                                    <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" @bind="day.IsActive" />
+                                                    <label class="form-check-label small">Active</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No days added yet. Click "Add Day" to create the first day of your multi-day event.
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
 
+        <!-- Action Panel -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" @onclick="SaveEvent">
+                            <i class="bi bi-save"></i> Create Event
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </div>
+                    <!-- Event Summary -->
+                    <hr />
+                    <h6>Event Summary</h6>
+                    <ul class="list-unstyled small">
+                        <li><strong>Days:</strong> @eventDays.Count</li>
+                        <li><strong>Date Range:</strong> 
+                            @if (eventModel.IsMultiDay && eventDays.Any())
+                            {
+                                var startDate = eventDays.Min(d => d.Date);
+                                var endDate = eventDays.Max(d => d.Date);
+                                <span>@startDate.ToString("MMM d") - @endDate.ToString("MMM d, yyyy")</span>
+                            }
+                            else
+                            {
+                                <span>@eventModel.Date.ToString("MMM d, yyyy")</span>
+                            }
+                        </li>
+                        <li><strong>Status:</strong> <span class="badge bg-secondary">@eventModel.Status</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
+    private Event? eventModel;
+    private List<EventDay> eventDays = new();
+    private List<SchoolYear>? schoolYears;
+    private List<EventCat>? eventCategories;
+    private List<EventCatSub>? eventSubcategories;
+    private bool isLoading = true;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDropdownData();
+        InitializeNewEvent();
+        isLoading = false;
+    }
+
+    private async Task LoadDropdownData()
+    {
+        try
+        {
+            schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
+            eventCategories = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
+            eventSubcategories = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error loading data: {ex.Message}");
+        }
+    }
+
+    private void InitializeNewEvent()
+    {
+        eventModel = new Event
+        {
+            Title = "",
+            Description = "",
+            Location = "",
+            Status = EventStatus.Planning,
+            IsMultiDay = false,
+            Date = DateTime.Today.AddDays(7), // Default to next week
+            EventStartTime = DateTime.Today.AddDays(7).AddHours(9), // 9 AM
+            EventEndTime = DateTime.Today.AddDays(7).AddHours(15), // 3 PM
+            RequiresVolunteers = false,
+            RequiresSetup = false,
+            RequiresCleanup = false
+        };
+        eventDays.Clear();
+    }
+
+    private void AddDay()
+    {
+        var nextDayNumber = eventDays.Any() ? eventDays.Max(d => d.DayNumber) + 1 : 1;
+        var lastDate = eventDays.Any() ? eventDays.Max(d => d.Date) : DateTime.Today.AddDays(7);
+        eventDays.Add(new EventDay
+        {
+            DayNumber = nextDayNumber,
+            Date = lastDate.AddDays(1),
+            DayTitle = $"Day {nextDayNumber}",
+            Description = "",
+            Location = "",
+            IsActive = true,
+            EventId = eventModel?.Id ?? 0
+        });
+    }
+
+    private void RemoveDay(EventDay day)
+    {
+        eventDays.Remove(day);
+        // Renumber remaining days
+        for (int i = 0; i < eventDays.Count; i++)
+        {
+            eventDays[i].DayNumber = i + 1;
+        }
+    }
+
+    private async Task SaveEvent()
+    {
+        try
+        {
+            if (eventModel == null) return;
+
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(eventModel.Title))
+            {
+                await JS.InvokeVoidAsync("alert", "Event title is required.");
+                return;
+            }
+            if (eventModel.SchoolYearId == 0)
+            {
+                await JS.InvokeVoidAsync("alert", "Please select a school year.");
+                return;
+            }
+            if (eventModel.EventCatId == 0)
+            {
+                await JS.InvokeVoidAsync("alert", "Please select an event category.");
+                return;
+            }
+            // Subcategory is optional for now
+            if (eventModel.IsMultiDay && !eventDays.Any())
+            {
+                await JS.InvokeVoidAsync("alert", "Please add at least one day for this multi-day event.");
+                return;
+            }
+            // Update event dates based on event days
+            if (eventModel.IsMultiDay && eventDays.Any())
+            {
+                eventModel.Date = eventDays.Min(d => d.Date);
+                eventModel.EventStartTime = eventDays.Min(d => d.Date);
+                eventModel.EventEndTime = eventDays.Max(d => d.Date).AddHours(12); // End of last day
+            }
+            HttpResponseMessage response = await Http.PostAsJsonAsync("api/events", eventModel);
+            if (response.IsSuccessStatusCode)
+            {
+                eventModel = await response.Content.ReadFromJsonAsync<Event>();
+                // Save event days if multi-day
+                if (eventModel != null && eventModel.IsMultiDay)
+                {
+                    foreach (var day in eventDays)
+                    {
+                        day.EventId = eventModel.Id;
+                        await Http.PostAsJsonAsync($"api/events/{eventModel.Id}/days", day);
+                    }
+                }
+                await JS.InvokeVoidAsync("alert", "Event saved successfully!");
+                NavigationManager.NavigateTo("/admin/events");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"Error saving event: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void OnMultiDayChanged(ChangeEventArgs e)
+    {
+        if (eventModel != null && !eventModel.IsMultiDay)
+        {
+            eventDays.Clear();
+        }
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private void CancelEdit()
+    {
+        NavigationManager.NavigateTo("/admin/events");
+    }
 }

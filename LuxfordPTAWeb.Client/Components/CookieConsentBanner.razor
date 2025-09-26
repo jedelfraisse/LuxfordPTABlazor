@@ -170,16 +170,24 @@
     private bool showDetailsModal = false;
     private bool allowAnalytics = true; // Default to true since analytics are now enabled by default
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if consent has been explicitly given before
+            var hasConsent = await CookieConsentService.HasConsentBeenGivenAsync();
+            showBanner = !hasConsent;
+            
+            // Get current consent level for modal
+            var currentLevel = await CookieConsentService.GetConsentLevelAsync();
+            allowAnalytics = currentLevel >= CookieConsentLevel.Analytics;
+            
+            StateHasChanged();
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        // Check if consent has been explicitly given before
-        var hasConsent = await CookieConsentService.HasConsentBeenGivenAsync();
-        showBanner = !hasConsent;
-        
-        // Get current consent level for modal (will default to Analytics if no explicit consent given)
-        var currentLevel = await CookieConsentService.GetConsentLevelAsync();
-        allowAnalytics = currentLevel >= CookieConsentLevel.Analytics;
-        
         // Subscribe to consent changes
         CookieConsentService.ConsentChanged += OnConsentChanged;
     }
