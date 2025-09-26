@@ -10,601 +10,608 @@
 <PageTitle>Manage Events</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-calendar-event"></i> Manage Events</h1>
-    <div>
-        <a href="/admin" class="btn btn-outline-secondary me-2">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
-        </a>
-        <a href="/admin/event-categories" class="btn btn-outline-info me-2">
-            <i class="bi bi-tags"></i> Event Categories
-        </a>
-        <a href="/admin/events/create" class="btn btn-primary">
-            <i class="bi bi-plus"></i> Add New Event
-        </a>
-    </div>
+	<h1><i class="bi bi-calendar-event"></i> Manage Events</h1>
+	<div>
+		<a href="/admin" class="btn btn-outline-secondary me-2">
+			<i class="bi bi-arrow-left"></i> Back to Dashboard
+		</a>
+		<a href="/admin/event-categories" class="btn btn-outline-info me-2">
+			<i class="bi bi-tags"></i> Event Categories
+		</a>
+		<a href="/admin/events/create" class="btn btn-primary">
+			<i class="bi bi-plus"></i> Add New Event
+		</a>
+	</div>
 </div>
 
 <!-- Combined Filters Card -->
 <div class="card mb-4">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Events</h6>
-    </div>
-    <div class="card-body">
-        <!-- Quick Filter Buttons -->
-        @if (eventSummary != null)
-        {
-            <div class="mb-3">
-                <h6 class="mb-2">Quick Filters</h6>
-                <div class="btn-group flex-wrap" role="group">
-                    <button type="button" class="btn @(selectedQuickFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetQuickFilter("all"))">
-                        All (@eventSummary.TotalEvents)
-                    </button>
-                    @if (eventSummary.PendingApproval > 0)
-                    {
-                        <button type="button" class="btn @(selectedQuickFilter == "pending" ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => SetQuickFilter("pending"))">
-                            Pending Approval (@eventSummary.PendingApproval)
-                        </button>
-                    }
-                    @if (eventSummary.RequiringVolunteers > 0)
-                    {
-                        <button type="button" class="btn @(selectedQuickFilter == "volunteers" ? "btn-info" : "btn-outline-info")" @onclick="@(() => SetQuickFilter("volunteers"))">
-                            Need Volunteers (@eventSummary.RequiringVolunteers)
-                        </button>
-                    }
-                    @if (eventSummary.UpcomingNext30Days > 0)
-                    {
-                        <button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
-                            Upcoming (@eventSummary.UpcomingNext30Days)
-                        </button>
-                    }
-                    <button type="button" class="btn @(selectedQuickFilter == "active" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("active"))">
-                        Active (@eventSummary.ActiveEvents)
-                    </button>
-                    <button type="button" class="btn @(selectedQuickFilter == "planning" ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => SetQuickFilter("planning"))">
-                        Planning (@eventSummary.PlanningEvents)
-                    </button>
-                </div>
-            </div>
-            <hr>
-        }
+	<div class="card-header">
+		<h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Events</h6>
+	</div>
+	<div class="card-body">
 
-        <!-- Advanced Filters -->
-        <div class="row align-items-end">
-            <div class="col-md-2">
-                <label for="schoolYearFilter" class="form-label">School Year</label>
-                <select id="schoolYearFilter" class="form-select" @onchange="FilterBySchoolYear">
-                    <option value="0">All School Years</option>
-                    @if (schoolYears != null)
-                    {
-                        @foreach (var year in schoolYears)
-                        {
-                            <option value="@year.Id" selected="@(selectedSchoolYearId == year.Id)">
-                                @year.Name 
-                                @if (year.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear)
-                                {
-                                    @: (Current)
-                                }
-                                @if (!year.IsVisibleToPublic)
-                                {
-                                    @: [Hidden from Public]
-                                }
-                            </option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="eventCatFilter" class="form-label">Event Category</label>
-                <select id="eventCatFilter" class="form-select" @onchange="FilterByEventCat">
-                    <option value="0">All Categories</option>
-                    @if (eventCats != null)
-                    {
-                        @foreach (var eventCat in eventCats)
-                        {
-                            <option value="@eventCat.Id" selected="@(selectedEventCatId == eventCat.Id)">
-                                @eventCat.Name
-                            </option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="eventSubCatFilter" class="form-label">Sub Category</label>
-                <select id="eventSubCatFilter" class="form-select" @onchange="FilterByEventSubCat" disabled="@(selectedEventCatId == 0)">
-                    <option value="0">All Sub Categories</option>
-                    @if (availableSubCats != null)
-                    {
-                        @foreach (var subCat in availableSubCats)
-                        {
-                            <option value="@subCat.Id" selected="@(selectedEventSubCatId == subCat.Id)">
-                                @subCat.Name
-                            </option>
-                        }
-                    }
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters">
-                    <i class="bi bi-x-circle"></i> Clear Filters
-                </button>
-                <button type="button" class="btn btn-outline-info ms-2" @onclick="ShowCurrentYear">
-                    <i class="bi bi-calendar-check"></i> Current Year
-                </button>
-            </div>
-            <div class="col-md-3 text-end">
-                <span class="text-muted">
-                    Showing @(filteredEvents?.Count ?? 0) of @(allEvents?.Count ?? 0) events
-                </span>
-                @if (selectedSchoolYear != null)
-                {
-                    <div class="small text-primary">@selectedSchoolYear.Name</div>
-                }
-            </div>
-        </div>
-    </div>
+
+		<!-- Advanced Filters -->
+		<div class="row align-items-end">
+			<div class="col-md-2">
+				<label for="schoolYearFilter" class="form-label">School Year</label>
+				<select id="schoolYearFilter" class="form-select" @onchange="FilterBySchoolYear">
+					<option value="0">All School Years</option>
+					@if (schoolYears != null)
+					{
+						@foreach (var year in schoolYears)
+						{
+							<option value="@year.Id" selected="@(selectedSchoolYearId == year.Id)">
+								@year.Name
+								@if (year.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear)
+								{
+									@: (Current)
+								}
+								@if (!year.IsVisibleToPublic)
+								{
+									@: [Hidden from Public]
+								}
+							</option>
+						}
+					}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label for="eventCatFilter" class="form-label">Event Category</label>
+				<select id="eventCatFilter" class="form-select" @onchange="FilterByEventCat">
+					<option value="0">All Categories</option>
+					@if (eventCats != null)
+					{
+						@foreach (var eventCat in eventCats)
+						{
+							<option value="@eventCat.Id" selected="@(selectedEventCatId == eventCat.Id)">
+								@eventCat.Name
+							</option>
+						}
+					}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label for="eventSubCatFilter" class="form-label">Sub Category</label>
+				<select id="eventSubCatFilter" class="form-select" @onchange="FilterByEventSubCat" disabled="@(selectedEventCatId == 0)">
+					<option value="0">All Sub Categories</option>
+					@if (availableSubCats != null)
+					{
+						@foreach (var subCat in availableSubCats)
+						{
+							<option value="@subCat.Id" selected="@(selectedEventSubCatId == subCat.Id)">
+								@subCat.Name
+							</option>
+						}
+					}
+				</select>
+			</div>
+			<div class="col-md-3">
+				<div class="d-flex align-items-center gap-2">
+					<button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters">
+						<i class="bi bi-x-circle"></i> Clear Filters
+					</button>
+					<button type="button" class="btn btn-outline-info" @onclick="ShowCurrentYear">
+						<i class="bi bi-calendar-check"></i> Current Year
+					</button>
+				</div>
+			</div>
+			<div class="col-md-3 text-end">
+				<span class="text-muted">
+					Showing @(filteredEvents?.Count ?? 0) of @(allEvents?.Count ?? 0) events
+				</span>
+				@if (selectedSchoolYear != null)
+				{
+					<div class="small text-primary">@selectedSchoolYear.Name</div>
+				}
+			</div>
+		</div>
+		<!-- Quick Filter Buttons -->
+		@if (eventSummary != null)
+		{
+			<hr />
+			<div class="mb-3">
+				<h6 class="mb-2">Quick Filters</h6>
+				<div class="btn-group flex-wrap" role="group">
+					<button type="button" class="btn @(selectedQuickFilter == "all" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetQuickFilter("all"))">
+						All (@eventSummary.TotalEvents)
+					</button>
+					@if (eventSummary.PendingApproval > 0)
+					{
+						<button type="button" class="btn @(selectedQuickFilter == "pending" ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => SetQuickFilter("pending"))">
+							Pending Approval (@eventSummary.PendingApproval)
+						</button>
+					}
+					@if (eventSummary.RequiringVolunteers > 0)
+					{
+						<button type="button" class="btn @(selectedQuickFilter == "volunteers" ? "btn-info" : "btn-outline-info")" @onclick="@(() => SetQuickFilter("volunteers"))">
+							Need Volunteers (@eventSummary.RequiringVolunteers)
+						</button>
+					}
+					@if (eventSummary.UpcomingNext30Days > 0)
+					{
+						<button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
+							Upcoming (@eventSummary.UpcomingNext30Days)
+						</button>
+					}
+					<button type="button" class="btn @(selectedQuickFilter == "active" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("active"))">
+						Active (@eventSummary.ActiveEvents)
+					</button>
+					<button type="button" class="btn @(selectedQuickFilter == "planning" ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => SetQuickFilter("planning"))">
+						Planning (@eventSummary.PlanningEvents)
+					</button>
+				</div>
+			</div>
+
+		}
+	</div>
 </div>
 
 @if (filteredEvents == null)
 {
-    <div class="alert alert-info">
-        <em>Loading events...</em>
-    </div>
+	<div class="alert alert-info">
+		<em>Loading events...</em>
+	</div>
 }
 else if (!filteredEvents.Any())
 {
-    <div class="alert alert-warning">
-        <em>No events found @(GetFilterDescription()).</em>
-    </div>
+	<div class="alert alert-warning">
+		<em>No events found @(GetFilterDescription()).</em>
+	</div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead class="table-dark">
-                <tr>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th>School Year</th>
-                    <th>Event Category</th>
-                    <th>Sub Category</th>
-                    <th>Date</th>
-                    <th>Location</th>
-                    <th>Coordinator</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var evt in filteredEvents.OrderBy(e => e.Date))
-                {
-                    <tr class="@(evt.Date < DateTime.Now ? "table-secondary" : "")">
-                        <td>
-                            <strong>@evt.Title</strong>
-                            @if (evt.IsMultiDay)
-                            {
-                                <span class="badge bg-info ms-2">Multi-Day (@evt.DayCount days)</span>
-                            }
-                            @if (evt.Date < DateTime.Now)
-                            {
-                                <span class="badge bg-secondary ms-2">Past</span>
-                            }
-                            else if (evt.Date <= DateTime.Now.AddDays(7))
-                            {
-                                <span class="badge bg-warning ms-2">Soon</span>
-                            }
-                            @if (evt.RequiresVolunteers && string.IsNullOrEmpty(evt.ExcelImportId))
-                            {
-                                <span class="badge bg-info ms-2">Volunteers Needed</span>
-                            }
-                        </td>
-                        <td>
-                            <span class="badge @GetStatusBadgeClass(evt.Status)">
-                                @evt.Status.ToString().Replace("SubmittedForApproval", "Pending Approval")
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge @(evt.SchoolYear?.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear ? "bg-success" : "bg-light text-dark")">
-                                @evt.SchoolYear?.Name
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge">@evt.EventCat?.Name</span>
-                        </td>
-                        <td>
-                            @if (evt.EventCatSub != null)
-                            {
-                                <span class="badge bg-light text-dark">@evt.EventCatSub.Name</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">-</span>
-                            }
-                        </td>
-                        <td>@evt.Date.ToString("MMM d, yyyy")
-                            @if (evt.IsMultiDay && evt.EventDays.Any())
-                            {
-                                var endDate = evt.EventDays.Max(d => d.Date);
-                                if (endDate != evt.Date)
-                                {
-                                    <br><small class="text-muted">to @endDate.ToString("MMM d, yyyy")</small>
-                                }
-                            }
-                        </td>
-                        <td>@evt.Location</td>
-                        <td>
-                            @if (evt.EventCoordinator != null)
-                            {
-                                @evt.EventCoordinator.FirstName @evt.EventCoordinator.LastName
-                            }
-                            else
-                            {
-                                <span class="text-muted">Unassigned</span>
-                            }
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="/admin/events/edit/@evt.Id" class="btn btn-outline-primary" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                @if (evt.Status == EventStatus.SubmittedForApproval)
-                                {
-                                    <button type="button" class="btn btn-outline-success" title="Approve" @onclick="@(() => ApproveEvent(evt.Id))">
-                                        <i class="bi bi-check-circle"></i>
-                                    </button>
-                                }
-                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="@(() => DeleteEvent(evt.Id))">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+	<div class="table-responsive">
+		<table class="table table-striped">
+			<thead class="table-dark">
+				<tr>
+					<th>Title</th>
+					<th>Status</th>
+					<th>School Year</th>
+					<th>Event Category</th>
+					<th>Sub Category</th>
+					<th>Date</th>
+					<th>Location</th>
+					<th>Coordinator</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var evt in filteredEvents.OrderBy(e => e.Date))
+				{
+					<tr class="@(evt.Date < DateTime.Now ? "table-secondary" : "")">
+						<td>
+							<strong>@evt.Title</strong>
+							@if (evt.IsMultiDay)
+							{
+								<span class="badge bg-info ms-2">Multi-Day (@evt.DayCount days)</span>
+							}
+							@if (evt.Date < DateTime.Now)
+							{
+								<span class="badge bg-secondary ms-2">Past</span>
+							}
+							else if (evt.Date <= DateTime.Now.AddDays(7))
+							{
+								<span class="badge bg-warning ms-2">Soon</span>
+							}
+							@if (evt.RequiresVolunteers && string.IsNullOrEmpty(evt.ExcelImportId))
+							{
+								<span class="badge bg-info ms-2">Volunteers Needed</span>
+							}
+						</td>
+						<td>
+							<span class="badge @GetStatusBadgeClass(evt.Status)">
+								@evt.Status.ToString().Replace("SubmittedForApproval", "Pending Approval")
+							</span>
+						</td>
+						<td>
+							<span class="badge @(evt.SchoolYear?.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear ? "bg-success" : "bg-light text-dark")">
+								@evt.SchoolYear?.Name
+							</span>
+						</td>
+						<td>
+							<span class="badge">@evt.EventCat?.Name</span>
+						</td>
+						<td>
+							@if (evt.EventCatSub != null)
+							{
+								<span class="badge bg-light text-dark">@evt.EventCatSub.Name</span>
+							}
+							else
+							{
+								<span class="text-muted">-</span>
+							}
+						</td>
+						<td>
+							@evt.Date.ToString("MMM d, yyyy")
+							@if (evt.IsMultiDay && evt.EventDays.Any())
+							{
+								var endDate = evt.EventDays.Max(d => d.Date);
+								if (endDate != evt.Date)
+								{
+									<br>
+					
+									<small class="text-muted">to @endDate.ToString("MMM d, yyyy")</small>
+								}
+							}
+						</td>
+						<td>@evt.Location</td>
+						<td>
+							@if (evt.EventCoordinator != null)
+							{
+								@evt.EventCoordinator.FirstName@evt.EventCoordinator.LastName
+							}
+							else
+							{
+								<span class="text-muted">Unassigned</span>
+							}
+						</td>
+						<td>
+							<div class="btn-group btn-group-sm">
+								<a href="/admin/events/edit/@evt.Id" class="btn btn-outline-primary" title="Edit">
+									<i class="bi bi-pencil"></i>
+								</a>
+								@if (evt.Status == EventStatus.SubmittedForApproval)
+								{
+									<button type="button" class="btn btn-outline-success" title="Approve" @onclick="@(() => ApproveEvent(evt.Id))">
+										<i class="bi bi-check-circle"></i>
+									</button>
+								}
+								<button type="button" class="btn btn-outline-danger" title="Delete" @onclick="@(() => DeleteEvent(evt.Id))">
+									<i class="bi bi-trash"></i>
+								</button>
+							</div>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
 }
 
 @code {
-    private List<Event>? allEvents;
-    private List<Event>? filteredEvents;
-    private List<EventCat>? eventCats;
-    private List<EventCatSub>? allEventSubCats;
-    private List<EventCatSub>? availableSubCats;
-    private List<SchoolYear>? schoolYears;
-    private SchoolYear? selectedSchoolYear;
-    private EventDashboardSummary? eventSummary;
-    private int selectedEventCatId = 0;
-    private int selectedEventSubCatId = 0;
-    private int selectedSchoolYearId = 0;
-    private string selectedQuickFilter = "all";
+	private List<Event>? allEvents;
+	private List<Event>? filteredEvents;
+	private List<EventCat>? eventCats;
+	private List<EventCatSub>? allEventSubCats;
+	private List<EventCatSub>? availableSubCats;
+	private List<SchoolYear>? schoolYears;
+	private SchoolYear? selectedSchoolYear;
+	private EventDashboardSummary? eventSummary;
+	private int selectedEventCatId = 0;
+	private int selectedEventSubCatId = 0;
+	private int selectedSchoolYearId = 0;
+	private string selectedQuickFilter = "all";
 
-    protected override async Task OnInitializedAsync()
-    {
-        // Check for query parameters
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
-        var query = QueryHelpers.ParseQuery(uri.Query);
-        if (query.TryGetValue("filter", out var filterValue))
-        {
-            selectedQuickFilter = filterValue.ToString().ToLower();
-        }
+	protected override async Task OnInitializedAsync()
+	{
+		// Check for query parameters
+		var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+		var query = QueryHelpers.ParseQuery(uri.Query);
+		if (query.TryGetValue("filter", out var filterValue))
+		{
+			selectedQuickFilter = filterValue.ToString().ToLower();
+		}
 
-        await LoadSchoolYears();
-        await LoadEventCats();
-        await LoadEventSubCats();
-        await LoadEvents();
-        await LoadEventSummary();
-    }
+		await LoadSchoolYears();
+		await LoadEventCats();
+		await LoadEventSubCats();
+		await LoadEvents();
+		await LoadEventSummary();
+	}
 
-    private async Task LoadEvents()
-    {
-        try
-        {
-            // Get events with optional school year filtering
-            var url = selectedSchoolYearId > 0 
-                ? $"api/events/all-admin?schoolYearId={selectedSchoolYearId}"
-                : "api/events/all-admin";
-                
-            allEvents = await Http.GetFromJsonAsync<List<Event>>(url);
-            if (allEvents == null)
-            {
-                allEvents = new List<Event>();
-            }
-            ApplyFilters();
-        }
-        catch (Exception)
-        {
-            allEvents = new List<Event>();
-            filteredEvents = new List<Event>();
-        }
-    }
+	private async Task LoadEvents()
+	{
+		try
+		{
+			// Get events with optional school year filtering
+			var url = selectedSchoolYearId > 0
+				? $"api/events/all-admin?schoolYearId={selectedSchoolYearId}"
+				: "api/events/all-admin";
 
-    private async Task LoadEventSummary()
-    {
-        try
-        {
-            var url = selectedSchoolYearId > 0 
-                ? $"api/events/dashboard-summary/{selectedSchoolYearId}"
-                : "api/events/dashboard-summary";
-                
-            eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>(url);
-        }
-        catch (Exception)
-        {
-            // Handle errors silently
-        }
-    }
+			allEvents = await Http.GetFromJsonAsync<List<Event>>(url);
+			if (allEvents == null)
+			{
+				allEvents = new List<Event>();
+			}
+			ApplyFilters();
+		}
+		catch (Exception)
+		{
+			allEvents = new List<Event>();
+			filteredEvents = new List<Event>();
+		}
+	}
 
-    private async Task LoadEventCats()
-    {
-        try
-        {
-            eventCats = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
-        }
-        catch (Exception)
-        {
-            eventCats = new List<EventCat>();
-        }
-    }
+	private async Task LoadEventSummary()
+	{
+		try
+		{
+			var url = selectedSchoolYearId > 0
+				? $"api/events/dashboard-summary/{selectedSchoolYearId}"
+				: "api/events/dashboard-summary";
 
-    private async Task LoadEventSubCats()
-    {
-        try
-        {
-            allEventSubCats = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
-            UpdateAvailableSubCats();
-        }
-        catch (Exception)
-        {
-            allEventSubCats = new List<EventCatSub>();
-            availableSubCats = new List<EventCatSub>();
-        }
-    }
+			eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>(url);
+		}
+		catch (Exception)
+		{
+			// Handle errors silently
+		}
+	}
 
-    private void UpdateAvailableSubCats()
-    {
-        if (allEventSubCats == null)
-        {
-            availableSubCats = new List<EventCatSub>();
-            return;
-        }
+	private async Task LoadEventCats()
+	{
+		try
+		{
+			eventCats = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
+		}
+		catch (Exception)
+		{
+			eventCats = new List<EventCat>();
+		}
+	}
 
-        if (selectedEventCatId > 0)
-        {
-            availableSubCats = allEventSubCats
-                .Where(sc => sc.EventTypeId == selectedEventCatId && sc.IsActive)
-                .OrderBy(sc => sc.DisplayOrder)
-                .ThenBy(sc => sc.Name)
-                .ToList();
-        }
-        else
-        {
-            availableSubCats = new List<EventCatSub>();
-        }
-    }
+	private async Task LoadEventSubCats()
+	{
+		try
+		{
+			allEventSubCats = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
+			UpdateAvailableSubCats();
+		}
+		catch (Exception)
+		{
+			allEventSubCats = new List<EventCatSub>();
+			availableSubCats = new List<EventCatSub>();
+		}
+	}
 
-    private async Task LoadSchoolYears()
-    {
-        try
-        {
-            schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
-        }
-        catch (Exception)
-        {
-            schoolYears = new List<SchoolYear>();
-        }
-    }
+	private void UpdateAvailableSubCats()
+	{
+		if (allEventSubCats == null)
+		{
+			availableSubCats = new List<EventCatSub>();
+			return;
+		}
 
-    private async Task SetQuickFilter(string filter)
-    {
-        selectedQuickFilter = filter;
-        
-        // Auto-select current school year when applying quick filters
-        if (filter != "all" && selectedSchoolYearId == 0)
-        {
-            var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
-            if (currentYear != null)
-            {
-                selectedSchoolYearId = currentYear.Id;
-                selectedSchoolYear = currentYear;
-                await LoadEvents(); // Reload events with new school year filter
-                await LoadEventSummary(); // Reload summary with new filter
-            }
-        }
-        
-        ApplyFilters();
-    }
+		if (selectedEventCatId > 0)
+		{
+			availableSubCats = allEventSubCats
+				.Where(sc => sc.EventTypeId == selectedEventCatId && sc.IsActive)
+				.OrderBy(sc => sc.DisplayOrder)
+				.ThenBy(sc => sc.Name)
+				.ToList();
+		}
+		else
+		{
+			availableSubCats = new List<EventCatSub>();
+		}
+	}
 
-    private async Task FilterBySchoolYear(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int schoolYearId))
-        {
-            selectedSchoolYearId = schoolYearId;
-            selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == schoolYearId);
-            await LoadEvents(); // Reload events with new filter
-            await LoadEventSummary(); // Reload summary with new filter
-            ApplyFilters();
-        }
-    }
+	private async Task LoadSchoolYears()
+	{
+		try
+		{
+			schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
+		}
+		catch (Exception)
+		{
+			schoolYears = new List<SchoolYear>();
+		}
+	}
 
-    private async Task FilterByEventCat(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int eventCatId))
-        {
-            selectedEventCatId = eventCatId;
-            selectedEventSubCatId = 0; // Reset subcategory selection
-            UpdateAvailableSubCats();
-            ApplyFilters();
-        }
-    }
+	private async Task SetQuickFilter(string filter)
+	{
+		selectedQuickFilter = filter;
 
-    private async Task FilterByEventSubCat(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int eventSubCatId))
-        {
-            selectedEventSubCatId = eventSubCatId;
-            ApplyFilters();
-        }
-    }
+		// Auto-select current school year when applying quick filters
+		if (filter != "all" && selectedSchoolYearId == 0)
+		{
+			var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
+			if (currentYear != null)
+			{
+				selectedSchoolYearId = currentYear.Id;
+				selectedSchoolYear = currentYear;
+				await LoadEvents(); // Reload events with new school year filter
+				await LoadEventSummary(); // Reload summary with new filter
+			}
+		}
 
-    private void ApplyFilters()
-    {
-        if (allEvents == null) return;
+		ApplyFilters();
+	}
 
-        IEnumerable<Event> filtered = allEvents;
+	private async Task FilterBySchoolYear(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int schoolYearId))
+		{
+			selectedSchoolYearId = schoolYearId;
+			selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == schoolYearId);
+			await LoadEvents(); // Reload events with new filter
+			await LoadEventSummary(); // Reload summary with new filter
+			ApplyFilters();
+		}
+	}
 
-        // Apply quick filters first
-        var now = DateTime.UtcNow;
-        var next30Days = now.AddDays(30);
+	private async Task FilterByEventCat(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int eventCatId))
+		{
+			selectedEventCatId = eventCatId;
+			selectedEventSubCatId = 0; // Reset subcategory selection
+			UpdateAvailableSubCats();
+			ApplyFilters();
+		}
+	}
 
-        filtered = selectedQuickFilter switch
-        {
-            "pending" => filtered.Where(e => e.Status == EventStatus.SubmittedForApproval),
-            "volunteers" => filtered.Where(e => e.RequiresVolunteers && e.Date >= now && 
-                (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
-            "upcoming" => filtered.Where(e => e.Date >= now && e.Date <= next30Days && 
-                (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
-            "active" => filtered.Where(e => e.Status == EventStatus.Active),
-            "planning" => filtered.Where(e => e.Status == EventStatus.Planning),
-            _ => filtered
-        };
+	private async Task FilterByEventSubCat(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int eventSubCatId))
+		{
+			selectedEventSubCatId = eventSubCatId;
+			ApplyFilters();
+		}
+	}
 
-        if (selectedSchoolYearId > 0)
-        {
-            filtered = filtered.Where(e => e.SchoolYear?.Id == selectedSchoolYearId);
-        }
+	private void ApplyFilters()
+	{
+		if (allEvents == null) return;
 
-        if (selectedEventCatId > 0)
-        {
-            filtered = filtered.Where(e => e.EventCat?.Id == selectedEventCatId);
-        }
+		IEnumerable<Event> filtered = allEvents;
 
-        if (selectedEventSubCatId > 0)
-        {
-            filtered = filtered.Where(e => e.EventCatSub?.Id == selectedEventSubCatId);
-        }
+		// Apply quick filters first
+		var now = DateTime.UtcNow;
+		var next30Days = now.AddDays(30);
 
-        filteredEvents = filtered.ToList();
-    }
+		filtered = selectedQuickFilter switch
+		{
+			"pending" => filtered.Where(e => e.Status == EventStatus.SubmittedForApproval),
+			"volunteers" => filtered.Where(e => e.RequiresVolunteers && e.Date >= now &&
+				(e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
+			"upcoming" => filtered.Where(e => e.Date >= now && e.Date <= next30Days &&
+				(e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
+			"active" => filtered.Where(e => e.Status == EventStatus.Active),
+			"planning" => filtered.Where(e => e.Status == EventStatus.Planning),
+			_ => filtered
+		};
 
-    private async Task ClearFilters()
-    {
-        selectedSchoolYearId = 0;
-        selectedEventCatId = 0;
-        selectedEventSubCatId = 0;
-        selectedSchoolYear = null;
-        selectedQuickFilter = "all";
-        availableSubCats = new List<EventCatSub>();
-        
-        // Reload data when clearing filters
-        await LoadEvents();
-        await LoadEventSummary();
-        ApplyFilters();
-    }
+		if (selectedSchoolYearId > 0)
+		{
+			filtered = filtered.Where(e => e.SchoolYear?.Id == selectedSchoolYearId);
+		}
 
-    private async Task ShowCurrentYear()
-    {
-        var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
-        if (currentYear != null)
-        {
-            selectedSchoolYearId = currentYear.Id;
-            selectedSchoolYear = currentYear;
-        }
-        selectedEventCatId = 0;
-        selectedEventSubCatId = 0;
-        selectedQuickFilter = "all";
-        availableSubCats = new List<EventCatSub>();
-        
-        // Reload data when showing current year
-        await LoadEvents();
-        await LoadEventSummary();
-        ApplyFilters();
-    }
+		if (selectedEventCatId > 0)
+		{
+			filtered = filtered.Where(e => e.EventCat?.Id == selectedEventCatId);
+		}
 
-    private string GetFilterDescription()
-    {
-        var parts = new List<string>();
-        
-        if (selectedQuickFilter != "all")
-        {
-            parts.Add($"with filter '{selectedQuickFilter}'");
-        }
-        
-        if (selectedSchoolYearId > 0)
-            parts.Add($"in {selectedSchoolYear?.Name}");
-            
-        if (selectedEventCatId > 0)
-        {
-            var eventCat = eventCats?.FirstOrDefault(ec => ec.Id == selectedEventCatId);
-            parts.Add($"for {eventCat?.Name}");
-            
-            if (selectedEventSubCatId > 0)
-            {
-                var eventSubCat = allEventSubCats?.FirstOrDefault(esc => esc.Id == selectedEventSubCatId);
-                parts.Add($"in {eventSubCat?.Name}");
-            }
-        }
+		if (selectedEventSubCatId > 0)
+		{
+			filtered = filtered.Where(e => e.EventCatSub?.Id == selectedEventSubCatId);
+		}
 
-        return parts.Any() ? string.Join(" ", parts) : "";
-    }
+		filteredEvents = filtered.ToList();
+	}
 
-    private string GetStatusBadgeClass(EventStatus status) => status switch
-    {
-        EventStatus.Planning => "bg-secondary",
-        EventStatus.SubmittedForApproval => "bg-warning",
-        EventStatus.Active => "bg-success",
-        EventStatus.InProgress => "bg-primary",
-        EventStatus.WrapUp => "bg-info",
-        EventStatus.Completed => "bg-dark",
-        EventStatus.Cancelled => "bg-danger",
-        _ => "bg-secondary"
-    };
+	private async Task ClearFilters()
+	{
+		selectedSchoolYearId = 0;
+		selectedEventCatId = 0;
+		selectedEventSubCatId = 0;
+		selectedSchoolYear = null;
+		selectedQuickFilter = "all";
+		availableSubCats = new List<EventCatSub>();
 
-    private async Task ApproveEvent(int eventId)
-    {
-        if (await ConfirmApproval())
-        {
-            try
-            {
-                HttpResponseMessage response = await Http.PostAsync($"api/events/{eventId}/approve", null);
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadEvents();
-                    await LoadEventSummary();
-                }
-            }
-            catch (Exception)
-            {
-                // Handle errors
-            }
-        }
-    }
+		// Reload data when clearing filters
+		await LoadEvents();
+		await LoadEventSummary();
+		ApplyFilters();
+	}
 
-    private async Task DeleteEvent(int eventId)
-    {
-        if (await ConfirmDelete())
-        {
-            try
-            {
-                HttpResponseMessage response = await Http.DeleteAsync($"api/events/{eventId}");
-                if (response.IsSuccessStatusCode)
-                {
-                    await LoadEvents();
-                    await LoadEventSummary();
-                }
-            }
-            catch (Exception)
-            {
-                // Handle errors
-            }
-        }
-    }
+	private async Task ShowCurrentYear()
+	{
+		var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
+		if (currentYear != null)
+		{
+			selectedSchoolYearId = currentYear.Id;
+			selectedSchoolYear = currentYear;
+		}
+		selectedEventCatId = 0;
+		selectedEventSubCatId = 0;
+		selectedQuickFilter = "all";
+		availableSubCats = new List<EventCatSub>();
 
-    private async Task<bool> ConfirmDelete()
-    {
-        return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this event?");
-    }
+		// Reload data when showing current year
+		await LoadEvents();
+		await LoadEventSummary();
+		ApplyFilters();
+	}
 
-    private async Task<bool> ConfirmApproval()
-    {
-        return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to approve this event?");
-    }
+	private string GetFilterDescription()
+	{
+		var parts = new List<string>();
+
+		if (selectedQuickFilter != "all")
+		{
+			parts.Add($"with filter '{selectedQuickFilter}'");
+		}
+
+		if (selectedSchoolYearId > 0)
+			parts.Add($"in {selectedSchoolYear?.Name}");
+
+		if (selectedEventCatId > 0)
+		{
+			var eventCat = eventCats?.FirstOrDefault(ec => ec.Id == selectedEventCatId);
+			parts.Add($"for {eventCat?.Name}");
+
+			if (selectedEventSubCatId > 0)
+			{
+				var eventSubCat = allEventSubCats?.FirstOrDefault(esc => esc.Id == selectedEventSubCatId);
+				parts.Add($"in {eventSubCat?.Name}");
+			}
+		}
+
+		return parts.Any() ? string.Join(" ", parts) : "";
+	}
+
+	private string GetStatusBadgeClass(EventStatus status) => status switch
+	{
+		EventStatus.Planning => "bg-secondary",
+		EventStatus.SubmittedForApproval => "bg-warning",
+		EventStatus.Active => "bg-success",
+		EventStatus.InProgress => "bg-primary",
+		EventStatus.WrapUp => "bg-info",
+		EventStatus.Completed => "bg-dark",
+		EventStatus.Cancelled => "bg-danger",
+		_ => "bg-secondary"
+	};
+
+	private async Task ApproveEvent(int eventId)
+	{
+		if (await ConfirmApproval())
+		{
+			try
+			{
+				HttpResponseMessage response = await Http.PostAsync($"api/events/{eventId}/approve", null);
+				if (response.IsSuccessStatusCode)
+				{
+					await LoadEvents();
+					await LoadEventSummary();
+				}
+			}
+			catch (Exception)
+			{
+				// Handle errors
+			}
+		}
+	}
+
+	private async Task DeleteEvent(int eventId)
+	{
+		if (await ConfirmDelete())
+		{
+			try
+			{
+				HttpResponseMessage response = await Http.DeleteAsync($"api/events/{eventId}");
+				if (response.IsSuccessStatusCode)
+				{
+					await LoadEvents();
+					await LoadEventSummary();
+				}
+			}
+			catch (Exception)
+			{
+				// Handle errors
+			}
+		}
+	}
+
+	private async Task<bool> ConfirmDelete()
+	{
+		return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this event?");
+	}
+
+	private async Task<bool> ConfirmApproval()
+	{
+		return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to approve this event?");
+	}
 }
