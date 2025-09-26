@@ -85,6 +85,10 @@
 					
 					<!-- Desktop Navigation (Hidden on mobile/tablet) -->
 					<div class="pta-nav-horizontal d-none d-lg-flex">
+						<NavLink href="/" class="pta-nav-link text-purple" aria-label="Home" title="Home" Match="NavLinkMatch.All">
+							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-house"></i></span>
+							Home
+						</NavLink>
 						<NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
 							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
 							Get Involved
@@ -187,6 +191,12 @@
 	<a href="." class="reload">Reload</a>
 	<span class="dismiss">🗙</span>
 </div>
+
+<style>
+.text-purple {
+    color: #7F4592 !important;
+}
+</style>
 
 @code {
 	private int minYear = 2024;

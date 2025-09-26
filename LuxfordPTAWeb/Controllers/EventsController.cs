@@ -28,8 +28,10 @@ public class EventsController : ControllerBase
         {
             var events = await _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
                 .Where(e => e.Status == EventStatus.Active)
                 .ToListAsync();
 
@@ -49,8 +51,12 @@ public class EventsController : ControllerBase
         {
             var eventItem = await _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.SourceEvent)
+                .Include(e => e.CopiedEvents)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (eventItem == null)
@@ -73,6 +79,73 @@ public class EventsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting event {EventId}", id);
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    [HttpGet("by-slug/{slug}")]
+    public async Task<ActionResult<Event>> GetBySlug(string slug, [FromQuery] string? instance = null, [FromQuery] bool showAll = false)
+    {
+        try
+        {
+            var query = _db.Events
+                .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
+                .Include(e => e.SchoolYear)
+                .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.SourceEvent)
+                .Include(e => e.CopiedEvents)
+                .Where(e => e.Slug == slug);
+
+            if (!string.IsNullOrEmpty(instance))
+            {
+                // Filter by specific school year or instance
+                query = query.Where(e => e.SchoolYear.Name.Contains(instance));
+            }
+
+            var events = await query.ToListAsync();
+
+            if (!events.Any())
+            {
+                return NotFound($"No events found with slug '{slug}'");
+            }
+
+            Event selectedEvent;
+
+            if (showAll)
+            {
+                // Return the most recent event but include all related instances
+                selectedEvent = events
+                    .Where(e => e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)
+                    .OrderByDescending(e => e.Date)
+                    .FirstOrDefault() ?? events.OrderByDescending(e => e.Date).First();
+            }
+            else
+            {
+                // Smart resolution: Active/InProgress → Most Recent Completed → Planning
+                selectedEvent = events.FirstOrDefault(e => e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)
+                              ?? events.Where(e => e.Status == EventStatus.Completed).OrderByDescending(e => e.Date).FirstOrDefault()
+                              ?? events.Where(e => e.Status == EventStatus.Planning).OrderByDescending(e => e.Date).FirstOrDefault()
+                              ?? events.First();
+            }
+
+            // Check permissions for non-active events
+            var currentUser = await _userManager.GetUserAsync(User);
+            var userRoles = currentUser != null ? await _userManager.GetRolesAsync(currentUser) : new List<string>();
+            var isAuthorizedUser = userRoles.Contains("Admin") || userRoles.Contains("BoardMember") ||
+                                   (currentUser != null && selectedEvent.EventCoordinatorId == currentUser.Id);
+
+            if (selectedEvent.Status != EventStatus.Active && !isAuthorizedUser)
+            {
+                return Forbid();
+            }
+
+            return Ok(selectedEvent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting event by slug {Slug}", slug);
             return BadRequest(new { Error = ex.Message });
         }
     }
@@ -164,19 +237,187 @@ public class EventsController : ControllerBase
                 }
             }
 
+            // Generate slug if not provided
+            if (string.IsNullOrEmpty(eventItem.Slug))
+            {
+                eventItem.Slug = Event.GenerateSlug(eventItem.Title);
+            }
+
+            // Ensure slug is unique within the school year
+            var existingSlug = await _db.Events
+                .AnyAsync(e => e.Slug == eventItem.Slug && e.SchoolYearId == eventItem.SchoolYearId);
+            if (existingSlug)
+            {
+                // Append year to make it unique
+                var schoolYear = await _db.SchoolYears.FindAsync(eventItem.SchoolYearId);
+                eventItem.Slug += $"-{schoolYear?.Name?.Replace(" ", "").ToLower()}";
+            }
+
             _db.Events.Add(eventItem);
             await _db.SaveChangesAsync();
 
             // Load navigation properties for return
             await _db.Entry(eventItem).Reference(e => e.EventCat).LoadAsync();
+            await _db.Entry(eventItem).Reference(e => e.EventCatSub).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.SchoolYear).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.EventCoordinator).LoadAsync();
+            await _db.Entry(eventItem).Collection(e => e.EventDays).LoadAsync();
 
             return CreatedAtAction(nameof(Get), new { id = eventItem.Id }, eventItem);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating event");
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/copy")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<ActionResult<Event>> CopyEvent(int id, [FromBody] CopyEventRequest request)
+    {
+        try
+        {
+            var sourceEvent = await _db.Events
+                .Include(e => e.EventDays)
+                .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
+                .Include(e => e.SchoolYear)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (sourceEvent == null)
+            {
+                return NotFound("Source event not found");
+            }
+
+            var targetSchoolYear = await _db.SchoolYears.FindAsync(request.TargetSchoolYearId);
+            if (targetSchoolYear == null)
+            {
+                return BadRequest("Target school year not found");
+            }
+
+            // Create new event based on source
+            var newEvent = new Event
+            {
+                Title = request.NewTitle ?? sourceEvent.Title,
+                Date = request.NewStartDate ?? sourceEvent.Date.AddYears(1),
+                Description = sourceEvent.Description,
+                Location = sourceEvent.Location,
+                ImageUrl = sourceEvent.ImageUrl,
+                Link = sourceEvent.Link,
+                EventCoordinatorId = request.NewCoordinatorId ?? sourceEvent.EventCoordinatorId,
+                Status = EventStatus.Planning, // New events start in planning
+                EventStartTime = UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.EventStartTime),
+                EventEndTime = UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.EventEndTime),
+                SetupStartTime = sourceEvent.SetupStartTime.HasValue 
+                    ? UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.SetupStartTime.Value)
+                    : null,
+                CleanupEndTime = sourceEvent.CleanupEndTime.HasValue 
+                    ? UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.CleanupEndTime.Value)
+                    : null,
+                MaxAttendees = sourceEvent.MaxAttendees,
+                EstimatedAttendees = sourceEvent.EstimatedAttendees,
+                RequiresVolunteers = sourceEvent.RequiresVolunteers,
+                RequiresSetup = sourceEvent.RequiresSetup,
+                RequiresCleanup = sourceEvent.RequiresCleanup,
+                Notes = sourceEvent.Notes,
+                PublicInstructions = sourceEvent.PublicInstructions,
+                WeatherBackupPlan = sourceEvent.WeatherBackupPlan,
+                SchoolYearId = request.TargetSchoolYearId,
+                EventCatId = sourceEvent.EventCatId,
+                EventSubTypeId = sourceEvent.EventSubTypeId,
+                IsMultiDay = sourceEvent.IsMultiDay,
+                Slug = Event.GenerateSlug(request.NewTitle ?? sourceEvent.Title),
+                SourceEventId = sourceEvent.Id,
+                CopyGeneration = sourceEvent.CopyGeneration + 1
+            };
+
+            // Ensure slug is unique
+            var baseSlug = newEvent.Slug;
+            var counter = 1;
+            while (await _db.Events.AnyAsync(e => e.Slug == newEvent.Slug && e.SchoolYearId == request.TargetSchoolYearId))
+            {
+                newEvent.Slug = $"{baseSlug}-{counter}";
+                counter++;
+            }
+
+            _db.Events.Add(newEvent);
+            await _db.SaveChangesAsync();
+
+            // Copy event days if multi-day event
+            if (sourceEvent.IsMultiDay && sourceEvent.EventDays.Any() && request.CopyEventDays)
+            {
+                var dayOffset = request.NewStartDate?.Subtract(sourceEvent.Date).Days ?? 365; // Default 1 year offset
+
+                foreach (var sourceDay in sourceEvent.EventDays.OrderBy(d => d.DayNumber))
+                {
+                    var newDay = new EventDay
+                    {
+                        EventId = newEvent.Id,
+                        DayNumber = sourceDay.DayNumber,
+                        Date = sourceDay.Date.AddDays(dayOffset),
+                        DayTitle = sourceDay.DayTitle,
+                        Description = sourceDay.Description,
+                        Location = sourceDay.Location,
+                        StartTime = sourceDay.StartTime?.AddDays(dayOffset),
+                        EndTime = sourceDay.EndTime?.AddDays(dayOffset),
+                        IsActive = sourceDay.IsActive,
+                        SpecialInstructions = sourceDay.SpecialInstructions,
+                        MaxAttendees = sourceDay.MaxAttendees,
+                        EstimatedAttendees = sourceDay.EstimatedAttendees,
+                        WeatherBackupPlan = sourceDay.WeatherBackupPlan
+                    };
+
+                    _db.EventDays.Add(newDay);
+                }
+
+                await _db.SaveChangesAsync();
+            }
+
+            // Load navigation properties for return
+            await _db.Entry(newEvent).Reference(e => e.EventCat).LoadAsync();
+            await _db.Entry(newEvent).Reference(e => e.EventCatSub).LoadAsync();
+            await _db.Entry(newEvent).Reference(e => e.SchoolYear).LoadAsync();
+            await _db.Entry(newEvent).Reference(e => e.EventCoordinator).LoadAsync();
+            await _db.Entry(newEvent).Collection(e => e.EventDays).LoadAsync();
+
+            return CreatedAtAction(nameof(Get), new { id = newEvent.Id }, newEvent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error copying event {EventId}", id);
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    [HttpGet("available-for-copy")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<ActionResult<IEnumerable<Event>>> GetAvailableForCopy([FromQuery] int? excludeSchoolYearId = null)
+    {
+        try
+        {
+            var query = _db.Events
+                .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
+                .Include(e => e.SchoolYear)
+                .Include(e => e.EventCoordinator)
+                .Where(e => e.Status == EventStatus.Completed || e.Status == EventStatus.Active)
+                .AsQueryable();
+
+            if (excludeSchoolYearId.HasValue)
+            {
+                query = query.Where(e => e.SchoolYearId != excludeSchoolYearId.Value);
+            }
+
+            var events = await query
+                .OrderByDescending(e => e.Date)
+                .ToListAsync();
+
+            return Ok(events);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting events available for copying");
             return BadRequest(new { Error = ex.Message });
         }
     }
@@ -243,7 +484,25 @@ public class EventsController : ControllerBase
             eventItem.WeatherBackupPlan = updatedEvent.WeatherBackupPlan;
             eventItem.SchoolYearId = updatedEvent.SchoolYearId;
             eventItem.EventCatId = updatedEvent.EventCatId;
+            eventItem.EventSubTypeId = updatedEvent.EventSubTypeId;
             eventItem.ExcelImportId = updatedEvent.ExcelImportId;
+            eventItem.IsMultiDay = updatedEvent.IsMultiDay;
+            
+            // Update slug if title changed
+            if (eventItem.Title != updatedEvent.Title && !string.IsNullOrEmpty(updatedEvent.Title))
+            {
+                var newSlug = Event.GenerateSlug(updatedEvent.Title);
+                if (newSlug != eventItem.Slug)
+                {
+                    // Check if new slug is available
+                    var existingSlug = await _db.Events
+                        .AnyAsync(e => e.Slug == newSlug && e.SchoolYearId == eventItem.SchoolYearId && e.Id != id);
+                    if (!existingSlug)
+                    {
+                        eventItem.Slug = newSlug;
+                    }
+                }
+            }
 
             // Only admins/board members can change coordinator
             if (userRoles.Contains("Admin") || userRoles.Contains("BoardMember"))
@@ -271,8 +530,10 @@ public class EventsController : ControllerBase
 
             var events = await _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
                 .Where(e => e.Date >= now && e.Date <= in30Days && e.Status == EventStatus.Active)
                 .OrderBy(e => e.Date)
                 .Take(5)
@@ -294,8 +555,10 @@ public class EventsController : ControllerBase
         {
             var events = await _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
                 .Where(e => e.EventCatId == eventCatId && e.Status == EventStatus.Active)
                 .OrderBy(e => e.Date)
                 .ToListAsync();
@@ -316,8 +579,10 @@ public class EventsController : ControllerBase
         {
             var events = await _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
                 .Where(e => e.EventCat.Slug == slug && e.EventCat.IsActive && e.Status == EventStatus.Active)
                 .OrderBy(e => e.Date)
                 .ToListAsync();
@@ -366,10 +631,18 @@ public class EventsController : ControllerBase
     {
         try
         {
-            var eventItem = await _db.Events.FindAsync(id);
+            var eventItem = await _db.Events
+                .Include(e => e.EventDays)
+                .FirstOrDefaultAsync(e => e.Id == id);
             if (eventItem == null)
             {
                 return NotFound();
+            }
+
+            // Remove all event days first
+            if (eventItem.EventDays.Any())
+            {
+                _db.EventDays.RemoveRange(eventItem.EventDays);
             }
 
             _db.Events.Remove(eventItem);
@@ -391,8 +664,10 @@ public class EventsController : ControllerBase
         {
             var query = _db.Events
                 .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays)
                 .AsQueryable();
 
             // Filter by school year if provided
@@ -428,7 +703,12 @@ public class EventsController : ControllerBase
                 return BadRequest("Event is not in SubmittedForApproval status");
             }
 
+            var currentUser = await _userManager.GetUserAsync(User);
+            
             eventItem.Status = EventStatus.Active;
+            eventItem.ApprovedByUserId = currentUser?.Id;
+            eventItem.ApprovedDate = DateTime.UtcNow;
+
             await _db.SaveChangesAsync();
 
             return NoContent();
@@ -439,4 +719,42 @@ public class EventsController : ControllerBase
             return BadRequest(new { Error = ex.Message });
         }
     }
+
+    [HttpGet("by-school-year/{schoolYearId}")]
+    public async Task<ActionResult<IEnumerable<Event>>> GetBySchoolYear(int schoolYearId)
+    {
+        try
+        {
+            var events = await _db.Events
+                .Include(e => e.EventCat)
+                .Include(e => e.EventCatSub)
+                .Include(e => e.SchoolYear)
+                .Include(e => e.EventCoordinator)
+                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Where(e => e.SchoolYearId == schoolYearId && e.Status == EventStatus.Active)
+                .OrderBy(e => e.Date)
+                .ToListAsync();
+
+            return Ok(events);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting events for school year {SchoolYearId}", schoolYearId);
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    private DateTime UpdateDateKeepTime(DateTime newDate, DateTime originalDateTime)
+    {
+        return newDate.Date.Add(originalDateTime.TimeOfDay);
+    }
+}
+
+public class CopyEventRequest
+{
+    public string? NewTitle { get; set; }
+    public DateTime? NewStartDate { get; set; }
+    public int TargetSchoolYearId { get; set; }
+    public string? NewCoordinatorId { get; set; }
+    public bool CopyEventDays { get; set; } = true;
 }

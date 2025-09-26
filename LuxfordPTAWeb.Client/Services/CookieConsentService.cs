@@ -22,7 +22,7 @@ public class CookieConsentService : ICookieConsentService, IAsyncDisposable
     {
         _jsRuntime = jsRuntime;
         _moduleTask = new(() => _jsRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/LuxfordPTAWeb.Client/js/cookieConsent.js").AsTask());
+            "import", "./js/preferences.js").AsTask());
     }
     
     /// <summary>
@@ -126,6 +126,34 @@ public class CookieConsentService : ICookieConsentService, IAsyncDisposable
             // Reset to default Analytics level instead of Essential
             _cachedConsent = CookieConsentLevel.Analytics;
             ConsentChanged?.Invoke(CookieConsentLevel.Analytics);
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+    
+    private async Task<string?> GetConsentDirectAsync()
+    {
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("localStorage.getItem", CONSENT_KEY);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task SetConsentDirectAsync(string value)
+    {
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", CONSENT_KEY, value);
+            
+            // Also set expiry
+            var expiryDate = DateTime.Now.AddDays(CONSENT_EXPIRY_DAYS);
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", CONSENT_KEY + "_expiry", expiryDate.ToString("O"));
         }
         catch
         {

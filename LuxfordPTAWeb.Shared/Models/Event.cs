@@ -46,6 +46,21 @@ public class Event
 	// Excel import tracking (for volunteer coordination)
 	public string? ExcelImportId { get; set; } // Links to volunteer signups from Excel imports
 
+	// NEW: Multi-day event support
+	public bool IsMultiDay { get; set; } = false;
+	
+	// NEW: Event copying and templates
+	public string Slug { get; set; } = string.Empty; // URL-friendly identifier
+	public int? SourceEventId { get; set; } // Reference to source event if this is a copy
+	public Event? SourceEvent { get; set; }
+	public int CopyGeneration { get; set; } = 0; // 0 = original, 1 = first copy, etc.
+	
+	// NEW: Approval tracking
+	public string? ApprovedByUserId { get; set; }
+	public ApplicationUser? ApprovedBy { get; set; }
+	public DateTime? ApprovedDate { get; set; }
+	public string ApprovalNotes { get; set; } = string.Empty;
+
 	// Existing relationships
 	public int SchoolYearId { get; set; }
 	public SchoolYear SchoolYear { get; set; } = default!;
@@ -56,9 +71,15 @@ public class Event
 	public int EventCatId { get; set; }
 	public EventCat EventCat { get; set; } = default!;
 
-	// New Event Sub-type fields
+	// Event Sub-type fields
 	public int? EventSubTypeId { get; set; }
 	public EventCatSub? EventCatSub { get; set; }
+	
+	// NEW: Multi-day event days
+	public ICollection<EventDay> EventDays { get; set; } = new List<EventDay>();
+	
+	// NEW: Events copied from this event
+	public ICollection<Event> CopiedEvents { get; set; } = new List<Event>();
 
 	// Duration helpers (these ARE useful and used)
 	public TimeSpan? EventDuration => EventEndTime != default && EventStartTime != default
@@ -68,6 +89,33 @@ public class Event
 	public TimeSpan? TotalEventDuration => CleanupEndTime.HasValue && SetupStartTime.HasValue
 		? CleanupEndTime.Value - SetupStartTime.Value
 		: null;
+		
+	// NEW: Multi-day event helpers
+	public DateTime? MultiDayStartDate => IsMultiDay && EventDays.Any() 
+		? EventDays.OrderBy(d => d.Date).First().Date 
+		: Date;
+		
+	public DateTime? MultiDayEndDate => IsMultiDay && EventDays.Any() 
+		? EventDays.OrderByDescending(d => d.Date).First().Date 
+		: Date;
+		
+	public int DayCount => IsMultiDay ? EventDays.Count : 1;
+	
+	// Helper method to generate slug from title
+	public static string GenerateSlug(string title)
+	{
+		if (string.IsNullOrEmpty(title))
+			return string.Empty;
+			
+		return title.ToLowerInvariant()
+				   .Replace(" ", "-")
+				   .Replace("&", "and")
+				   .Replace("/", "-")
+				   .Replace("'", "")
+				   .Replace("\"", "")
+				   .Where(c => char.IsLetterOrDigit(c) || c == '-')
+				   .Aggregate("", (current, c) => current + c);
+	}
 
 	// Flexible sponsor/event/level relationships
 	public ICollection<SponsorAssignment> SponsorAssignments { get; set; } = new List<SponsorAssignment>();
