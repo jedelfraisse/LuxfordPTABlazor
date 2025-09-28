@@ -1,4 +1,6 @@
-﻿namespace LuxfordPTAWeb.Shared.Models;
+﻿using LuxfordPTAWeb.Shared.Enums;
+
+namespace LuxfordPTAWeb.Shared.Models;
 
 public class EventCat
 {
@@ -17,6 +19,18 @@ public class EventCat
 	public int MaxEventsToShow { get; set; } = 0; // For InlineWithLimit mode (0 = unlimited)
 	public bool ShowViewEventsButton { get; set; } = true; // Whether to show "View Events" button
 	public bool ShowInlineOnMainPage { get; set; } = false; // Show events directly on main page instead of category card
+
+	// NEW: Event creation/editing permissions
+	/// <summary>
+	/// Defines who can create or edit events within this category
+	/// </summary>
+	public EventCategoryPermission EditingPermission { get; set; } = EventCategoryPermission.BoardMembersAndAdmin;
+
+	// NEW: Coordinator requirement setting
+	/// <summary>
+	/// Defines whether an event coordinator is required for events in this category
+	/// </summary>
+	public EventCoordinatorRequirement CoordinatorRequirement { get; set; } = EventCoordinatorRequirement.Optional;
 
 	public ICollection<Event> Events { get; set; } = new List<Event>();
 	public ICollection<EventCatSub> EventCatSub { get; set; } = new List<EventCatSub>();

@@ -121,6 +121,56 @@ else if (createEventDto != null)
                             <input type="text" class="form-control" id="location" @bind="createEventDto.Location" />
                         </div>
                     </div>
+
+                    <!-- Event Coordinator Section - conditional based on category settings -->
+                    @if (ShouldShowCoordinatorField())
+                    {
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="eventCoordinator" class="form-label">
+                                    Event Coordinator
+                                    @if (IsCoordinatorRequired())
+                                    {
+                                        <span class="text-danger">*</span>
+                                        <i class="bi bi-info-circle ms-1" title="A coordinator is required for events in this category"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-info-circle ms-1" title="Event coordinator is optional for this category"></i>
+                                    }
+                                </label>
+                                <select class="form-select" id="eventCoordinator" @bind="createEventDto.EventCoordinatorId">
+                                    <option value="">@(IsCoordinatorRequired() ? "Select Coordinator" : "No Coordinator Assigned")</option>
+                                    @if (availableCoordinators != null)
+                                    {
+                                        @foreach (var coordinator in availableCoordinators)
+                                        {
+                                            <option value="@coordinator.Id">@coordinator.FirstName @coordinator.LastName (@coordinator.Email)</option>
+                                        }
+                                    }
+                                </select>
+                                @if (IsCoordinatorRequired())
+                                {
+                                    <div class="form-text text-muted">
+                                        Events in this category require a designated coordinator to manage logistics and communications.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="form-text text-muted">
+                                        Optionally assign a coordinator to manage event logistics and communications.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Events in this category do not require a coordinator assignment.
+                        </div>
+                    }
                     
                     <!-- Day 1 Information (Primary Event Day) -->
                     <div class="card border-primary mb-3">
@@ -361,6 +411,7 @@ else if (createEventDto != null)
     private List<SchoolYear>? schoolYears;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
+    private List<ApplicationUser>? availableCoordinators;
     private bool isLoading = true;
     private bool isSaving = false;
     private string errorMessage = string.Empty;
@@ -405,6 +456,7 @@ else if (createEventDto != null)
             schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
             eventCategories = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
             eventSubcategories = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
+            availableCoordinators = await Http.GetFromJsonAsync<List<ApplicationUser>>("api/users/coordinators");
         }
         catch (Exception ex)
         {
@@ -659,6 +711,13 @@ else if (createEventDto != null)
                 return;
             }
             
+            // NEW: Validate coordinator assignment based on category requirements
+            if (IsCoordinatorRequired() && string.IsNullOrEmpty(createEventDto.EventCoordinatorId))
+            {
+                errorMessage = "A coordinator is required for events in this category.";
+                return;
+            }
+            
             // Set EventSubTypeId properly - null if not selected
             createEventDto.EventSubTypeId = eventSubCategoryId > 0 ? eventSubCategoryId : null;
             
@@ -764,5 +823,23 @@ else if (createEventDto != null)
     private void CancelEdit()
     {
         NavigationManager.NavigateTo("/admin/events");
+    }
+
+    private bool ShouldShowCoordinatorField()
+    {
+        if (createEventDto?.EventCatId == 0 || eventCategories == null)
+            return true; // Default to showing if category not selected
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
+        return category?.CoordinatorRequirement != EventCoordinatorRequirement.NotNeeded;
+    }
+
+    private bool IsCoordinatorRequired()
+    {
+        if (createEventDto?.EventCatId == 0 || eventCategories == null)
+            return false; // Default to not required
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
+        return category?.CoordinatorRequirement == EventCoordinatorRequirement.Required;
     }
 }
