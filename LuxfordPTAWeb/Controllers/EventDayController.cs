@@ -1,6 +1,7 @@
 using LuxfordPTAWeb.Data;
 using LuxfordPTAWeb.Shared.Models;
 using LuxfordPTAWeb.Shared.Enums;
+using LuxfordPTAWeb.Shared.DTOs; // Added DTO namespace
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -102,11 +103,7 @@ public class EventDayController : ControllerBase
                 return Forbid();
             }
 
-            // Ensure the event is marked as multi-day
-            if (!eventItem.IsMultiDay)
-            {
-                eventItem.IsMultiDay = true;
-            }
+            // No need to set IsMultiDay; multi-day status is inferred from EventDays.Count > 1
 
             // Set the event ID and validate day number
             eventDay.EventId = eventId;
@@ -234,11 +231,7 @@ public class EventDayController : ControllerBase
 
             _db.EventDays.Remove(eventDay);
 
-            // If this was the last day, mark the event as single-day
-            if (eventItem.EventDays.Count <= 1)
-            {
-                eventItem.IsMultiDay = false;
-            }
+            // No need to set IsMultiDay; multi-day status is inferred from EventDays.Count > 1
 
             await _db.SaveChangesAsync();
             return NoContent();
@@ -251,7 +244,7 @@ public class EventDayController : ControllerBase
     }
 
     [HttpPost("{dayId}/copy")]
-    public async Task<ActionResult<EventDay>> CopyEventDay(int eventId, int dayId, [FromBody] CopyEventDayRequest request)
+    public async Task<ActionResult<EventDay>> CopyEventDay(int eventId, int dayId, [FromBody] CopyEventDayRequestDTO request)
     {
         try
         {
@@ -296,11 +289,7 @@ public class EventDayController : ControllerBase
 
             _db.EventDays.Add(newEventDay);
             
-            // Mark target event as multi-day if not already
-            if (!targetEvent.IsMultiDay)
-            {
-                targetEvent.IsMultiDay = true;
-            }
+            // No need to set IsMultiDay; multi-day status is inferred from EventDays.Count > 1
 
             await _db.SaveChangesAsync();
 
@@ -354,11 +343,4 @@ public class EventDayController : ControllerBase
             .MaxAsync(ed => (int?)ed.DayNumber) ?? 0;
         return maxDayNumber + 1;
     }
-}
-
-public class CopyEventDayRequest
-{
-    public int TargetEventId { get; set; }
-    public int NewDayNumber { get; set; } = 0; // 0 = auto-assign
-    public DateTime? NewDate { get; set; } // null = use source date + 1 year
 }

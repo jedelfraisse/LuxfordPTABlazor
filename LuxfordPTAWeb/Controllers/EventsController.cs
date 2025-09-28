@@ -1,6 +1,7 @@
 ﻿using LuxfordPTAWeb.Data;
 using LuxfordPTAWeb.Shared.Models;
 using LuxfordPTAWeb.Shared.Enums;
+using LuxfordPTAWeb.Shared.DTOs; // Added DTO namespace
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -152,7 +153,7 @@ public class EventsController : ControllerBase
 
     [HttpGet("dashboard-summary")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<EventDashboardSummary>> GetDashboardSummary()
+    public async Task<ActionResult<EventDashboardSummaryDTO>> GetDashboardSummary()
     {
         try
         {
@@ -176,7 +177,7 @@ public class EventsController : ControllerBase
 
     [HttpGet("dashboard-summary/{schoolYearId}")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<EventDashboardSummary>> GetDashboardSummary(int schoolYearId)
+    public async Task<ActionResult<EventDashboardSummaryDTO>> GetDashboardSummary(int schoolYearId)
     {
         try
         {
@@ -190,7 +191,7 @@ public class EventsController : ControllerBase
             var next30Days = now.AddDays(30);
             var next7Days = now.AddDays(7);
 
-            var summary = new EventDashboardSummary
+            var summary = new EventDashboardSummaryDTO
             {
                 TotalEvents = allEvents.Count,
                 PendingApproval = allEvents.Count(e => e.Status == EventStatus.SubmittedForApproval),
@@ -274,7 +275,7 @@ public class EventsController : ControllerBase
 
     [HttpPost("{id}/copy")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<Event>> CopyEvent(int id, [FromBody] CopyEventRequest request)
+    public async Task<ActionResult<Event>> CopyEvent(int id, [FromBody] CopyEventRequestDTO request)
     {
         try
         {
@@ -326,7 +327,6 @@ public class EventsController : ControllerBase
                 SchoolYearId = request.TargetSchoolYearId,
                 EventCatId = sourceEvent.EventCatId,
                 EventSubTypeId = sourceEvent.EventSubTypeId,
-                IsMultiDay = sourceEvent.IsMultiDay,
                 Slug = Event.GenerateSlug(request.NewTitle ?? sourceEvent.Title),
                 SourceEventId = sourceEvent.Id,
                 CopyGeneration = sourceEvent.CopyGeneration + 1
@@ -344,8 +344,8 @@ public class EventsController : ControllerBase
             _db.Events.Add(newEvent);
             await _db.SaveChangesAsync();
 
-            // Copy event days if multi-day event
-            if (sourceEvent.IsMultiDay && sourceEvent.EventDays.Any() && request.CopyEventDays)
+            // Copy event days if requested and source event has days
+            if (sourceEvent.EventDays.Any() && request.CopyEventDays)
             {
                 var dayOffset = request.NewStartDate?.Subtract(sourceEvent.Date).Days ?? 365; // Default 1 year offset
 
@@ -486,7 +486,6 @@ public class EventsController : ControllerBase
             eventItem.EventCatId = updatedEvent.EventCatId;
             eventItem.EventSubTypeId = updatedEvent.EventSubTypeId;
             eventItem.ExcelImportId = updatedEvent.ExcelImportId;
-            eventItem.IsMultiDay = updatedEvent.IsMultiDay;
             
             // Update slug if title changed
             if (eventItem.Title != updatedEvent.Title && !string.IsNullOrEmpty(updatedEvent.Title))
@@ -567,13 +566,13 @@ public class EventsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting events by type");
+            _logger.LogError(ex, "Error getting events by category");
             return BadRequest(new { Error = ex.Message });
         }
     }
 
     [HttpGet("by-category/{slug}")]
-    public async Task<ActionResult<IEnumerable<Event>>> GetByEventTypeSlug(string slug)
+    public async Task<ActionResult<IEnumerable<Event>>> GetByEventCatSlug(string slug)
     {
         try
         {
@@ -748,13 +747,4 @@ public class EventsController : ControllerBase
     {
         return newDate.Date.Add(originalDateTime.TimeOfDay);
     }
-}
-
-public class CopyEventRequest
-{
-    public string? NewTitle { get; set; }
-    public DateTime? NewStartDate { get; set; }
-    public int TargetSchoolYearId { get; set; }
-    public string? NewCoordinatorId { get; set; }
-    public bool CopyEventDays { get; set; } = true;
 }

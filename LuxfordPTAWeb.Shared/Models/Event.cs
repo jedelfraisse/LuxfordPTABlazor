@@ -46,8 +46,6 @@ public class Event
 	// Excel import tracking (for volunteer coordination)
 	public string? ExcelImportId { get; set; } // Links to volunteer signups from Excel imports
 
-	// NEW: Multi-day event support
-	public bool IsMultiDay { get; set; } = false;
 	
 	// NEW: Event copying and templates
 	public string Slug { get; set; } = string.Empty; // URL-friendly identifier
@@ -91,15 +89,15 @@ public class Event
 		: null;
 		
 	// NEW: Multi-day event helpers
-	public DateTime? MultiDayStartDate => IsMultiDay && EventDays.Any() 
-		? EventDays.OrderBy(d => d.Date).First().Date 
+	public DateTime? MultiDayStartDate => EventDays.Count > 1 && EventDays.Any()
+		? EventDays.OrderBy(d => d.Date).First().Date
 		: Date;
-		
-	public DateTime? MultiDayEndDate => IsMultiDay && EventDays.Any() 
-		? EventDays.OrderByDescending(d => d.Date).First().Date 
+
+	public DateTime? MultiDayEndDate => EventDays.Count > 1 && EventDays.Any()
+		? EventDays.OrderByDescending(d => d.Date).First().Date
 		: Date;
-		
-	public int DayCount => IsMultiDay ? EventDays.Count : 1;
+
+	public int DayCount => EventDays.Count > 1 ? EventDays.Count : 1;
 	
 	// Helper method to generate slug from title
 	public static string GenerateSlug(string title)

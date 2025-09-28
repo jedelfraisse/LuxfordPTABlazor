@@ -1,5 +1,6 @@
 @page "/admin/events/calendar"
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
@@ -167,7 +168,7 @@ else
 @code {
     private SchoolYear? selectedSchoolYear;
     private List<Event>? allEvents;
-    private EventDashboardSummary? eventSummary;
+    private EventDashboardSummaryDTO? eventSummary;
 
     protected override async Task OnInitializedAsync()
     {
@@ -205,7 +206,7 @@ else
         try
         {
             if (selectedSchoolYear == null) return;
-            eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>($"api/events/dashboard-summary/{selectedSchoolYear.Id}");
+            eventSummary = await Http.GetFromJsonAsync<EventDashboardSummaryDTO>($"api/events/dashboard-summary/{selectedSchoolYear.Id}");
         }
         catch (Exception)
         {

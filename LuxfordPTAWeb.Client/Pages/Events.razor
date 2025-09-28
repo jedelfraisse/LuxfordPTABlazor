@@ -438,7 +438,7 @@ else
 
     private IEnumerable<EventCatSub> GetSubcategoriesForCategory(int categoryId)
     {
-        return eventSubcategories?.Where(esc => esc.EventTypeId == categoryId && esc.IsActive) ?? Enumerable.Empty<EventCatSub>();
+        return eventSubcategories?.Where(esc => esc.EventCatId == categoryId && esc.IsActive) ?? Enumerable.Empty<EventCatSub>();
     }
 
     private IEnumerable<Event> GetEventsWithoutSubcategory(IEnumerable<Event> categoryEvents)

@@ -1,5 +1,6 @@
 ﻿@page "/admin"
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
 @using LuxfordPTAWeb.Client.Components.Admin
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
@@ -54,52 +55,4 @@ else
 			<i class="bi bi-calendar3"></i> School Years
 		</a>
 	</div>
-}
-
-@code {
-	private SchoolYear? selectedSchoolYear;
-	private List<Event>? filteredEvents;
-	private EventDashboardSummary? eventSummary;
-	private List<ApplicationUser> availableUsers = new();
-
-	protected override async Task OnInitializedAsync()
-	{
-		try
-		{
-			selectedSchoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
-
-			if (selectedSchoolYear != null)
-			{
-				// Load all events for the selected school year
-				var events = await Http.GetFromJsonAsync<List<Event>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
-				filteredEvents = events ?? new List<Event>();
-
-				// Load event summary
-				await LoadEventSummaryAsync();
-			}
-			
-			// Load available users
-			availableUsers = (await Http.GetFromJsonAsync<List<ApplicationUser>>("api/users") ?? new List<ApplicationUser>())
-				.OrderBy(u => u.LastName)
-				.ThenBy(u => u.FirstName)
-				.ToList();
-		}
-		catch (Exception)
-		{
-			// Handle errors silently for now
-		}
-	}
-
-	private async Task LoadEventSummaryAsync()
-	{
-		try
-		{
-			if (selectedSchoolYear == null) return;
-			eventSummary = await Http.GetFromJsonAsync<EventDashboardSummary>($"api/events/dashboard-summary/{selectedSchoolYear.Id}");
-		}
-		catch (Exception)
-		{
-			// Handle errors silently for now
-		}
-	}
 }

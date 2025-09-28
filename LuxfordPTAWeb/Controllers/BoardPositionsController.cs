@@ -226,7 +226,7 @@ public class BoardPositionsController : ControllerBase
 
 	[HttpPut("assign-user-override")]
 	[Authorize(Roles = "Admin,BoardMember")]
-	public async Task<IActionResult> AssignUserOverride([FromBody] AssignUserOverrideDto dto)
+	public async Task<IActionResult> AssignUserOverride([FromBody] AssignUserOverrideDTO dto)
 	{
 		var bp = await _db.BoardPositions
 			.FirstOrDefaultAsync(bp => bp.BoardPositionTitleId == dto.BoardPositionTitleId && bp.SchoolYearId == dto.SchoolYearId);
@@ -260,12 +260,5 @@ public class BoardPositionsController : ControllerBase
 
 		await _db.SaveChangesAsync();
 		return NoContent();
-	}
-
-	public class AssignUserOverrideDto
-	{
-		public int BoardPositionTitleId { get; set; }
-		public string? UserId { get; set; }
-		public int SchoolYearId { get; set; }
 	}
 }

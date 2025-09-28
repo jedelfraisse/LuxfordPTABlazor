@@ -92,7 +92,7 @@ else if (eventModel != null)
                                 <option value="0">Select Sub-Category</option>
                                 @if (eventSubcategories != null)
                                 {
-                                    @foreach (var subcat in eventSubcategories.Where(sc => sc.EventTypeId == eventModel.EventCatId && sc.IsActive).OrderBy(sc => sc.DisplayOrder))
+                                    @foreach (var subcat in eventSubcategories.Where(sc => sc.EventCatId == eventModel.EventCatId && sc.IsActive).OrderBy(sc => sc.DisplayOrder))
                                     {
                                         <option value="@subcat.Id">@subcat.Name</option>
                                     }
@@ -105,80 +105,96 @@ else if (eventModel != null)
                         </div>
                     </div>
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="multiDay" @bind="eventModel.IsMultiDay">
-                        <label class="form-check-label" for="multiDay">
-                            Multi-Day Event
-                        </label>
-                    </div>
-                    <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
                         <label class="form-check-label" for="requiresVolunteers">
                             Requires Volunteers
                         </label>
                     </div>
+                    @if (eventModel.RequiresVolunteers)
+                    {
+                        <div class="card mb-4 border-primary">
+                            <div class="card-header">
+                                <strong><i class="bi bi-people"></i> Volunteer Details</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Number of Volunteer Spots</label>
+                                    <input type="number" class="form-control" @bind="volunteerSpots" min="1" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">SignUpGenius Link</label>
+                                    <input type="url" class="form-control" @bind="signUpGeniusLink" placeholder="https://www.signupgenius.com/go/..." />
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(signUpGeniusLink))
+                                {
+                                    <div class="alert alert-info">
+                                        <a href="@signUpGeniusLink" target="_blank">View Volunteer Signup</a>
+                                    </div>
+                                }
+                                <!-- Future: Integrate SignUpGenius API or scraping for slots -->
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
 
-            @if (eventModel.IsMultiDay)
-            {
-                <!-- Multi-Day Management -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Event Days</h5>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddDay">
-                            <i class="bi bi-plus"></i> Add Day
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        @if (eventDays.Any())
-                        {
-                            <div class="row">
-                                @foreach (var day in eventDays.OrderBy(d => d.DayNumber))
-                                {
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card border-left-primary">
-                                            <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                                <small class="text-muted">Day @day.DayNumber</small>
-                                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveDay(day)">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
+            <!-- Event Days Management (always shown) -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Event Days</h5>
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddDay">
+                        <i class="bi bi-plus"></i> Add Day
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (eventDays.Any())
+                    {
+                        <div class="row">
+                            @foreach (var day in eventDays.OrderBy(d => d.DayNumber))
+                            {
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-left-primary">
+                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                            <small class="text-muted">Day @day.DayNumber</small>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveDay(day)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                        <div class="card-body py-2">
+                                            <div class="mb-2">
+                                                <label class="form-label small">Day Title</label>
+                                                <input type="text" class="form-control form-control-sm" @bind="day.DayTitle" placeholder="e.g., 'Fire Safety Demo'" />
                                             </div>
-                                            <div class="card-body py-2">
-                                                <div class="mb-2">
-                                                    <label class="form-label small">Day Title</label>
-                                                    <input type="text" class="form-control form-control-sm" @bind="day.DayTitle" placeholder="e.g., 'Fire Safety Demo'" />
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small">Date *</label>
-                                                    <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" />
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small">Location (optional)</label>
-                                                    <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label small">Description</label>
-                                                    <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" @bind="day.IsActive" />
-                                                    <label class="form-check-label small">Active</label>
-                                                </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Date *</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Location (optional)</label>
+                                                <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small">Description</label>
+                                                <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" @bind="day.IsActive" />
+                                                <label class="form-check-label small">Active</label>
                                             </div>
                                         </div>
                                     </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i> No days added yet. Click "Add Day" to create the first day of your multi-day event.
-                            </div>
-                        }
-                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No days added yet. Click "Add Day" to create the first day of your event.
+                        </div>
+                    }
                 </div>
-            }
+            </div>
         </div>
 
         <!-- Action Panel -->
@@ -202,11 +218,15 @@ else if (eventModel != null)
                     <ul class="list-unstyled small">
                         <li><strong>Days:</strong> @eventDays.Count</li>
                         <li><strong>Date Range:</strong> 
-                            @if (eventModel.IsMultiDay && eventDays.Any())
+                            @if (eventDays.Count > 1 && eventDays.Any())
                             {
                                 var startDate = eventDays.Min(d => d.Date);
                                 var endDate = eventDays.Max(d => d.Date);
                                 <span>@startDate.ToString("MMM d") - @endDate.ToString("MMM d, yyyy")</span>
+                            }
+                            else if (eventDays.Any())
+                            {
+                                <span>@eventDays.First().Date.ToString("MMM d, yyyy")</span>
                             }
                             else
                             {
@@ -222,6 +242,8 @@ else if (eventModel != null)
 }
 
 @code {
+    private int volunteerSpots = 0;
+    private string signUpGeniusLink = string.Empty;
     private Event? eventModel;
     private List<EventDay> eventDays = new();
     private List<SchoolYear>? schoolYears;
@@ -232,10 +254,20 @@ else if (eventModel != null)
     protected override async Task OnInitializedAsync()
     {
         await LoadDropdownData();
-        InitializeNewEvent();
+
+        // Read query parameters for schoolYearId and eventCatId
+        var uri = new Uri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        int schoolYearId = 0;
+        int eventCatId = 0;
+        if (query.TryGetValue("schoolYearId", out var syVal))
+            int.TryParse(syVal, out schoolYearId);
+        if (query.TryGetValue("eventCatId", out var catVal))
+            int.TryParse(catVal, out eventCatId);
+
+        InitializeNewEvent(schoolYearId, eventCatId);
         isLoading = false;
     }
-
     private async Task LoadDropdownData()
     {
         try
@@ -249,8 +281,7 @@ else if (eventModel != null)
             await JS.InvokeVoidAsync("alert", $"Error loading data: {ex.Message}");
         }
     }
-
-    private void InitializeNewEvent()
+    private void InitializeNewEvent(int schoolYearId = 0, int eventCatId = 0)
     {
         eventModel = new Event
         {
@@ -258,13 +289,14 @@ else if (eventModel != null)
             Description = "",
             Location = "",
             Status = EventStatus.Planning,
-            IsMultiDay = false,
             Date = DateTime.Today.AddDays(7), // Default to next week
             EventStartTime = DateTime.Today.AddDays(7).AddHours(9), // 9 AM
             EventEndTime = DateTime.Today.AddDays(7).AddHours(15), // 3 PM
             RequiresVolunteers = false,
             RequiresSetup = false,
-            RequiresCleanup = false
+            RequiresCleanup = false,
+            SchoolYearId = schoolYearId > 0 ? schoolYearId : 0,
+            EventCatId = eventCatId > 0 ? eventCatId : 0
         };
         eventDays.Clear();
     }
@@ -318,13 +350,14 @@ else if (eventModel != null)
                 return;
             }
             // Subcategory is optional for now
-            if (eventModel.IsMultiDay && !eventDays.Any())
+            // Require at least one day if multi-day
+            if (eventDays.Count > 1 && !eventDays.Any())
             {
-                await JS.InvokeVoidAsync("alert", "Please add at least one day for this multi-day event.");
+                await JS.InvokeVoidAsync("alert", "Please add at least one day for this event.");
                 return;
             }
             // Update event dates based on event days
-            if (eventModel.IsMultiDay && eventDays.Any())
+            if (eventDays.Any())
             {
                 eventModel.Date = eventDays.Min(d => d.Date);
                 eventModel.EventStartTime = eventDays.Min(d => d.Date);
@@ -334,8 +367,8 @@ else if (eventModel != null)
             if (response.IsSuccessStatusCode)
             {
                 eventModel = await response.Content.ReadFromJsonAsync<Event>();
-                // Save event days if multi-day
-                if (eventModel != null && eventModel.IsMultiDay)
+                // Save event days if present
+                if (eventModel != null && eventDays.Any())
                 {
                     foreach (var day in eventDays)
                     {
@@ -358,13 +391,6 @@ else if (eventModel != null)
         }
     }
 
-    private void OnMultiDayChanged(ChangeEventArgs e)
-    {
-        if (eventModel != null && !eventModel.IsMultiDay)
-        {
-            eventDays.Clear();
-        }
-    }
 
     private void OnCategoryChanged(ChangeEventArgs e)
     {
