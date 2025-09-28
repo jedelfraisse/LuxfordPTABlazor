@@ -8,11 +8,6 @@ namespace LuxfordPTAWeb.Client.AdminPages;
 
 public partial class Dashboard : ComponentBase
 {
-    [Inject] private HttpClient Http { get; set; } = default!;
-    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport { get; set; } = default!;
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-
     private SchoolYear? selectedSchoolYear;
     private List<Event>? filteredEvents;
     private EventDashboardSummaryDTO? eventSummary;

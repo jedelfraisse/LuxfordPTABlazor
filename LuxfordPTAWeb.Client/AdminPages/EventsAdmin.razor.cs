@@ -10,10 +10,6 @@ namespace LuxfordPTAWeb.Client.AdminPages;
 
 public partial class EventsAdmin : ComponentBase
 {
-    [Inject] private HttpClient Http { get; set; } = default!;
-    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-
     private List<Event>? allEvents;
     private List<Event>? filteredEvents;
     private List<EventCat>? eventCats;
