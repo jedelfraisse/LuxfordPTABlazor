@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using LuxfordPTAWeb.Shared.Enums;
+using LuxfordPTAWeb.Shared.Interfaces;
 
 namespace LuxfordPTAWeb.Shared.Models;
 
-public class Event
+public class Event : IAuditableEntity
 {
 	public int Id { get; set; }
 	public string Title { get; set; } = string.Empty;
@@ -58,6 +59,13 @@ public class Event
 	public ApplicationUser? ApprovedBy { get; set; }
 	public DateTime? ApprovedDate { get; set; }
 	public string ApprovalNotes { get; set; } = string.Empty;
+
+	// NEW: Audit metadata for tracking changes and creation
+	public string CreatedBy { get; set; } = string.Empty;
+	public DateTime CreatedOn { get; set; }
+	public string LastEditedBy { get; set; } = string.Empty;
+	public DateTime LastEditedOn { get; set; }
+	public string ChangeNotes { get; set; } = string.Empty; // Optional notes about what was changed
 
 	// Existing relationships
 	public int SchoolYearId { get; set; }

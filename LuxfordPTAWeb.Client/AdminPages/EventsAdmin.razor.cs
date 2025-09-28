@@ -31,6 +31,8 @@ public partial class EventsAdmin : ComponentBase
             queryParams.Add($"schoolYearId={selectedSchoolYearId}");
         if (selectedEventCatId > 0)
             queryParams.Add($"eventCatId={selectedEventCatId}");
+        if (selectedEventSubCatId > 0)
+            queryParams.Add($"eventSubCatId={selectedEventSubCatId}");
         if (queryParams.Count > 0)
             url += "?" + string.Join("&", queryParams);
         return url;
@@ -49,6 +51,18 @@ public partial class EventsAdmin : ComponentBase
         await LoadSchoolYears();
         await LoadEventCats();
         await LoadEventSubCats();
+        
+        // Auto-select current school year if no specific school year is selected
+        if (selectedSchoolYearId == 0)
+        {
+            var currentYear = schoolYears?.FirstOrDefault(sy => sy.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear);
+            if (currentYear != null)
+            {
+                selectedSchoolYearId = currentYear.Id;
+                selectedSchoolYear = currentYear;
+            }
+        }
+        
         await LoadEvents();
         await LoadEventSummary();
     }
@@ -202,6 +216,27 @@ public partial class EventsAdmin : ComponentBase
             selectedEventSubCatId = eventSubCatId;
             ApplyFilters();
         }
+    }
+    
+    // New methods for @bind:after handling
+    private async Task OnSchoolYearFilterChanged()
+    {
+        selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == selectedSchoolYearId);
+        await LoadEvents(); // Reload events with new filter
+        await LoadEventSummary(); // Reload summary with new filter
+        ApplyFilters();
+    }
+
+    private async Task OnEventCatFilterChanged()
+    {
+        selectedEventSubCatId = 0; // Reset subcategory selection
+        UpdateAvailableSubCats();
+        ApplyFilters();
+    }
+
+    private async Task OnEventSubCatFilterChanged()
+    {
+        ApplyFilters();
     }
 
     private void ApplyFilters()

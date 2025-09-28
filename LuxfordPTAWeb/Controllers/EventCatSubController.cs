@@ -119,4 +119,58 @@ public class EventCatSubController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    [HttpPost("{id}/move-up")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<IActionResult> MoveUp(int id)
+    {
+        var eventCatSub = await _db.EventCatSubs.FindAsync(id);
+        if (eventCatSub == null)
+        {
+            return NotFound();
+        }
+
+        var previousEventCatSub = await _db.EventCatSubs
+            .Where(ecs => ecs.EventCatId == eventCatSub.EventCatId && ecs.DisplayOrder < eventCatSub.DisplayOrder)
+            .OrderByDescending(ecs => ecs.DisplayOrder)
+            .FirstOrDefaultAsync();
+
+        if (previousEventCatSub != null)
+        {
+            var tempOrder = eventCatSub.DisplayOrder;
+            eventCatSub.DisplayOrder = previousEventCatSub.DisplayOrder;
+            previousEventCatSub.DisplayOrder = tempOrder;
+
+            await _db.SaveChangesAsync();
+        }
+
+        return NoContent();
+    }
+
+    [HttpPost("{id}/move-down")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<IActionResult> MoveDown(int id)
+    {
+        var eventCatSub = await _db.EventCatSubs.FindAsync(id);
+        if (eventCatSub == null)
+        {
+            return NotFound();
+        }
+
+        var nextEventCatSub = await _db.EventCatSubs
+            .Where(ecs => ecs.EventCatId == eventCatSub.EventCatId && ecs.DisplayOrder > eventCatSub.DisplayOrder)
+            .OrderBy(ecs => ecs.DisplayOrder)
+            .FirstOrDefaultAsync();
+
+        if (nextEventCatSub != null)
+        {
+            var tempOrder = eventCatSub.DisplayOrder;
+            eventCatSub.DisplayOrder = nextEventCatSub.DisplayOrder;
+            nextEventCatSub.DisplayOrder = tempOrder;
+
+            await _db.SaveChangesAsync();
+        }
+
+        return NoContent();
+    }
 }

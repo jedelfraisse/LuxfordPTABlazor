@@ -86,6 +86,9 @@ public class Program
 
 		builder.Services.AddScoped<SchoolYearSupport>();
 
+		// Register audit service for tracking entity changes
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IAuditService, LuxfordPTAWeb.Services.AuditService>();
+
 		// Configure Google Analytics options
 		var googleAnalyticsOptions = builder.Configuration.GetSection("GoogleAnalytics").Get<GoogleAnalyticsOptions>() ?? new GoogleAnalyticsOptions();
 		builder.Services.AddSingleton(googleAnalyticsOptions);
