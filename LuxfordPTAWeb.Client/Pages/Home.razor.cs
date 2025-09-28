@@ -7,10 +7,6 @@ namespace LuxfordPTAWeb.Client.Pages;
 
 public partial class Home : ComponentBase
 {
-    [Inject] private HttpClient Http { get; set; } = default!;
-    [Inject] private LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport { get; set; } = default!;
-    [Inject] private GoogleAnalyticsService GoogleAnalytics { get; set; } = default!;
-
     private List<AssignedUserDTO> boardMembers = new();
     private string boardYearLabel = "";
     private bool isLoadingBoard = true;
