@@ -18,6 +18,7 @@
     private List<SchoolYear>? schoolYears;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
+    private List<ApplicationUser>? availableCoordinators;
     private bool isLoading = true;
     private bool isSaving = false;
     private string errorMessage = string.Empty;
@@ -49,6 +50,7 @@
             schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears");
             eventCategories = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat");
             eventSubcategories = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub");
+            availableCoordinators = await Http.GetFromJsonAsync<List<ApplicationUser>>("api/users/coordinators");
         }
         catch (Exception ex)
         {
@@ -361,6 +363,13 @@
                 return;
             }
             
+            // NEW: Validate coordinator assignment based on category requirements
+            if (IsCoordinatorRequired() && string.IsNullOrEmpty(eventModel.EventCoordinatorId))
+            {
+                errorMessage = "A coordinator is required for events in this category.";
+                return;
+            }
+            
             // Create UpdateEventDTO with all the event data
             var updateDto = new UpdateEventDTO
             {
@@ -408,13 +417,45 @@
             
             if (primaryDay.Id > 0)
             {
-                // Update existing day
-                await Http.PutAsJsonAsync($"api/events/{EventId}/days/{primaryDay.Id}", primaryDay);
+                // Update existing day using DTO
+                var primaryDayUpdateDto = new UpdateEventDayDTO
+                {
+                    DayNumber = primaryDay.DayNumber,
+                    Date = primaryDay.Date,
+                    DayTitle = primaryDay.DayTitle,
+                    Description = primaryDay.Description,
+                    Location = primaryDay.Location,
+                    StartTime = primaryDay.StartTime,
+                    EndTime = primaryDay.EndTime,
+                    IsActive = primaryDay.IsActive,
+                    SpecialInstructions = primaryDay.SpecialInstructions,
+                    MaxAttendees = primaryDay.MaxAttendees,
+                    EstimatedAttendees = primaryDay.EstimatedAttendees,
+                    WeatherBackupPlan = primaryDay.WeatherBackupPlan
+                };
+                await Http.PutAsJsonAsync($"api/events/{EventId}/days/{primaryDay.Id}", primaryDayUpdateDto);
             }
             else
             {
-                // Create new day
-                var dayResponse = await Http.PostAsJsonAsync($"api/events/{EventId}/days", primaryDay);
+                // Create new day using DTO
+                var primaryDayCreateDto = new CreateEventDayDTO
+                {
+                    EventId = EventId,
+                    DayNumber = primaryDay.DayNumber,
+                    Date = primaryDay.Date,
+                    DayTitle = primaryDay.DayTitle,
+                    Description = primaryDay.Description,
+                    Location = primaryDay.Location,
+                    StartTime = primaryDay.StartTime,
+                    EndTime = primaryDay.EndTime,
+                    IsActive = primaryDay.IsActive,
+                    SpecialInstructions = primaryDay.SpecialInstructions,
+                    MaxAttendees = primaryDay.MaxAttendees,
+                    EstimatedAttendees = primaryDay.EstimatedAttendees,
+                    WeatherBackupPlan = primaryDay.WeatherBackupPlan
+                };
+                
+                var dayResponse = await Http.PostAsJsonAsync($"api/events/{EventId}/days", primaryDayCreateDto);
                 if (dayResponse.IsSuccessStatusCode)
                 {
                     var createdDay = await dayResponse.Content.ReadFromJsonAsync<EventDay>();
@@ -430,13 +471,44 @@
                 
                 if (day.Id > 0)
                 {
-                    // Update existing day
-                    await Http.PutAsJsonAsync($"api/events/{EventId}/days/{day.Id}", day);
+                    // Update existing day using DTO
+                    var dayUpdateDto = new UpdateEventDayDTO
+                    {
+                        DayNumber = day.DayNumber,
+                        Date = day.Date,
+                        DayTitle = day.DayTitle,
+                        Description = day.Description,
+                        Location = day.Location,
+                        StartTime = day.StartTime,
+                        EndTime = day.EndTime,
+                        IsActive = day.IsActive,
+                        SpecialInstructions = day.SpecialInstructions,
+                        MaxAttendees = day.MaxAttendees,
+                        EstimatedAttendees = day.EstimatedAttendees,
+                        WeatherBackupPlan = day.WeatherBackupPlan
+                    };
+                    await Http.PutAsJsonAsync($"api/events/{EventId}/days/{day.Id}", dayUpdateDto);
                 }
                 else
                 {
-                    // Create new day
-                    await Http.PostAsJsonAsync($"api/events/{EventId}/days", day);
+                    // Create new day using DTO
+                    var dayCreateDto = new CreateEventDayDTO
+                    {
+                        EventId = EventId,
+                        DayNumber = day.DayNumber,
+                        Date = day.Date,
+                        DayTitle = day.DayTitle,
+                        Description = day.Description,
+                        Location = day.Location,
+                        StartTime = day.StartTime,
+                        EndTime = day.EndTime,
+                        IsActive = day.IsActive,
+                        SpecialInstructions = day.SpecialInstructions,
+                        MaxAttendees = day.MaxAttendees,
+                        EstimatedAttendees = day.EstimatedAttendees,
+                        WeatherBackupPlan = day.WeatherBackupPlan
+                    };
+                    await Http.PostAsJsonAsync($"api/events/{EventId}/days", dayCreateDto);
                 }
             }
             
@@ -481,6 +553,24 @@
     private void CancelEdit()
     {
         NavigationManager.NavigateTo("/admin/events");
+    }
+
+    private bool ShouldShowCoordinatorField()
+    {
+        if (eventModel?.EventCatId == 0 || eventCategories == null)
+            return true; // Default to showing if category not selected
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == eventModel.EventCatId);
+        return category?.CoordinatorRequirement != EventCoordinatorRequirement.NotNeeded;
+    }
+
+    private bool IsCoordinatorRequired()
+    {
+        if (eventModel?.EventCatId == 0 || eventCategories == null)
+            return false; // Default to not required
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == eventModel.EventCatId);
+        return category?.CoordinatorRequirement == EventCoordinatorRequirement.Required;
     }
 }
 
@@ -527,43 +617,6 @@ else if (eventModel != null)
 {
     <div class="row">
         <div class="col-lg-8">
-            <!-- Audit Trail Card -->
-            @if (!string.IsNullOrEmpty(eventModel.CreatedBy))
-            {
-                <div class="card mb-4 border-info">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="mb-0"><i class="bi bi-clock-history"></i> Event History</h6>
-                    </div>
-                    <div class="card-body py-2">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <small><strong>Created:</strong></small><br>
-                                <small>@eventModel.CreatedOn.ToString("MMM d, yyyy 'at' h:mm tt")</small><br>
-                                <small>by @eventModel.CreatedBy.GetDisplayName()</small>
-                            </div>
-                            <div class="col-md-6">
-                                @if (eventModel.LastEditedOn != eventModel.CreatedOn)
-                                {
-                                    <small><strong>Last Modified:</strong></small><br>
-                                    <small>@eventModel.LastEditedOn.ToString("MMM d, yyyy 'at' h:mm tt")</small><br>
-                                    <small>by @eventModel.LastEditedBy.GetDisplayName()</small>
-                                }
-                                else
-                                {
-                                    <small class="text-muted">No edits yet</small>
-                                }
-                            </div>
-                        </div>
-                        @if (!string.IsNullOrEmpty(eventModel.ChangeNotes) && eventModel.ChangeNotes != "Initial creation")
-                        {
-                            <div class="mt-2">
-                                <small><strong>Last Change:</strong> @eventModel.ChangeNotes</small>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-
             <!-- Basic Event Information -->
             <div class="card mb-4">
                 <div class="card-header">
@@ -641,6 +694,56 @@ else if (eventModel != null)
                             <input type="text" class="form-control" id="location" @bind="eventModel.Location" />
                         </div>
                     </div>
+
+                    <!-- Event Coordinator Section - conditional based on category settings -->
+                    @if (ShouldShowCoordinatorField())
+                    {
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="eventCoordinator" class="form-label">
+                                    Event Coordinator
+                                    @if (IsCoordinatorRequired())
+                                    {
+                                        <span class="text-danger">*</span>
+                                        <i class="bi bi-info-circle ms-1" title="A coordinator is required for events in this category"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-info-circle ms-1" title="Event coordinator is optional for this category"></i>
+                                    }
+                                </label>
+                                <select class="form-select" id="eventCoordinator" @bind="eventModel.EventCoordinatorId">
+                                    <option value="">@(IsCoordinatorRequired() ? "Select Coordinator" : "No Coordinator Assigned")</option>
+                                    @if (availableCoordinators != null)
+                                    {
+                                        @foreach (var coordinator in availableCoordinators)
+                                        {
+                                            <option value="@coordinator.Id">@coordinator.FirstName @coordinator.LastName (@coordinator.Email)</option>
+                                        }
+                                    }
+                                </select>
+                                @if (IsCoordinatorRequired())
+                                {
+                                    <div class="form-text text-muted">
+                                        Events in this category require a designated coordinator to manage logistics and communications.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="form-text text-muted">
+                                        Optionally assign a coordinator to manage event logistics and communications.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Events in this category do not require a coordinator assignment.
+                        </div>
+                    }
                     
                     <!-- Primary Event Day -->
                     <div class="card border-primary mb-3">
@@ -863,6 +966,38 @@ else if (eventModel != null)
                     </ul>
                 </div>
             </div>
+            
+            <!-- Event History Card -->
+            @if (!string.IsNullOrEmpty(eventModel.CreatedBy))
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-clock-history"></i> Event History</h6>
+                    </div>
+                    <div class="card-body py-3">
+                        <div class="mb-2">
+                            <small><strong>Created:</strong></small><br>
+                            <small>@eventModel.CreatedOn.ToString("MMM d, yyyy 'at' h:mm tt")</small><br>
+                            <small class="text-muted">by @eventModel.CreatedBy.GetDisplayName()</small>
+                        </div>
+                        @if (eventModel.LastEditedOn != eventModel.CreatedOn)
+                        {
+                            <div class="mb-2">
+                                <small><strong>Last Modified:</strong></small><br>
+                                <small>@eventModel.LastEditedOn.ToString("MMM d, yyyy 'at' h:mm tt")</small><br>
+                                <small class="text-muted">by @eventModel.LastEditedBy.GetDisplayName()</small>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(eventModel.ChangeNotes) && eventModel.ChangeNotes != "Initial creation")
+                        {
+                            <div class="mt-2 p-2 bg-light rounded">
+                                <small><strong>Last Change:</strong></small><br>
+                                <small class="text-muted">@eventModel.ChangeNotes</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         </div>
     </div>
 }

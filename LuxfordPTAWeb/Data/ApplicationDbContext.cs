@@ -96,6 +96,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.Property(e => e.DisplayMode)
 			.HasConversion<int>();
 
+		// NEW: EventCat permission and coordinator requirement enum configurations
+		builder.Entity<EventCat>()
+			.Property(e => e.EditingPermission)
+			.HasConversion<int>();
+
+		builder.Entity<EventCat>()
+			.Property(e => e.CoordinatorRequirement)
+			.HasConversion<int>();
+
 		builder.Entity<BoardPosition>()
 			.HasOne(bp => bp.SchoolYear)
 			.WithMany(sy => sy.BoardPositions)

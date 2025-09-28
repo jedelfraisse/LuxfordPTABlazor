@@ -258,6 +258,9 @@ public partial class EventsAdmin : ComponentBase
                 (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
             "active" => filtered.Where(e => e.Status == EventStatus.Active),
             "planning" => filtered.Where(e => e.Status == EventStatus.Planning),
+            "missing-coordinator" => filtered.Where(e => e.EventCat != null && 
+                e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
+                string.IsNullOrEmpty(e.EventCoordinatorId) && e.Date >= now),
             _ => filtered
         };
 
@@ -400,5 +403,21 @@ public partial class EventsAdmin : ComponentBase
     private async Task<bool> ConfirmApproval()
     {
         return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to approve this event?");
+    }
+
+    private EventCoordinatorRequirement GetCoordinatorRequirement(EventCat? eventCat)
+    {
+        return eventCat?.CoordinatorRequirement ?? EventCoordinatorRequirement.Optional;
+    }
+
+    private int GetMissingCoordinatorCount()
+    {
+        if (allEvents == null) return 0;
+        
+        var now = DateTime.UtcNow;
+        return allEvents.Count(e => e.EventCat != null && 
+            e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
+            string.IsNullOrEmpty(e.EventCoordinatorId) && 
+            e.Date >= now);
     }
 }

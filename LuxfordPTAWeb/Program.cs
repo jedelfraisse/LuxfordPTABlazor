@@ -88,6 +88,9 @@ public class Program
 
 		// Register audit service for tracking entity changes
 		builder.Services.AddScoped<LuxfordPTAWeb.Services.IAuditService, LuxfordPTAWeb.Services.AuditService>();
+		
+		// Register event permission service for category-based permissions
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IEventPermissionService, LuxfordPTAWeb.Services.EventPermissionService>();
 
 		// Configure Google Analytics options
 		var googleAnalyticsOptions = builder.Configuration.GetSection("GoogleAnalytics").Get<GoogleAnalyticsOptions>() ?? new GoogleAnalyticsOptions();

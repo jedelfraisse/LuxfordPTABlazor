@@ -68,6 +68,10 @@ public class EventCatController : ControllerBase
         eventCat.MaxEventsToShow = updatedCat.MaxEventsToShow;
         eventCat.ShowViewEventsButton = updatedCat.ShowViewEventsButton;
         eventCat.ShowInlineOnMainPage = updatedCat.ShowInlineOnMainPage;
+        
+        // NEW: Update permission and coordinator requirement fields
+        eventCat.EditingPermission = updatedCat.EditingPermission;
+        eventCat.CoordinatorRequirement = updatedCat.CoordinatorRequirement;
 
         await _db.SaveChangesAsync();
         return NoContent();

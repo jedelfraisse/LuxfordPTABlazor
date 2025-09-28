@@ -16,17 +16,20 @@ public class EventsController : ControllerBase
     private readonly ILogger<EventsController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditService _auditService;
+    private readonly IEventPermissionService _eventPermissionService;
 
     public EventsController(
         ApplicationDbContext db, 
         ILogger<EventsController> logger, 
         UserManager<ApplicationUser> userManager,
-        IAuditService auditService)
+        IAuditService auditService,
+        IEventPermissionService eventPermissionService)
     {
         _db = db;
         _logger = logger;
         _userManager = userManager;
         _auditService = auditService;
+        _eventPermissionService = eventPermissionService;
     }
 
     [HttpGet]
@@ -191,6 +194,7 @@ public class EventsController : ControllerBase
             // Filter events by the provided school year ID
             var allEvents = await _db.Events
                 .Include(e => e.SchoolYear)
+                .Include(e => e.EventCat)
                 .Where(e => e.SchoolYearId == schoolYearId)
                 .ToListAsync();
 
@@ -215,7 +219,10 @@ public class EventsController : ControllerBase
                     e.Status == EventStatus.SubmittedForApproval ||
                     (e.Status == EventStatus.InProgress && e.Date < now.AddDays(-1)) ||
                     (e.RequiresVolunteers && string.IsNullOrEmpty(e.ExcelImportId) && 
-                     e.Date >= now && e.Date <= next30Days)),
+                     e.Date >= now && e.Date <= next30Days) ||
+                    // NEW: Add events that require a coordinator but don't have one
+                    (e.EventCat != null && e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
+                     string.IsNullOrEmpty(e.EventCoordinatorId) && e.Date >= now)),
                 RequiringVolunteers = allEvents.Count(e => e.RequiresVolunteers && 
                     e.Date >= now && (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress))
             };
@@ -238,16 +245,6 @@ public class EventsController : ControllerBase
             // Get current user for audit tracking
             var currentUser = await _userManager.GetUserAsync(User);
             
-            // Validate coordinator assignment
-            if (!string.IsNullOrEmpty(createEventDto.EventCoordinatorId))
-            {
-                var coordinator = await _userManager.FindByIdAsync(createEventDto.EventCoordinatorId);
-                if (coordinator == null)
-                {
-                    return BadRequest("Invalid event coordinator ID");
-                }
-            }
-
             // Validate foreign key references
             var schoolYear = await _db.SchoolYears.FindAsync(createEventDto.SchoolYearId);
             if (schoolYear == null)
@@ -260,6 +257,12 @@ public class EventsController : ControllerBase
             {
                 return BadRequest("Invalid event category ID");
             }
+            
+            // NEW: Check if user has permission to create events in this category
+            if (!await _eventPermissionService.CanUserCreateEditEventAsync(currentUser, eventCat))
+            {
+                return Forbid("You do not have permission to create events in this category");
+            }
 
             if (createEventDto.EventSubTypeId.HasValue)
             {
@@ -267,6 +270,24 @@ public class EventsController : ControllerBase
                 if (eventSubType == null)
                 {
                     return BadRequest("Invalid event subcategory ID");
+                }
+            }
+
+            // NEW: Validate coordinator assignment based on category requirements
+            var (coordinatorValid, coordinatorError) = await _eventPermissionService
+                .ValidateCoordinatorAssignmentAsync(createEventDto.EventCatId, createEventDto.EventCoordinatorId);
+            if (!coordinatorValid)
+            {
+                return BadRequest(coordinatorError);
+            }
+            
+            // Validate coordinator exists if provided
+            if (!string.IsNullOrEmpty(createEventDto.EventCoordinatorId))
+            {
+                var coordinator = await _userManager.FindByIdAsync(createEventDto.EventCoordinatorId);
+                if (coordinator == null)
+                {
+                    return BadRequest("Invalid event coordinator ID");
                 }
             }
 

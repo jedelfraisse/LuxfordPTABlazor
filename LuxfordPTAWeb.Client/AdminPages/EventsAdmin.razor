@@ -130,6 +130,15 @@
 							Need Volunteers (@eventSummary.RequiringVolunteers)
 						</button>
 					}
+					@{
+						var missingCoordinatorCount = GetMissingCoordinatorCount();
+					}
+					@if (missingCoordinatorCount > 0)
+					{
+						<button type="button" class="btn @(selectedQuickFilter == "missing-coordinator" ? "btn-danger" : "btn-outline-danger")" @onclick="@(() => SetQuickFilter("missing-coordinator"))">
+							Missing Coordinator (@missingCoordinatorCount)
+						</button>
+					}
 					@if (eventSummary.UpcomingNext30Days > 0)
 					{
 						<button type="button" class="btn @(selectedQuickFilter == "upcoming" ? "btn-success" : "btn-outline-success")" @onclick="@(() => SetQuickFilter("upcoming"))">
@@ -199,6 +208,15 @@ else
 							{
 								<span class="badge bg-info ms-2">Volunteers Needed</span>
 							}
+							@{
+								var coordinatorReq = GetCoordinatorRequirement(evt.EventCat);
+							}
+							@if (coordinatorReq == EventCoordinatorRequirement.Required && string.IsNullOrEmpty(evt.EventCoordinatorId))
+							{
+								<span class="badge bg-danger ms-2">
+									<i class="bi bi-person-exclamation"></i> No Coordinator
+								</span>
+							}
 							@if (!string.IsNullOrEmpty(evt.CreatedBy))
 							{
 								<div class="small text-muted mt-1">
@@ -222,12 +240,12 @@ else
 							</span>
 						</td>
 						<td>
-							<span class="badge">@evt.EventCat?.Name</span>
+							<span class="badge bg-primary text-white">@evt.EventCat?.Name</span>
 						</td>
 						<td>
 							@if (evt.EventCatSub != null)
 							{
-								<span class="badge bg-light text-dark">@evt.EventCatSub.Name</span>
+								<span class="badge bg-secondary text-white">@evt.EventCatSub.Name</span>
 							}
 							else
 							{
@@ -248,12 +266,35 @@ else
 						</td>
 						<td>@evt.Location</td>
 						<td>
-							@if (evt.EventCoordinator != null)
+							@{
+								var coordinatorRequirement = GetCoordinatorRequirement(evt.EventCat);
+							}
+							@if (coordinatorRequirement == EventCoordinatorRequirement.NotNeeded)
 							{
-								@evt.EventCoordinator.FirstName @evt.EventCoordinator.LastName
+								<!-- Show nothing for categories that don't need coordinators -->
+								<span class="text-muted small">N/A</span>
+							}
+							else if (evt.EventCoordinator != null)
+							{
+								<!-- Show coordinator name with optional role badge -->
+								<div>
+									@evt.EventCoordinator.FirstName @evt.EventCoordinator.LastName
+									@if (coordinatorRequirement == EventCoordinatorRequirement.Required)
+									{
+										<i class="bi bi-check-circle text-success ms-1" title="Required coordinator assigned"></i>
+									}
+								</div>
+							}
+							else if (coordinatorRequirement == EventCoordinatorRequirement.Required)
+							{
+								<!-- Show alert for required but unassigned -->
+								<span class="badge bg-danger" title="This event category requires a coordinator but none is assigned">
+									<i class="bi bi-exclamation-triangle-fill me-1"></i>Required - Unassigned
+								</span>
 							}
 							else
 							{
+								<!-- Optional but unassigned -->
 								<span class="text-muted">Unassigned</span>
 							}
 						</td>

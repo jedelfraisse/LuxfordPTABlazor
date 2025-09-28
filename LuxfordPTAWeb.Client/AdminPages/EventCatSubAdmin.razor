@@ -7,176 +7,299 @@
 <PageTitle>Manage Event Categories</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-tags"></i> Manage Event Categories</h1>
-    <div>
-        <a href="/admin/events" class="btn btn-outline-secondary me-2">
-            <i class="bi bi-arrow-left"></i> Back to Events
-        </a>
-        <button type="button" class="btn btn-primary" @onclick="ShowCreateForm">
-            <i class="bi bi-plus"></i> Add New Event Category
-        </button>
-    </div>
+	<div>
+		<h1><i class="bi bi-tags"></i> Manage Event Categories</h1>
+		@if (showForm && editingEventCat?.Id > 0)
+		{
+			<small class="text-muted">Currently editing: <strong>@editingEventCat.Name</strong></small>
+		}
+		else if (showForm)
+		{
+			<small class="text-muted">Creating new event category</small>
+		}
+	</div>
+	<div>
+		<a href="/admin/events" class="btn btn-outline-secondary me-2">
+			<i class="bi bi-arrow-left"></i> Back to Events
+		</a>
+		@if (!showForm)
+		{
+			<button type="button" class="btn btn-primary" @onclick="ShowCreateForm">
+				<i class="bi bi-plus"></i> Add New Event Category
+			</button>
+		}
+		else
+		{
+			<button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
+				<i class="bi bi-x-circle"></i> Cancel Editing
+			</button>
+		}
+	</div>
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @errorMessage
-        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
-    </div>
+	<div class="alert alert-danger alert-dismissible fade show" role="alert">
+		@errorMessage
+		<button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+	</div>
 }
 
 @if (!string.IsNullOrEmpty(successMessage))
 {
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @successMessage
-        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
-    </div>
+	<div class="alert alert-success alert-dismissible fade show" role="alert">
+		@successMessage
+		<button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+	</div>
 }
 
 <!-- Create/Edit Form -->
 @if (showForm)
 {
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0">@(editingEventCat?.Id > 0 ? "Edit" : "Create") Event Category</h5>
-        </div>
-        <div class="card-body">
-            <EditForm Model="editingEventCat" OnValidSubmit="SaveEventCategory">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger mb-3" />
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Name *</label>
-                            <InputText id="name" @bind-Value="editingEventCat.Name" @onblur="GenerateSlugFromName" class="form-control" maxlength="100" />
-                            <ValidationMessage For="() => editingEventCat.Name" class="text-danger" />
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="slug" class="form-label">URL Slug *</label>
-                            <InputText id="slug" @bind-Value="editingEventCat.Slug" class="form-control" maxlength="100" />
-                            <ValidationMessage For="() => editingEventCat.Slug" class="text-danger" />
-                            <div class="form-text">Used in URLs: /events/category/<strong>@(editingEventCat.Slug ?? "slug")</strong></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label for="description" class="form-label">Description</label>
-                    <InputTextArea id="description" @bind-Value="editingEventCat.Description" class="form-control" rows="3" maxlength="500" />
-                    <ValidationMessage For="() => editingEventCat.Description" class="text-danger" />
-                    <div class="form-text">Description shown on event category cards</div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="icon" class="form-label">Icon Class</label>
-                            <InputText id="icon" @bind-Value="editingEventCat.Icon" class="form-control" placeholder="bi-calendar-event" />
-                            <ValidationMessage For="() => editingEventCat.Icon" class="text-danger" />
-                            <div class="form-text">Bootstrap Icons class (e.g., bi-calendar-event)</div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="colorClass" class="form-label">Color Class</label>
-                            <InputSelect id="colorClass" @bind-Value="editingEventCat.ColorClass" class="form-select">
-                                <option value="">Default</option>
-                                <option value="text-primary">Blue</option>
-                                <option value="text-success">Green</option>
-                                <option value="text-danger">Red</option>
-                                <option value="text-warning">Yellow</option>
-                                <option value="text-info">Cyan</option>
-                                <option value="text-secondary">Gray</option>
-                            </InputSelect>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="mb-3">
-                            <label for="size" class="form-label">Card Size</label>
-                            <InputSelect id="size" @bind-Value="editingEventCat.Size" class="form-select">
-                                <option value="0">Half Size</option>
-                                <option value="1">Full Size</option>
-                            </InputSelect>
-                            <div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-check mb-3 d-flex align-items-center" style="height: 38px;">
-                            <InputCheckbox id="isActive" @bind-Value="editingEventCat.IsActive" class="form-check-input" />
-                            <label for="isActive" class="form-check-label">
-                                Active
-                                <small class="text-muted d-block">Inactive categories are hidden from public view</small>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <!-- Sub-categories card -->
-                @if (editingEventCat.Id > 0)
-                {
-                    <div class="card border-info mb-4">
-                        <div class="card-header bg-info text-white">
-                            <h6 class="mb-0">Sub-Categories</h6>
-                        </div>
-                        <div class="card-body">
-                            @if (subCategories == null)
-                            {
-                                <div class="text-muted">Loading sub-categories...</div>
-                            }
-                            else
-                            {
-                                <div class="mb-3">
-                                    <!-- Sub-category list -->
-                                    @foreach (var subcat in subCategories.OrderBy(sc => sc.DisplayOrder))
-                                    {
-                                        <div class="d-flex align-items-center mb-2 border rounded p-2 bg-light">
-                                            <div class="flex-grow-1">
-                                                <strong>@subcat.Name</strong>
-                                                <div class="text-muted small">@subcat.Description</div>
-                                                <span class="badge @(subcat.IsActive ? "bg-success" : "bg-secondary")">
-                                                    @(subcat.IsActive ? "Active" : "Inactive")
-                                                </span>
-                                            </div>
-                                            <div class="btn-group ms-2">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveUp(subcat.Id)" disabled="@(!CanSubCatMoveUp(subcat) || showSubcatModal)">↑</button>
-                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveDown(subcat.Id)" disabled="@(!CanSubCatMoveDown(subcat) || showSubcatModal)">↓</button>
-                                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => EditSubcat(subcat)" disabled="@showSubcatModal">Edit</button>
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                                <div class="mt-2">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSubCategory(editingEventCat.Id)">
-                                        <i class="bi bi-plus"></i> Add Sub-Category
-                                    </button>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-success" disabled="@isSaving">
-                        @if (isSaving)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        }
-                        <i class="bi bi-check-circle me-1"></i>
-                        Save Event Category
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
-                        <i class="bi bi-x-circle me-1"></i>
-                        Cancel
-                    </button>
-                </div>
-            </EditForm>
-        </div>
-    </div>
+	<div class="card mb-4">
+		<div class="card-header">
+			<h5 class="mb-0">@(editingEventCat?.Id > 0 ? "Edit" : "Create") Event Category</h5>
+		</div>
+		<div class="card-body">
+			<EditForm Model="editingEventCat" OnValidSubmit="SaveEventCategory">
+				<DataAnnotationsValidator />
+				<ValidationSummary class="text-danger mb-3" />
+				<div class="row">
+					<div class="col-md-6">
+						<div class="mb-3">
+							<label for="name" class="form-label">Name *</label>
+							<InputText id="name" @bind-Value="editingEventCat.Name" @onblur="GenerateSlugFromName" class="form-control" maxlength="100" />
+							<ValidationMessage For="() => editingEventCat.Name" class="text-danger" />
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="mb-3">
+							<label for="slug" class="form-label">URL Slug *</label>
+							<InputText id="slug" @bind-Value="editingEventCat.Slug" class="form-control" maxlength="100" />
+							<ValidationMessage For="() => editingEventCat.Slug" class="text-danger" />
+							<div class="form-text">Used in URLs: /events/category/<strong>@(editingEventCat.Slug ?? "slug")</strong></div>
+						</div>
+					</div>
+				</div>
+				<div class="mb-3">
+					<label for="description" class="form-label">Description</label>
+					<InputTextArea id="description" @bind-Value="editingEventCat.Description" class="form-control" rows="3" maxlength="500" />
+					<ValidationMessage For="() => editingEventCat.Description" class="text-danger" />
+					<div class="form-text">Description shown on event category cards</div>
+				</div>
+				<div class="row">
+					<div class="col-md-6">
+						<div class="mb-3">
+							<label for="icon" class="form-label">Icon Class</label>
+							<InputText id="icon" @bind-Value="editingEventCat.Icon" class="form-control" placeholder="bi-calendar-event" />
+							<ValidationMessage For="() => editingEventCat.Icon" class="text-danger" />
+							<div class="form-text">Bootstrap Icons class (e.g., bi-calendar-event)</div>
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="mb-3">
+							<label for="colorClass" class="form-label">Color Class</label>
+							<InputSelect id="colorClass" @bind-Value="editingEventCat.ColorClass" class="form-select">
+								<option value="">Default</option>
+								<option value="text-primary">Blue</option>
+								<option value="text-success">Green</option>
+								<option value="text-danger">Red</option>
+								<option value="text-warning">Yellow</option>
+								<option value="text-info">Cyan</option>
+								<option value="text-secondary">Gray</option>
+							</InputSelect>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-4">
+						<div class="mb-3">
+							<label for="size" class="form-label">Card Size</label>
+							<InputSelect id="size" @bind-Value="editingEventCat.Size" class="form-select">
+								<option value="0">Half Size</option>
+								<option value="1">Full Size</option>
+							</InputSelect>
+							<div class="form-text">Half size: 2 per row, Full size: 1 per row</div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="mb-3">
+							<label for="editingPermission" class="form-label">
+								Event Editing Permissions
+								<i class="bi bi-info-circle" title="Who can create or edit events in this category"></i>
+							</label>
+							<InputSelect id="editingPermission" @bind-Value="editingEventCat.EditingPermission" class="form-select">
+								<option value="0">Admin Only</option>
+								<option value="1">Board Members & Admin</option>
+								<option value="2">Event Coordinators & Above</option>
+								<option value="3">All Users</option>
+							</InputSelect>
+							<div class="form-text">Controls who can create/edit events in this category</div>
+						</div>
+					</div>
+					<div class="col-md-4">
+						<div class="mb-3">
+							<label for="coordinatorRequirement" class="form-label">
+								Coordinator Requirement
+								<i class="bi bi-info-circle" title="Whether events in this category need a coordinator"></i>
+							</label>
+							<InputSelect id="coordinatorRequirement" @bind-Value="editingEventCat.CoordinatorRequirement" class="form-select">
+								<option value="0">Not Needed</option>
+								<option value="1">Optional</option>
+								<option value="2">Required</option>
+							</InputSelect>
+							<div class="form-text">
+								@if (editingEventCat.CoordinatorRequirement == 0)
+								{
+									<span class="text-muted">Coordinator field will be hidden</span>
+								}
+								else if (editingEventCat.CoordinatorRequirement == 1)
+								{
+									<span class="text-muted">Coordinator field shown but optional</span>
+								}
+								else
+								{
+									<span class="text-muted">Coordinator field shown and required</span>
+								}
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-6">
+						<div class="form-check mb-3 d-flex align-items-center" style="height: 38px;">
+							<InputCheckbox id="isActive" @bind-Value="editingEventCat.IsActive" class="form-check-input" />
+							<label for="isActive" class="form-check-label">
+								Active
+								<small class="text-muted d-block">Inactive categories are hidden from public view</small>
+							</label>
+						</div>
+					</div>
+				</div>
+				<!-- Sub-categories card -->
+				@if (editingEventCat.Id > 0)
+				{
+					<div class="card border-info mb-4">
+						<div class="card-header bg-info text-white">
+							<h6 class="mb-0">Sub-Categories</h6>
+						</div>
+						<div class="card-body">
+							@if (subCategories == null)
+							{
+								<div class="text-muted">Loading sub-categories...</div>
+							}
+							else
+							{
+								<div class="mb-3">
+									<!-- Sub-category list -->
+									@foreach (var subcat in subCategories.OrderBy(sc => sc.DisplayOrder))
+									{
+										<div class="d-flex align-items-center mb-2 border rounded p-2 bg-light">
+											<div class="flex-grow-1">
+												<strong>@subcat.Name</strong>
+												<div class="text-muted small">@subcat.Description</div>
+												<span class="badge @(subcat.IsActive ? "bg-success" : "bg-secondary")">
+													@(subcat.IsActive ? "Active" : "Inactive")
+												</span>
+											</div>
+											<div class="btn-group ms-2">
+												<button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveUp(subcat.Id)" disabled="@(!CanSubCatMoveUp(subcat) || showSubcatModal)">↑</button>
+												<button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveDown(subcat.Id)" disabled="@(!CanSubCatMoveDown(subcat) || showSubcatModal)">↓</button>
+												<button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => EditSubcat(subcat)" disabled="@showSubcatModal">Edit</button>
+											</div>
+										</div>
+									}
+								</div>
+								<div class="mt-2">
+									<button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSubCategory(editingEventCat.Id)">
+										<i class="bi bi-plus"></i> Add Sub-Category
+									</button>
+								</div>
+							}
+						</div>
+					</div>
+				}
+				<div class="d-flex gap-2">
+					<button type="submit" class="btn btn-success" disabled="@isSaving">
+						@if (isSaving)
+						{
+							<span class="spinner-border spinner-border-sm me-2" role="status"></span>
+						}
+						<i class="bi bi-check-circle me-1"></i>
+						Save Event Category
+					</button>
+					<button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">
+						<i class="bi bi-x-circle me-1"></i>
+						Cancel
+					</button>
+				</div>
+			</EditForm>
+		</div>
+	</div>
+
+	<!-- Modal for editing sub-category -->
+	@if (showSubcatModal)
+	{
+		<div class="modal-backdrop show"></div>
+		<div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.2);">
+			<div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Edit Sub-Category</h5>
+						<button type="button" class="btn-close" @onclick="CloseSubcatModal"></button>
+					</div>
+					<div class="modal-body">
+						<EditForm Model="editModel" OnValidSubmit="SaveEdit">
+							<DataAnnotationsValidator />
+							<ValidationSummary />
+							<div class="mb-3">
+								<label class="form-label">Name</label>
+								<input class="form-control" @bind="editModel.Name" />
+							</div>
+							<div class="mb-3">
+								<label class="form-label">Description</label>
+								<textarea class="form-control" @bind="editModel.Description" rows="2"></textarea>
+							</div>
+							<div class="row">
+								<div class="col-md-6">
+									<div class="mb-3">
+										<label class="form-label">Icon Class</label>
+										<input class="form-control" @bind="editModel.Icon" placeholder="bi-flag" />
+										<div class="form-text">Bootstrap Icons class</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<div class="mb-3">
+										<label class="form-label">Color Class</label>
+										<select class="form-select" @bind="editModel.ColorClass">
+											<option value="">Default</option>
+											<option value="text-primary">Blue</option>
+											<option value="text-success">Green</option>
+											<option value="text-danger">Red</option>
+											<option value="text-warning">Yellow</option>
+											<option value="text-info">Cyan</option>
+											<option value="text-secondary">Gray</option>
+										</select>
+									</div>
+								</div>
+							</div>
+							<div class="mb-3 form-check">
+								<input type="checkbox" class="form-check-input" id="subcatActive" @bind="editModel.IsActive" />
+								<label for="subcatActive" class="form-check-label">Active</label>
+							</div>
+							<div class="d-flex gap-2">
+								<button type="submit" class="btn btn-success">Save</button>
+								<button type="button" class="btn btn-secondary" @onclick="CloseSubcatModal">Cancel</button>
+							</div>
+						</EditForm>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
 }
 
+<!-- Show loading, empty, or the list when not editing/creating -->
 @if (eventCategories == null)
 {
     <div class="alert alert-info">
@@ -189,9 +312,8 @@ else if (!eventCategories.Any())
         <em>No event categories found. Create your first event category above!</em>
     </div>
 }
-else
+else if (!showForm)
 {
-    <!-- Responsive Event Categories Card Layout -->
     <div class="row g-3">
         @foreach (var eventCat in eventCategories.OrderBy(et => et.DisplayOrder))
         {
@@ -222,20 +344,30 @@ else
                         <div class="mb-2">
                             <span class="text-muted">Events: @GetEventCount(eventCat.Id)</span>
                         </div>
+                        <div class="mb-1">
+                            <small class="text-muted">
+                                <strong>Permissions:</strong> @GetPermissionText(eventCat.EditingPermission)
+                            </small>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <strong>Coordinator:</strong> @GetCoordinatorRequirementText(eventCat.CoordinatorRequirement)
+                            </small>
+                        </div>
                     </div>
                     <div class="card-footer d-flex justify-content-end gap-2">
                         <div class="btn-group">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" title="Move Up" @onclick="() => MoveEventCategoryUp(eventCat.Id)" disabled="@(!CanMoveUp(eventCat) || isReordering)">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" title="Move Up" @onclick="async () => await MoveEventCategoryUp(eventCat.Id)" disabled="@(!CanMoveUp(eventCat) || isReordering)">
                                 <i class="bi bi-chevron-up"></i>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" title="Move Down" @onclick="() => MoveEventCategoryDown(eventCat.Id)" disabled="@(!CanMoveDown(eventCat) || isReordering)">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" title="Move Down" @onclick="async () => await MoveEventCategoryDown(eventCat.Id)" disabled="@(!CanMoveDown(eventCat) || isReordering)">
                                 <i class="bi bi-chevron-down"></i>
                             </button>
                         </div>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => EditEventCategory(eventCat)">
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="async () => await EditEventCategory(eventCat)">
                             <i class="bi bi-pencil"></i> Edit
                         </button>
-                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteEventCategory(eventCat.Id)">
+                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="async () => await DeleteEventCategory(eventCat.Id)">
                             <i class="bi bi-trash"></i> Delete
                         </button>
                     </div>
@@ -245,558 +377,518 @@ else
     </div>
 }
 
-<!-- Modal for editing sub-category -->
-@if (showSubcatModal)
-{
-    <div class="modal-backdrop show"></div>
-    <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.2);">
-        <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Sub-Category</h5>
-                    <button type="button" class="btn-close" @onclick="CloseSubcatModal"></button>
-                </div>
-                <div class="modal-body">
-                    <EditForm Model="editModel" OnValidSubmit="SaveEdit">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary />
-                        <div class="mb-3">
-                            <label class="form-label">Name</label>
-                            <input class="form-control" @bind="editModel.Name" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" @bind="editModel.Description" rows="2"></textarea>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Icon Class</label>
-                                    <input class="form-control" @bind="editModel.Icon" placeholder="bi-flag" />
-                                    <div class="form-text">Bootstrap Icons class</div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Color Class</label>
-                                    <select class="form-select" @bind="editModel.ColorClass">
-                                        <option value="">Default</option>
-                                        <option value="text-primary">Blue</option>
-                                        <option value="text-success">Green</option>
-                                        <option value="text-danger">Red</option>
-                                        <option value="text-warning">Yellow</option>
-                                        <option value="text-info">Cyan</option>
-                                        <option value="text-secondary">Gray</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="subcatActive" @bind="editModel.IsActive" />
-                            <label for="subcatActive" class="form-check-label">Active</label>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-success">Save</button>
-                            <button type="button" class="btn btn-secondary" @onclick="CloseSubcatModal">Cancel</button>
-                        </div>
-                    </EditForm>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
 @code {
-    private List<EventCatDto>? eventCategories;
-    private List<EventDto>? events;
-    private CreateEventCatDto editingEventCat = new();
-    private bool showForm = false;
-    private bool isSaving = false;
-    private bool isReordering = false;
-    private string errorMessage = string.Empty;
-    private string successMessage = string.Empty;
-    private List<EventCatSubDto>? subCategories;
-    private int? editingSubcatId = null;
-    private EventCatSubDto editModel = new();
-    private bool showSubcatModal = false;
+	private List<EventCatDto>? eventCategories;
+	private List<EventDto>? events;
+	private CreateEventCatDto editingEventCat = new();
+	private bool showForm = false;
+	private bool isSaving = false;
+	private bool isReordering = false;
+	private string errorMessage = string.Empty;
+	private string successMessage = string.Empty;
+	private List<EventCatSubDto>? subCategories;
+	private int? editingSubcatId = null;
+	private EventCatSubDto editModel = new();
+	private bool showSubcatModal = false;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadEventCategories();
-        await LoadEvents();
-    }
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadEventCategories();
+		await LoadEvents();
+	}
 
-    private async Task LoadEventCategories()
-    {
-        try
-        {
-            eventCategories = await Http.GetFromJsonAsync<List<EventCatDto>>("api/eventcat");
-        }
-        catch (Exception ex)
-        {
-            eventCategories = new List<EventCatDto>();
-            errorMessage = $"Error loading event categories: {ex.Message}";
-        }
-    }
+	private async Task LoadEventCategories()
+	{
+		try
+		{
+			eventCategories = await Http.GetFromJsonAsync<List<EventCatDto>>("api/eventcat");
+		}
+		catch (Exception ex)
+		{
+			eventCategories = new List<EventCatDto>();
+			errorMessage = $"Error loading event categories: {ex.Message}";
+		}
+	}
 
-    private async Task LoadEvents()
-    {
-        try
-        {
-            events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
-        }
-        catch (Exception)
-        {
-            events = new List<EventDto>();
-        }
-    }
+	private async Task LoadEvents()
+	{
+		try
+		{
+			events = await Http.GetFromJsonAsync<List<EventDto>>("api/events");
+		}
+		catch (Exception)
+		{
+			events = new List<EventDto>();
+		}
+	}
 
-    private bool CanMoveUp(EventCatDto eventCat)
-    {
-        if (eventCategories == null) return false;
-        return eventCategories.OrderBy(et => et.DisplayOrder).First().Id != eventCat.Id;
-    }
+	private bool CanMoveUp(EventCatDto eventCat)
+	{
+		if (eventCategories == null) return false;
+		return eventCategories.OrderBy(et => et.DisplayOrder).First().Id != eventCat.Id;
+	}
 
-    private bool CanMoveDown(EventCatDto eventCat)
-    {
-        if (eventCategories == null) return false;
-        return eventCategories.OrderBy(et => et.DisplayOrder).Last().Id != eventCat.Id;
-    }
+	private bool CanMoveDown(EventCatDto eventCat)
+	{
+		if (eventCategories == null) return false;
+		return eventCategories.OrderBy(et => et.DisplayOrder).Last().Id != eventCat.Id;
+	}
 
-    private async Task MoveEventCategoryUp(int id)
-    {
-        isReordering = true;
-        try
-        {
-            var response = await Http.PostAsync($"api/eventcat/{id}/move-up", null);
-            if (response.IsSuccessStatusCode)
-            {
-                await LoadEventCategories();
-                StateHasChanged();
-            }
-            else
-            {
-                errorMessage = "Failed to reorder event category.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error reordering event category: {ex.Message}";
-        }
-        finally
-        {
-            isReordering = false;
-        }
-    }
+	private async Task MoveEventCategoryUp(int id)
+	{
+		isReordering = true;
+		try
+		{
+			var response = await Http.PostAsync($"api/eventcat/{id}/move-up", null);
+			if (response.IsSuccessStatusCode)
+			{
+				await LoadEventCategories();
+				StateHasChanged();
+			}
+			else
+			{
+				errorMessage = "Failed to reorder event category.";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error reordering event category: {ex.Message}";
+		}
+		finally
+		{
+			isReordering = false;
+		}
+	}
 
-    private async Task MoveEventCategoryDown(int id)
-    {
-        isReordering = true;
-        try
-        {
-            var response = await Http.PostAsync($"api/eventcat/{id}/move-down", null);
-            if (response.IsSuccessStatusCode)
-            {
-                await LoadEventCategories();
-                StateHasChanged();
-            }
-            else
-            {
-                errorMessage = "Failed to reorder event category.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error reordering event category: {ex.Message}";
-        }
-        finally
-        {
-            isReordering = false;
-        }
-    }
+	private async Task MoveEventCategoryDown(int id)
+	{
+		isReordering = true;
+		try
+		{
+			var response = await Http.PostAsync($"api/eventcat/{id}/move-down", null);
+			if (response.IsSuccessStatusCode)
+			{
+				await LoadEventCategories();
+				StateHasChanged();
+			}
+			else
+			{
+				errorMessage = "Failed to reorder event category.";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error reordering event category: {ex.Message}";
+		}
+		finally
+		{
+			isReordering = false;
+		}
+	}
 
-    private void ShowCreateForm()
-    {
-        var nextOrder = eventCategories?.Any() == true ? eventCategories.Max(et => et.DisplayOrder) + 1 : 0;
-        editingEventCat = new CreateEventCatDto
-        {
-            DisplayOrder = nextOrder,
-            IsActive = true,
-            Size = 1
-        };
-        showForm = true;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-        subCategories = new List<EventCatSubDto>();
-    }
+	private void ShowCreateForm()
+	{
+		var nextOrder = eventCategories?.Any() == true ? eventCategories.Max(et => et.DisplayOrder) + 1 : 0;
+		editingEventCat = new CreateEventCatDto
+		{
+			DisplayOrder = nextOrder,
+			IsActive = true,
+			Size = 1,
+			EditingPermission = 1, // Default to Board Members & Admin
+			CoordinatorRequirement = 1 // Default to Optional
+		};
+		showForm = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+		subCategories = new List<EventCatSubDto>();
+	}
 
-    private async void EditEventCategory(EventCatDto eventCat)
-    {
-        editingEventCat = new CreateEventCatDto
-        {
-            Id = eventCat.Id,
-            Name = eventCat.Name,
-            Description = eventCat.Description,
-            DisplayOrder = eventCat.DisplayOrder,
-            IsActive = eventCat.IsActive,
-            Size = eventCat.Size,
-            Icon = eventCat.Icon,
-            ColorClass = eventCat.ColorClass,
-            Slug = eventCat.Slug
-        };
-        showForm = true;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-        _ = LoadSubCategories(eventCat.Id);
-        await JS.InvokeVoidAsync("scrollToEditForm");
-    }
+	private async Task EditEventCategory(EventCatDto eventCat)
+	{
+		editingEventCat = new CreateEventCatDto
+		{
+			Id = eventCat.Id,
+			Name = eventCat.Name,
+			Description = eventCat.Description,
+			DisplayOrder = eventCat.DisplayOrder,
+			IsActive = eventCat.IsActive,
+			Size = eventCat.Size,
+			Icon = eventCat.Icon,
+			ColorClass = eventCat.ColorClass,
+			Slug = eventCat.Slug,
+			EditingPermission = eventCat.EditingPermission,
+			CoordinatorRequirement = eventCat.CoordinatorRequirement
+		};
+		showForm = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+		await LoadSubCategories(eventCat.Id);
+	}
 
-    private void CancelForm()
-    {
-        showForm = false;
-        editingEventCat = new CreateEventCatDto();
-        subCategories = new List<EventCatSubDto>();
-    }
+	private async Task CancelForm()
+	{
+		showForm = false;
+		editingEventCat = new CreateEventCatDto();
+		subCategories = new List<EventCatSubDto>();
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+	}
 
-    private async Task SaveEventCategory()
-    {
-        isSaving = true;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-        try
-        {
-            HttpResponseMessage response;
-            if (editingEventCat.Id > 0)
-            {
-                response = await Http.PutAsJsonAsync($"api/eventcat/{editingEventCat.Id}", editingEventCat);
-                if (response.IsSuccessStatusCode)
-                {
-                    successMessage = "Event category updated successfully!";
-                }
-            }
-            else
-            {
-                response = await Http.PostAsJsonAsync("api/eventcat", editingEventCat);
-                if (response.IsSuccessStatusCode)
-                {
-                    successMessage = "Event category created successfully!";
-                }
-            }
-            if (response.IsSuccessStatusCode)
-            {
-                showForm = false;
-                await LoadEventCategories();
-                editingEventCat = new CreateEventCatDto();
-                subCategories = new List<EventCatSubDto>();
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                errorMessage = $"Error saving event category: {error}";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error saving event category: {ex.Message}";
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
+	private async Task SaveEventCategory()
+	{
+		isSaving = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+		try
+		{
+			HttpResponseMessage response;
+			if (editingEventCat.Id > 0)
+			{
+				response = await Http.PutAsJsonAsync($"api/eventcat/{editingEventCat.Id}", editingEventCat);
+				if (response.IsSuccessStatusCode)
+				{
+					successMessage = "Event category updated successfully!";
+				}
+			}
+			else
+			{
+				response = await Http.PostAsJsonAsync("api/eventcat", editingEventCat);
+				if (response.IsSuccessStatusCode)
+				{
+					successMessage = "Event category created successfully!";
+				}
+			}
+			if (response.IsSuccessStatusCode)
+			{
+				showForm = false;
+				await LoadEventCategories();
+				editingEventCat = new CreateEventCatDto();
+				subCategories = new List<EventCatSubDto>();
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				errorMessage = $"Error saving event category: {error}";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error saving event category: {ex.Message}";
+		}
+		finally
+		{
+			isSaving = false;
+		}
+	}
 
-    private async Task DeleteEventCategory(int id)
-    {
-        if (!await ConfirmDelete()) return;
-        try
-        {
-            var response = await Http.DeleteAsync($"api/eventcat/{id}");
-            if (response.IsSuccessStatusCode)
-            {
-                successMessage = "Event category deleted successfully!";
-                await LoadEventCategories();
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                errorMessage = $"Error deleting event category: {error}";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error deleting event category: {ex.Message}";
-        }
-    }
+	private async Task DeleteEventCategory(int id)
+	{
+		try
+		{
+			var response = await Http.DeleteAsync($"api/eventcat/{id}");
+			if (response.IsSuccessStatusCode)
+			{
+				successMessage = "Event category deleted successfully!";
+				await LoadEventCategories();
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				errorMessage = $"Error deleting event category: {error}";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error deleting event category: {ex.Message}";
+		}
+	}
 
-    private async Task<bool> ConfirmDelete()
-    {
-        return await Task.FromResult(true);
-    }
+	private int GetEventCount(int eventCatId)
+	{
+		return events?.Count(e => e.EventCat?.Id == eventCatId) ?? 0;
+	}
 
-    private int GetEventCount(int eventCatId)
-    {
-        return events?.Count(e => e.EventCat?.Id == eventCatId) ?? 0;
-    }
+	private string TruncateText(string text, int maxLength)
+	{
+		if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+			return text;
+		return text.Substring(0, maxLength - 3) + "...";
+	}
 
-    private string TruncateText(string text, int maxLength)
-    {
-        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
-            return text;
-        return text.Substring(0, maxLength - 3) + "...";
-    }
+	private string GetPermissionText(int permission)
+	{
+		return permission switch
+		{
+			0 => "Admin Only",
+			1 => "Board Members & Admin",
+			2 => "Event Coordinators & Above",
+			3 => "All Users",
+			_ => "Unknown"
+		};
+	}
 
-    private void GenerateSlugFromName()
-    {
-        if (!string.IsNullOrEmpty(editingEventCat.Name) && string.IsNullOrEmpty(editingEventCat.Slug))
-        {
-            editingEventCat.Slug = GenerateSlug(editingEventCat.Name);
-        }
-    }
+	private string GetCoordinatorRequirementText(int requirement)
+	{
+		return requirement switch
+		{
+			0 => "Not Needed",
+			1 => "Optional",
+			2 => "Required",
+			_ => "Unknown"
+		};
+	}
 
-    private string GenerateSlug(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-            return string.Empty;
-        return name.ToLowerInvariant()
-                   .Replace(" ", "-")
-                   .Replace("&", "and")
-                   .Replace("/", "-")
-                   .Replace("'", "")
-                   .Replace("\"", "")
-                   .Where(c => char.IsLetterOrDigit(c) || c == '-')
-                   .Aggregate("", (current, c) => current + c);
-    }
+	private void GenerateSlugFromName()
+	{
+		if (!string.IsNullOrEmpty(editingEventCat.Name) && string.IsNullOrEmpty(editingEventCat.Slug))
+		{
+			editingEventCat.Slug = GenerateSlug(editingEventCat.Name);
+		}
+	}
 
-    private async Task LoadSubCategories(int eventCatId)
-    {
-        try
-        {
-            subCategories = await Http.GetFromJsonAsync<List<EventCatSubDto>>($"api/eventcatsub?eventCatId={eventCatId}");
-        }
-        catch
-        {
-            subCategories = new List<EventCatSubDto>();
-        }
-        StateHasChanged();
-    }
+	private string GenerateSlug(string name)
+	{
+		if (string.IsNullOrEmpty(name))
+			return string.Empty;
+		return name.ToLowerInvariant()
+				   .Replace(" ", "-")
+				   .Replace("&", "and")
+				   .Replace("/", "-")
+				   .Replace("'", "")
+				   .Replace("\"", "")
+				   .Where(c => char.IsLetterOrDigit(c) || c == '-')
+				   .Aggregate("", (current, c) => current + c);
+	}
 
-    private async Task SaveSubCategory(EventCatSubDto subCat)
-    {
-        if (subCat.Id > 0)
-        {
-            await Http.PutAsJsonAsync($"api/eventcatsub/{subCat.Id}", subCat);
-        }
-        else
-        {
-            await Http.PostAsJsonAsync("api/eventcatsub", subCat);
-        }
-    await LoadSubCategories(subCat.EventCatId);
-    }
+	private async Task LoadSubCategories(int eventCatId)
+	{
+		try
+		{
+			subCategories = await Http.GetFromJsonAsync<List<EventCatSubDto>>($"api/eventcatsub?eventCatId={eventCatId}");
+		}
+		catch
+		{
+			subCategories = new List<EventCatSubDto>();
+		}
+		StateHasChanged();
+	}
 
-    private async Task DeleteSubCategory(int subCatId)
-    {
-        await Http.DeleteAsync($"api/eventcatsub/{subCatId}");
-        if (editingEventCat.Id > 0)
-            await LoadSubCategories(editingEventCat.Id);
-    }
+	private async Task SaveSubCategory(EventCatSubDto subCat)
+	{
+		if (subCat.Id > 0)
+		{
+			await Http.PutAsJsonAsync($"api/eventcatsub/{subCat.Id}", subCat);
+		}
+		else
+		{
+			await Http.PostAsJsonAsync("api/eventcatsub", subCat);
+		}
+		await LoadSubCategories(subCat.EventCatId);
+	}
 
-    private void AddSubCategory(int eventCatId)
-    {
-        if (subCategories == null) subCategories = new List<EventCatSubDto>();
-    subCategories.Add(new EventCatSubDto { EventCatId = eventCatId, Name = "", DisplayOrder = subCategories.Count + 1, IsActive = true });
-    }
+	private async Task DeleteSubCategory(int subCatId)
+	{
+		await Http.DeleteAsync($"api/eventcatsub/{subCatId}");
+		if (editingEventCat.Id > 0)
+			await LoadSubCategories(editingEventCat.Id);
+	}
 
-    private void EditSubcat(EventCatSubDto subcat)
-    {
-        editingSubcatId = subcat.Id;
-        editModel = new EventCatSubDto
-        {
-            Id = subcat.Id,
-            EventCatId = subcat.EventCatId,
-            Name = subcat.Name,
-            Description = subcat.Description,
-            DisplayOrder = subcat.DisplayOrder,
-            IsActive = subcat.IsActive,
-            Icon = subcat.Icon ?? string.Empty,
-            ColorClass = subcat.ColorClass ?? string.Empty
-        };
-        showSubcatModal = true;
-    }
+	private void AddSubCategory(int eventCatId)
+	{
+		if (subCategories == null) subCategories = new List<EventCatSubDto>();
+		subCategories.Add(new EventCatSubDto { EventCatId = eventCatId, Name = "", DisplayOrder = subCategories.Count + 1, IsActive = true });
+	}
 
-    private void CloseSubcatModal()
-    {
-        showSubcatModal = false;
-    }
+	private void EditSubcat(EventCatSubDto subcat)
+	{
+		editingSubcatId = subcat.Id;
+		editModel = new EventCatSubDto
+		{
+			Id = subcat.Id,
+			EventCatId = subcat.EventCatId,
+			Name = subcat.Name,
+			Description = subcat.Description,
+			DisplayOrder = subcat.DisplayOrder,
+			IsActive = subcat.IsActive,
+			Icon = subcat.Icon ?? string.Empty,
+			ColorClass = subcat.ColorClass ?? string.Empty
+		};
+		showSubcatModal = true;
+	}
 
-    private async Task SaveEdit()
-    {
-        try
-        {
-            // Create the EventCatSubCreateDTO to match what the controller expects
-            var dto = new EventCatSubCreateDTO
-            {
-                EventCatId = editModel.EventCatId,
-                Name = editModel.Name,
-                Description = editModel.Description,
-                DisplayOrder = editModel.DisplayOrder,
-                IsActive = editModel.IsActive,
-                Icon = editModel.Icon ?? string.Empty,
-                ColorClass = editModel.ColorClass ?? string.Empty
-            };
+	private void CloseSubcatModal()
+	{
+		showSubcatModal = false;
+	}
 
-            HttpResponseMessage response;
-            if (editModel.Id > 0)
-            {
-                response = await Http.PutAsJsonAsync($"api/eventcatsub/{editModel.Id}", dto);
-            }
-            else
-            {
-                response = await Http.PostAsJsonAsync("api/eventcatsub", dto);
-            }
+	private async Task SaveEdit()
+	{
+		try
+		{
+			var dto = new EventCatSubCreateDTO
+			{
+				EventCatId = editModel.EventCatId,
+				Name = editModel.Name,
+				Description = editModel.Description,
+				DisplayOrder = editModel.DisplayOrder,
+				IsActive = editModel.IsActive,
+				Icon = editModel.Icon ?? string.Empty,
+				ColorClass = editModel.ColorClass ?? string.Empty
+			};
 
-            if (response.IsSuccessStatusCode)
-            {
-                successMessage = "Sub-category saved successfully!";
-                editingSubcatId = null;
-                showSubcatModal = false;
-                await LoadSubCategories(editModel.EventCatId);
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                errorMessage = $"Error saving sub-category: {error}";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error saving sub-category: {ex.Message}";
-        }
-    }
+			HttpResponseMessage response;
+			if (editModel.Id > 0)
+			{
+				response = await Http.PutAsJsonAsync($"api/eventcatsub/{editModel.Id}", dto);
+			}
+			else
+			{
+				response = await Http.PostAsJsonAsync("api/eventcatsub", dto);
+			}
 
-    private async Task DeleteSubcat(int id)
-    {
-        await Http.DeleteAsync($"api/eventcatsub/{id}");
-        editingSubcatId = null;
-        if (editingEventCat.Id > 0)
-            await LoadSubCategories(editingEventCat.Id);
-    }
+			if (response.IsSuccessStatusCode)
+			{
+				successMessage = "Sub-category saved successfully!";
+				editingSubcatId = null;
+				showSubcatModal = false;
+				await LoadSubCategories(editModel.EventCatId);
+			}
+			else
+			{
+				var error = await response.Content.ReadAsStringAsync();
+				errorMessage = $"Error saving sub-category: {error}";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error saving sub-category: {ex.Message}";
+		}
+	}
 
-    private async Task MoveUp(int id)
-    {
-        try
-        {
-            var response = await Http.PostAsync($"api/eventcatsub/{id}/move-up", null);
-            if (response.IsSuccessStatusCode)
-            {
-                if (editingEventCat.Id > 0)
-                    await LoadSubCategories(editingEventCat.Id);
-                StateHasChanged();
-            }
-            else
-            {
-                errorMessage = "Failed to reorder sub-category.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error reordering sub-category: {ex.Message}";
-        }
-    }
+	private async Task DeleteSubcat(int id)
+	{
+		await Http.DeleteAsync($"api/eventcatsub/{id}");
+		editingSubcatId = null;
+		if (editingEventCat.Id > 0)
+			await LoadSubCategories(editingEventCat.Id);
+	}
 
-    private async Task MoveDown(int id)
-    {
-        try
-        {
-            var response = await Http.PostAsync($"api/eventcatsub/{id}/move-down", null);
-            if (response.IsSuccessStatusCode)
-            {
-                if (editingEventCat.Id > 0)
-                    await LoadSubCategories(editingEventCat.Id);
-                StateHasChanged();
-            }
-            else
-            {
-                errorMessage = "Failed to reorder sub-category.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error reordering sub-category: {ex.Message}";
-        }
-    }
+	private async Task MoveUp(int id)
+	{
+		try
+		{
+			var response = await Http.PostAsync($"api/eventcatsub/{id}/move-up", null);
+			if (response.IsSuccessStatusCode)
+			{
+				if (editingEventCat.Id > 0)
+					await LoadSubCategories(editingEventCat.Id);
+				StateHasChanged();
+			}
+			else
+			{
+				errorMessage = "Failed to reorder sub-category.";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error reordering sub-category: {ex.Message}";
+		}
+	}
 
-    private bool CanSubCatMoveUp(EventCatSubDto subCat)
-    {
-        if (subCategories == null || !subCategories.Any()) return false;
-        return subCategories.OrderBy(sc => sc.DisplayOrder).First().Id != subCat.Id;
-    }
+	private async Task MoveDown(int id)
+	{
+		try
+		{
+			var response = await Http.PostAsync($"api/eventcatsub/{id}/move-down", null);
+			if (response.IsSuccessStatusCode)
+			{
+				if (editingEventCat.Id > 0)
+					await LoadSubCategories(editingEventCat.Id);
+				StateHasChanged();
+			}
+			else
+			{
+				errorMessage = "Failed to reorder sub-category.";
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Error reordering sub-category: {ex.Message}";
+		}
+	}
 
-    private bool CanSubCatMoveDown(EventCatSubDto subCat)
-    {
-        if (subCategories == null || !subCategories.Any()) return false;
-        return subCategories.OrderBy(sc => sc.DisplayOrder).Last().Id != subCat.Id;
-    }
+	private bool CanSubCatMoveUp(EventCatSubDto subCat)
+	{
+		if (subCategories == null || !subCategories.Any()) return false;
+		return subCategories.OrderBy(sc => sc.DisplayOrder).First().Id != subCat.Id;
+	}
 
-    public class EventCatDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Slug { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int DisplayOrder { get; set; }
-        public bool IsActive { get; set; }
-        public int Size { get; set; }
-        public string Icon { get; set; } = string.Empty;
-        public string ColorClass { get; set; } = string.Empty;
-    }
-    public class EventDto
-    {
-        public int Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public EventCatDto? EventCat { get; set; }
-    }
-    public class CreateEventCatDto
-    {
-        public int Id { get; set; }
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required")]
-        public string Name { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Slug is required")]
-        public string Slug { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
-        public string Description { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
-        public int DisplayOrder { get; set; } = 0;
-        public bool IsActive { get; set; } = true;
-        [System.ComponentModel.DataAnnotations.Range(0, 1, ErrorMessage = "Size must be Half (0) or Full (1)")]
-        public int Size { get; set; } = 1;
-        [System.ComponentModel.DataAnnotations.StringLength(50, ErrorMessage = "Icon class cannot be longer than 50 characters")]
-        public string Icon { get; set; } = string.Empty;
-        [System.ComponentModel.DataAnnotations.StringLength(30, ErrorMessage = "Color class cannot be longer than 30 characters")]
-        public string ColorClass { get; set; } = string.Empty;
+	private bool CanSubCatMoveDown(EventCatSubDto subCat)
+	{
+		if (subCategories == null || !subCategories.Any()) return false;
+		return subCategories.OrderBy(sc => sc.DisplayOrder).Last().Id != subCat.Id;
+	}
 
-    }
-    public class EventCatSubDto
-    {
-        public int Id { get; set; }
-        public int EventCatId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int DisplayOrder { get; set; } = 0;
-        public bool IsActive { get; set; } = true;
-        public string Icon { get; set; } = string.Empty;
-        public string ColorClass { get; set; } = string.Empty;
-    }
-
-    public class EventCatSubCreateDTO
-    {
-        public int EventCatId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public int DisplayOrder { get; set; }
-        public bool IsActive { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public string Icon { get; set; } = string.Empty;
-        public string ColorClass { get; set; } = string.Empty;
-    }
+	public class EventCatDto
+	{
+		public int Id { get; set; }
+		public string Name { get; set; } = string.Empty;
+		public string Slug { get; set; } = string.Empty;
+		public string Description { get; set; } = string.Empty;
+		public int DisplayOrder { get; set; }
+		public bool IsActive { get; set; }
+		public int Size { get; set; }
+		public string Icon { get; set; } = string.Empty;
+		public string ColorClass { get; set; } = string.Empty;
+		public int EditingPermission { get; set; } = 1;
+		public int CoordinatorRequirement { get; set; } = 1;
+	}
+	public class EventDto
+	{
+		public int Id { get; set; }
+		public string Title { get; set; } = string.Empty;
+		public EventCatDto? EventCat { get; set; }
+	}
+	public class CreateEventCatDto
+	{
+		public int Id { get; set; }
+		[System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required")]
+		public string Name { get; set; } = string.Empty;
+		[System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Slug is required")]
+		public string Slug { get; set; } = string.Empty;
+		[System.ComponentModel.DataAnnotations.StringLength(500, ErrorMessage = "Description cannot be longer than 500 characters")]
+		public string Description { get; set; } = string.Empty;
+		[System.ComponentModel.DataAnnotations.Range(0, 999, ErrorMessage = "Display order must be between 0 and 999")]
+		public int DisplayOrder { get; set; } = 0;
+		public bool IsActive { get; set; } = true;
+		[System.ComponentModel.DataAnnotations.Range(0, 1, ErrorMessage = "Size must be Half (0) or Full (1)")]
+		public int Size { get; set; } = 1;
+		[System.ComponentModel.DataAnnotations.StringLength(50, ErrorMessage = "Icon class cannot be longer than 50 characters")]
+		public string Icon { get; set; } = string.Empty;
+		[System.ComponentModel.DataAnnotations.StringLength(30, ErrorMessage = "Color class cannot be longer than 30 characters")]
+		public string ColorClass { get; set; } = string.Empty;
+		public int EditingPermission { get; set; } = 1;
+		public int CoordinatorRequirement { get; set; } = 1;
+	}
+	public class EventCatSubDto
+	{
+		public int Id { get; set; }
+		public int EventCatId { get; set; }
+		public string Name { get; set; } = string.Empty;
+		public string Description { get; set; } = string.Empty;
+		public int DisplayOrder { get; set; } = 0;
+		public bool IsActive { get; set; } = true;
+		public string Icon { get; set; } = string.Empty;
+		public string ColorClass { get; set; } = string.Empty;
+	}
+	public class EventCatSubCreateDTO
+	{
+		public int EventCatId { get; set; }
+		public string Name { get; set; } = string.Empty;
+		public int DisplayOrder { get; set; }
+		public bool IsActive { get; set; }
+		public string Description { get; set; } = string.Empty;
+		public string Icon { get; set; } = string.Empty;
+		public string ColorClass { get; set; } = string.Empty;
+	}
 }
-
-<script src="js/scrollToEditForm.js"></script>
