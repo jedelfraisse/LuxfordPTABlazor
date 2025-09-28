@@ -3,6 +3,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
 
 <PageTitle>New Event</PageTitle>
@@ -40,7 +41,7 @@
         <em>Loading...</em>
     </div>
 }
-else if (eventModel != null)
+else if (createEventDto != null)
 {
     <div class="row">
         <div class="col-lg-8">
@@ -53,11 +54,11 @@ else if (eventModel != null)
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <label for="title" class="form-label">Event Title *</label>
-                            <input type="text" class="form-control" id="title" @bind="eventModel.Title" />
+                            <input type="text" class="form-control" id="title" @bind="createEventDto.Title" required />
                         </div>
                         <div class="col-md-4">
                             <label for="status" class="form-label">Status</label>
-                            <select class="form-select" id="status" @bind="eventModel.Status">
+                            <select class="form-select" id="status" @bind="createEventDto.Status">
                                 <option value="@EventStatus.Planning">Planning</option>
                                 <option value="@EventStatus.SubmittedForApproval">Submit for Approval</option>
                                 <option value="@EventStatus.Active">Active</option>
@@ -70,13 +71,13 @@ else if (eventModel != null)
 
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" rows="4" @bind="eventModel.Description"></textarea>
+                        <textarea class="form-control" id="description" rows="4" @bind="createEventDto.Description"></textarea>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="schoolYear" class="form-label">School Year *</label>
-                            <select class="form-select" id="schoolYear" @bind="eventModel.SchoolYearId">
+                            <select class="form-select" id="schoolYear" @bind="createEventDto.SchoolYearId" required>
                                 <option value="0">Select School Year</option>
                                 @if (schoolYears != null)
                                 {
@@ -89,7 +90,7 @@ else if (eventModel != null)
                         </div>
                         <div class="col-md-6">
                             <label for="eventCategory" class="form-label">Event Category *</label>
-                            <select class="form-select" id="eventCategory" @bind="eventModel.EventCatId" @bind:after="OnCategoryChanged">
+                            <select class="form-select" id="eventCategory" @bind="createEventDto.EventCatId" @bind:after="OnCategoryChanged" required>
                                 <option value="0">Select Category</option>
                                 @if (eventCategories != null)
                                 {
@@ -104,11 +105,11 @@ else if (eventModel != null)
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="eventSubCategory" class="form-label">Event Sub-Category</label>
-                            <select class="form-select" id="eventSubCategory" @bind="eventModel.EventSubTypeId">
-                                <option value="">Select Sub-Category</option>
+                            <select class="form-select" id="eventSubCategory" @bind="eventSubCategoryId">
+                                <option value="0">Select Sub-Category</option>
                                 @if (eventSubcategories != null)
                                 {
-                                    @foreach (var subcat in eventSubcategories.Where(sc => sc.EventCatId == eventModel.EventCatId && sc.IsActive).OrderBy(sc => sc.DisplayOrder))
+                                    @foreach (var subcat in eventSubcategories.Where(sc => sc.EventCatId == createEventDto.EventCatId && sc.IsActive).OrderBy(sc => sc.DisplayOrder))
                                     {
                                         <option value="@subcat.Id">@subcat.Name</option>
                                     }
@@ -117,18 +118,65 @@ else if (eventModel != null)
                         </div>
                         <div class="col-md-6">
                             <label for="location" class="form-label">Location</label>
-                            <input type="text" class="form-control" id="location" @bind="eventModel.Location" />
+                            <input type="text" class="form-control" id="location" @bind="createEventDto.Location" />
                         </div>
                     </div>
+                    
+                    <!-- Day 1 Information (Primary Event Day) -->
+                    <div class="card border-primary mb-3">
+                        <div class="card-header bg-primary text-white py-2">
+                            <h6 class="mb-0"><i class="bi bi-calendar-date"></i> Primary Event Day</h6>
+                        </div>
+                        <div class="card-body py-3">
+                            <div class="row mb-2">
+                                <div class="col-md-6">
+                                    <label for="eventDate" class="form-label">Event Date *</label>
+                                    <input type="date" class="form-control" id="eventDate" @bind="primaryDay.Date" @bind:format="yyyy-MM-dd" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="dayTitle" class="form-label">Day Title (optional)</label>
+                                    <input type="text" class="form-control" id="dayTitle" @bind="primaryDay.DayTitle" placeholder="e.g., 'Opening Day', 'Main Event'" />
+                                </div>
+                            </div>
+                            
+                            <!-- Time Range Section -->
+                            <div class="mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="allDayPrimary" checked="@primaryDayIsAllDay" @onchange="@(e => OnPrimaryDayAllDayChanged((bool?)e.Value ?? false))" />
+                                    <label class="form-check-label" for="allDayPrimary">All Day Event</label>
+                                </div>
+                            </div>
+                            
+                            @if (!primaryDayIsAllDay)
+                            {
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <label for="startTime" class="form-label">Start Time</label>
+                                        <input type="time" class="form-control" id="startTime" value="@primaryDayStartTime" @onchange="@(e => UpdatePrimaryStartTimeFromInput(e.Value?.ToString()))" />
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="endTime" class="form-label">End Time</label>
+                                        <input type="time" class="form-control" id="endTime" value="@primaryDayEndTime" @onchange="@(e => UpdatePrimaryEndTimeFromInput(e.Value?.ToString()))" />
+                                    </div>
+                                </div>
+                            }
+                            
+                            <div class="mb-2">
+                                <label for="dayDescription" class="form-label">Day-Specific Description (optional)</label>
+                                <textarea class="form-control" id="dayDescription" rows="2" @bind="primaryDay.Description" placeholder="Specific activities or details for this day"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
+                        <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="createEventDto.RequiresVolunteers">
                         <label class="form-check-label" for="requiresVolunteers">
                             Requires Volunteers
                         </label>
                     </div>
-                    @if (eventModel.RequiresVolunteers)
+                    @if (createEventDto.RequiresVolunteers)
                     {
-                        <div class="card mb-4 border-primary">
+                        <div class="card mb-4 border-warning">
                             <div class="card-header">
                                 <strong><i class="bi bi-people"></i> Volunteer Details</strong>
                             </div>
@@ -154,25 +202,25 @@ else if (eventModel != null)
                 </div>
             </div>
 
-            <!-- Event Days Management (always shown) -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Event Days</h5>
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddDay">
-                        <i class="bi bi-plus"></i> Add Day
-                    </button>
-                </div>
-                <div class="card-body">
-                    @if (eventDays.Any())
-                    {
+            <!-- Additional Event Days (only show if there are additional days) -->
+            @if (additionalDays.Any())
+            {
+                <div class="card mb-4 border-info">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Additional Event Days <span class="badge bg-info ms-2">Multi-Day Event</span></h5>
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAdditionalDay">
+                            <i class="bi bi-plus"></i> Add Another Day
+                        </button>
+                    </div>
+                    <div class="card-body">
                         <div class="row">
-                            @foreach (var day in eventDays.OrderBy(d => d.DayNumber))
+                            @foreach (var day in additionalDays.OrderBy(d => d.DayNumber))
                             {
                                 <div class="col-md-6 mb-3">
-                                    <div class="card border-left-primary">
+                                    <div class="card border-info">
                                         <div class="card-header d-flex justify-content-between align-items-center py-2">
                                             <small class="text-muted">Day @day.DayNumber</small>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveDay(day)">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveAdditionalDay(day)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -183,12 +231,35 @@ else if (eventModel != null)
                                             </div>
                                             <div class="mb-2">
                                                 <label class="form-label small">Date *</label>
-                                                <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" />
+                                                <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" required />
                                             </div>
                                             <div class="mb-2">
                                                 <label class="form-label small">Location (optional)</label>
                                                 <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
                                             </div>
+                                            
+                                            <!-- Time Range Section -->
+                                            <div class="mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" checked="@GetIsAllDay(day)" @onchange="@(e => OnAllDayChanged(day, (bool?)e.Value ?? false))" />
+                                                    <label class="form-check-label small">All Day Event</label>
+                                                </div>
+                                            </div>
+                                            
+                                            @if (!GetIsAllDay(day))
+                                            {
+                                                <div class="row mb-2">
+                                                    <div class="col-6">
+                                                        <label for="startTime" class="form-label small">Start Time</label>
+                                                        <input type="time" class="form-control form-control-sm" value="@GetStartTimeString(day)" @onchange="@(e => UpdateStartTimeFromInput(day, e.Value?.ToString()))" />
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label for="endTime" class="form-label small">End Time</label>
+                                                        <input type="time" class="form-control form-control-sm" value="@GetEndTimeString(day)" @onchange="@(e => UpdateEndTimeFromInput(day, e.Value?.ToString()))" />
+                                                    </div>
+                                                </div>
+                                            }
+                                            
                                             <div class="mb-2">
                                                 <label class="form-label small">Description</label>
                                                 <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
@@ -202,15 +273,22 @@ else if (eventModel != null)
                                 </div>
                             }
                         </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> No days added yet. Click "Add Day" to create the first day of your event.
-                        </div>
-                    }
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <!-- Multi-Day Option -->
+                <div class="card mb-4 border-info">
+                    <div class="card-body text-center py-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> Is this a multi-day event?</h6>
+                        <button type="button" class="btn btn-outline-info" @onclick="AddAdditionalDay">
+                            <i class="bi bi-plus-circle"></i> Add Additional Days
+                        </button>
+                        <p class="text-muted small mt-2">Perfect for events like Fire Prevention Week, Book Fair, Spirit Week, etc.</p>
+                    </div>
+                </div>
+            }
         </div>
 
         <!-- Action Panel -->
@@ -236,24 +314,37 @@ else if (eventModel != null)
                     <hr />
                     <h6>Event Summary</h6>
                     <ul class="list-unstyled small">
-                        <li><strong>Days:</strong> @eventDays.Count</li>
+                        <li><strong>Total Days:</strong> @(1 + additionalDays.Count)</li>
                         <li><strong>Date Range:</strong> 
-                            @if (eventDays.Count > 1 && eventDays.Any())
-                            {
-                                var startDate = eventDays.Min(d => d.Date);
-                                var endDate = eventDays.Max(d => d.Date);
-                                <span>@startDate.ToString("MMM d") - @endDate.ToString("MMM d, yyyy")</span>
-                            }
-                            else if (eventDays.Any())
-                            {
-                                <span>@eventDays.First().Date.ToString("MMM d, yyyy")</span>
-                            }
-                            else
-                            {
-                                <span>@eventModel.Date.ToString("MMM d, yyyy")</span>
+                            @{
+                                var allEventDays = new List<EventDay> { primaryDay };
+                                allEventDays.AddRange(additionalDays);
+                                
+                                if (allEventDays.Count > 1 && allEventDays.Any())
+                                {
+                                    var startDate = allEventDays.Min(d => d.Date);
+                                    var endDate = allEventDays.Max(d => d.Date);
+                                    <span>@startDate.ToString("MMM d") - @endDate.ToString("MMM d, yyyy")</span>
+                                }
+                                else if (primaryDay.Date != DateTime.MinValue)
+                                {
+                                    <span>@primaryDay.Date.ToString("MMM d, yyyy")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Not set</span>
+                                }
                             }
                         </li>
-                        <li><strong>Status:</strong> <span class="badge bg-secondary">@eventModel.Status</span></li>
+                        <li><strong>Status:</strong> <span class="badge bg-secondary">@createEventDto.Status</span></li>
+                        @if (primaryDayIsAllDay && additionalDays.All(d => GetIsAllDay(d)))
+                        {
+                            <li><strong>Time:</strong> <span class="text-muted">All Day</span></li>
+                        }
+                        else if (!primaryDayIsAllDay)
+                        {
+                            <li><strong>Primary Day Time:</strong> @primaryDayStartTime - @primaryDayEndTime</li>
+                        }
                     </ul>
                 </div>
             </div>
@@ -264,8 +355,9 @@ else if (eventModel != null)
 @code {
     private int volunteerSpots = 0;
     private string signUpGeniusLink = string.Empty;
-    private Event? eventModel;
-    private List<EventDay> eventDays = new();
+    private CreateEventDTO? createEventDto;
+    private EventDay primaryDay = new();
+    private List<EventDay> additionalDays = new();
     private List<SchoolYear>? schoolYears;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
@@ -273,24 +365,39 @@ else if (eventModel != null)
     private bool isSaving = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
+    private int eventSubCategoryId = 0;
+    
+    // Primary day time tracking
+    private bool primaryDayIsAllDay = true;
+    private string primaryDayStartTime = "09:00";
+    private string primaryDayEndTime = "15:00";
+    
+    // Additional days time tracking
+    private Dictionary<int, string> dayStartTimes = new();
+    private Dictionary<int, string> dayEndTimes = new();
+    private Dictionary<int, bool> dayIsAllDay = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDropdownData();
 
-        // Read query parameters for schoolYearId and eventCatId
+        // Read query parameters for schoolYearId, eventCatId, and eventSubCatId
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
         int schoolYearId = 0;
         int eventCatId = 0;
+        int eventSubCatId = 0;
         if (query.TryGetValue("schoolYearId", out var syVal))
             int.TryParse(syVal, out schoolYearId);
         if (query.TryGetValue("eventCatId", out var catVal))
             int.TryParse(catVal, out eventCatId);
+        if (query.TryGetValue("eventSubCatId", out var subCatVal))
+            int.TryParse(subCatVal, out eventSubCatId);
 
-        InitializeNewEvent(schoolYearId, eventCatId);
+        InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId);
         isLoading = false;
     }
+    
     private async Task LoadDropdownData()
     {
         try
@@ -304,9 +411,10 @@ else if (eventModel != null)
             errorMessage = $"Error loading data: {ex.Message}";
         }
     }
-    private void InitializeNewEvent(int schoolYearId = 0, int eventCatId = 0)
+    
+    private void InitializeNewEvent(int schoolYearId = 0, int eventCatId = 0, int eventSubCatId = 0)
     {
-        eventModel = new Event
+        createEventDto = new CreateEventDTO
         {
             Title = "",
             Description = "",
@@ -321,14 +429,39 @@ else if (eventModel != null)
             SchoolYearId = schoolYearId > 0 ? schoolYearId : 0,
             EventCatId = eventCatId > 0 ? eventCatId : 0
         };
-        eventDays.Clear();
+        
+        // Set the eventSubCategoryId from query parameter
+        eventSubCategoryId = eventSubCatId > 0 ? eventSubCatId : 0;
+        
+        // Initialize primary day
+        primaryDay = new EventDay
+        {
+            DayNumber = 1,
+            Date = DateTime.Today.AddDays(7),
+            DayTitle = "",
+            Description = "",
+            Location = "",
+            IsActive = true,
+            EventId = 0
+        };
+        
+        // Reset additional days and tracking
+        additionalDays.Clear();
+        dayStartTimes.Clear();
+        dayEndTimes.Clear();
+        dayIsAllDay.Clear();
+        
+        // Initialize primary day time tracking
+        primaryDayIsAllDay = true;
+        primaryDayStartTime = "09:00";
+        primaryDayEndTime = "15:00";
     }
 
-    private void AddDay()
+    private void AddAdditionalDay()
     {
-        var nextDayNumber = eventDays.Any() ? eventDays.Max(d => d.DayNumber) + 1 : 1;
-        var lastDate = eventDays.Any() ? eventDays.Max(d => d.Date) : DateTime.Today.AddDays(7);
-        eventDays.Add(new EventDay
+        var nextDayNumber = additionalDays.Any() ? additionalDays.Max(d => d.DayNumber) + 1 : 2; // Start from 2 since primary is 1
+        var lastDate = additionalDays.Any() ? additionalDays.Max(d => d.Date) : primaryDay.Date;
+        var newDay = new EventDay
         {
             DayNumber = nextDayNumber,
             Date = lastDate.AddDays(1),
@@ -336,17 +469,159 @@ else if (eventModel != null)
             Description = "",
             Location = "",
             IsActive = true,
-            EventId = eventModel?.Id ?? 0
-        });
+            EventId = 0
+        };
+        
+        additionalDays.Add(newDay);
+        
+        // Initialize as all-day by default
+        dayIsAllDay[newDay.DayNumber] = true;
+        dayStartTimes[newDay.DayNumber] = "09:00";
+        dayEndTimes[newDay.DayNumber] = "15:00";
     }
 
-    private void RemoveDay(EventDay day)
+    private void RemoveAdditionalDay(EventDay day)
     {
-        eventDays.Remove(day);
-        // Renumber remaining days
-        for (int i = 0; i < eventDays.Count; i++)
+        additionalDays.Remove(day);
+        dayIsAllDay.Remove(day.DayNumber);
+        dayStartTimes.Remove(day.DayNumber);
+        dayEndTimes.Remove(day.DayNumber);
+        
+        // Renumber remaining additional days (keeping primary as day 1)
+        var orderedDays = additionalDays.OrderBy(d => d.Date).ToList();
+        additionalDays.Clear();
+        dayIsAllDay.Clear();
+        dayStartTimes.Clear();
+        dayEndTimes.Clear();
+        
+        for (int i = 0; i < orderedDays.Count; i++)
         {
-            eventDays[i].DayNumber = i + 1;
+            orderedDays[i].DayNumber = i + 2; // Start from 2 since primary is 1
+            additionalDays.Add(orderedDays[i]);
+            
+            // Re-initialize time tracking
+            dayIsAllDay[orderedDays[i].DayNumber] = orderedDays[i].StartTime == null;
+            dayStartTimes[orderedDays[i].DayNumber] = orderedDays[i].StartTime?.ToString("HH:mm") ?? "09:00";
+            dayEndTimes[orderedDays[i].DayNumber] = orderedDays[i].EndTime?.ToString("HH:mm") ?? "15:00";
+        }
+    }
+    
+    // Primary day time management
+    private void OnPrimaryDayAllDayChanged(bool isAllDay)
+    {
+        primaryDayIsAllDay = isAllDay;
+        
+        if (isAllDay)
+        {
+            primaryDay.StartTime = null;
+            primaryDay.EndTime = null;
+        }
+        else
+        {
+            UpdatePrimaryStartTime();
+            UpdatePrimaryEndTime();
+        }
+    }
+    
+    private void UpdatePrimaryStartTime()
+    {
+        if (!primaryDayIsAllDay && TimeSpan.TryParse(primaryDayStartTime, out var startTime))
+        {
+            primaryDay.StartTime = primaryDay.Date.Date.Add(startTime);
+        }
+    }
+    
+    private void UpdatePrimaryEndTime()
+    {
+        if (!primaryDayIsAllDay && TimeSpan.TryParse(primaryDayEndTime, out var endTime))
+        {
+            primaryDay.EndTime = primaryDay.Date.Date.Add(endTime);
+        }
+    }
+    
+    private void UpdatePrimaryStartTimeFromInput(string? timeValue)
+    {
+        if (!string.IsNullOrEmpty(timeValue))
+        {
+            primaryDayStartTime = timeValue;
+            UpdatePrimaryStartTime();
+        }
+    }
+    
+    private void UpdatePrimaryEndTimeFromInput(string? timeValue)
+    {
+        if (!string.IsNullOrEmpty(timeValue))
+        {
+            primaryDayEndTime = timeValue;
+            UpdatePrimaryEndTime();
+        }
+    }
+    
+    // Additional days time management helpers
+    private bool GetIsAllDay(EventDay day)
+    {
+        return dayIsAllDay.GetValueOrDefault(day.DayNumber, true);
+    }
+    
+    private string GetStartTimeString(EventDay day)
+    {
+        return dayStartTimes.GetValueOrDefault(day.DayNumber, "09:00");
+    }
+    
+    private string GetEndTimeString(EventDay day)
+    {
+        return dayEndTimes.GetValueOrDefault(day.DayNumber, "15:00");
+    }
+    
+    private void OnAllDayChanged(EventDay day, bool isAllDay)
+    {
+        dayIsAllDay[day.DayNumber] = isAllDay;
+        
+        if (isAllDay)
+        {
+            // Set to all day - clear specific times
+            day.StartTime = null;
+            day.EndTime = null;
+        }
+        else
+        {
+            // Set specific times
+            UpdateStartTime(day);
+            UpdateEndTime(day);
+        }
+    }
+    
+    private void UpdateStartTime(EventDay day)
+    {
+        if (!GetIsAllDay(day) && TimeSpan.TryParse(GetStartTimeString(day), out var startTime))
+        {
+            day.StartTime = day.Date.Date.Add(startTime);
+        }
+    }
+    
+    private void UpdateEndTime(EventDay day)
+    {
+        if (!GetIsAllDay(day) && TimeSpan.TryParse(GetEndTimeString(day), out var endTime))
+        {
+            day.EndTime = day.Date.Date.Add(endTime);
+        }
+    }
+    
+    private void UpdateStartTimeFromInput(EventDay day, string? timeValue)
+    {
+        if (!string.IsNullOrEmpty(timeValue))
+        {
+            dayStartTimes[day.DayNumber] = timeValue;
+            UpdateStartTime(day);
+        }
+    }
+    
+    private void UpdateEndTimeFromInput(EventDay day, string? timeValue)
+    {
+        if (!string.IsNullOrEmpty(timeValue))
+        {
+            dayEndTimes[day.DayNumber] = timeValue;
+            UpdateEndTime(day);
         }
     }
 
@@ -358,58 +633,104 @@ else if (eventModel != null)
         
         try
         {
-            if (eventModel == null) return;
+            if (createEventDto == null) return;
 
             // Validate required fields
-            if (string.IsNullOrWhiteSpace(eventModel.Title))
+            if (string.IsNullOrWhiteSpace(createEventDto.Title))
             {
                 errorMessage = "Event title is required.";
                 return;
             }
-            if (eventModel.SchoolYearId == 0)
+            if (createEventDto.SchoolYearId == 0)
             {
                 errorMessage = "Please select a school year.";
                 return;
             }
-            if (eventModel.EventCatId == 0)
+            if (createEventDto.EventCatId == 0)
             {
                 errorMessage = "Please select an event category.";
                 return;
             }
             
-            // Convert nullable int to null instead of 0 for optional subcategory
-            if (eventModel.EventSubTypeId == 0)
+            // Validate primary day has a date
+            if (primaryDay.Date == DateTime.MinValue)
             {
-                eventModel.EventSubTypeId = null;
-            }
-            
-            // Require at least one day if multi-day
-            if (eventDays.Count > 1 && !eventDays.Any())
-            {
-                errorMessage = "Please add at least one day for this event.";
+                errorMessage = "Please set a date for the event.";
                 return;
             }
             
-            // Update event dates based on event days
-            if (eventDays.Any())
-            {
-                eventModel.Date = eventDays.Min(d => d.Date);
-                eventModel.EventStartTime = eventDays.Min(d => d.Date);
-                eventModel.EventEndTime = eventDays.Max(d => d.Date).AddHours(12); // End of last day
-            }
+            // Set EventSubTypeId properly - null if not selected
+            createEventDto.EventSubTypeId = eventSubCategoryId > 0 ? eventSubCategoryId : null;
             
-            HttpResponseMessage response = await Http.PostAsJsonAsync("api/events", eventModel);
+            // Update event dates based on all days (primary + additional)
+            var allDays = new List<EventDay> { primaryDay };
+            allDays.AddRange(additionalDays);
+            
+            createEventDto.Date = allDays.Min(d => d.Date);
+            createEventDto.EventStartTime = allDays.Min(d => d.StartTime ?? d.Date.AddHours(9));
+            createEventDto.EventEndTime = allDays.Max(d => d.EndTime ?? d.Date.AddHours(15));
+            
+            HttpResponseMessage response = await Http.PostAsJsonAsync("api/events", createEventDto);
             if (response.IsSuccessStatusCode)
             {
-                eventModel = await response.Content.ReadFromJsonAsync<Event>();
+                var createdEvent = await response.Content.ReadFromJsonAsync<Event>();
                 
-                // Save event days if present
-                if (eventModel != null && eventDays.Any())
+                // Save all event days (primary + additional) using DTOs
+                if (createdEvent != null)
                 {
-                    foreach (var day in eventDays)
+                    // Save primary day using DTO
+                    var primaryDayDto = new CreateEventDayDTO
                     {
-                        day.EventId = eventModel.Id;
-                        await Http.PostAsJsonAsync($"api/events/{eventModel.Id}/days", day);
+                        EventId = createdEvent.Id,
+                        DayNumber = primaryDay.DayNumber,
+                        Date = primaryDay.Date,
+                        DayTitle = primaryDay.DayTitle,
+                        Description = primaryDay.Description,
+                        Location = primaryDay.Location,
+                        StartTime = primaryDay.StartTime,
+                        EndTime = primaryDay.EndTime,
+                        IsActive = primaryDay.IsActive,
+                        SpecialInstructions = primaryDay.SpecialInstructions,
+                        MaxAttendees = primaryDay.MaxAttendees,
+                        EstimatedAttendees = primaryDay.EstimatedAttendees,
+                        WeatherBackupPlan = primaryDay.WeatherBackupPlan
+                    };
+
+                    var primaryResponse = await Http.PostAsJsonAsync($"api/events/{createdEvent.Id}/days", primaryDayDto);
+                    if (!primaryResponse.IsSuccessStatusCode)
+                    {
+                        var dayError = await primaryResponse.Content.ReadAsStringAsync();
+                        errorMessage = $"Error saving primary event day: {dayError}";
+                        return;
+                    }
+                    
+                    // Save additional days using DTOs
+                    foreach (var day in additionalDays)
+                    {
+                        var additionalDayDto = new CreateEventDayDTO
+                        {
+                            EventId = createdEvent.Id,
+                            DayNumber = day.DayNumber,
+                            Date = day.Date,
+                            DayTitle = day.DayTitle,
+                            Description = day.Description,
+                            Location = day.Location,
+                            StartTime = day.StartTime,
+                            EndTime = day.EndTime,
+                            IsActive = day.IsActive,
+                            SpecialInstructions = day.SpecialInstructions,
+                            MaxAttendees = day.MaxAttendees,
+                            EstimatedAttendees = day.EstimatedAttendees,
+                            WeatherBackupPlan = day.WeatherBackupPlan
+                        };
+
+                        var dayResponse = await Http.PostAsJsonAsync($"api/events/{createdEvent.Id}/days", additionalDayDto);
+                        if (!dayResponse.IsSuccessStatusCode)
+                        {
+                            var dayError = await dayResponse.Content.ReadAsStringAsync();
+                            errorMessage = $"Error saving event day: {dayError}";
+                            return;
+                        }
                     }
                 }
                 
@@ -436,10 +757,7 @@ else if (eventModel != null)
     private void OnCategoryChanged()
     {
         // Reset subcategory when category changes
-        if (eventModel != null)
-        {
-            eventModel.EventSubTypeId = null;
-        }
+        eventSubCategoryId = 0;
         StateHasChanged();
     }
 

@@ -2,6 +2,7 @@
 using LuxfordPTAWeb.Shared.Models;
 using LuxfordPTAWeb.Shared.Enums;
 using LuxfordPTAWeb.Shared.DTOs; // Added DTO namespace
+using LuxfordPTAWeb.Services; // Added for audit service
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,12 +15,18 @@ public class EventsController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly ILogger<EventsController> _logger;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IAuditService _auditService;
 
-    public EventsController(ApplicationDbContext db, ILogger<EventsController> logger, UserManager<ApplicationUser> userManager)
+    public EventsController(
+        ApplicationDbContext db, 
+        ILogger<EventsController> logger, 
+        UserManager<ApplicationUser> userManager,
+        IAuditService auditService)
     {
         _db = db;
         _logger = logger;
         _userManager = userManager;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -224,24 +231,85 @@ public class EventsController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<Event>> Post([FromBody] Event eventItem)
+    public async Task<ActionResult<Event>> Post([FromBody] CreateEventDTO createEventDto)
     {
         try
         {
+            // Get current user for audit tracking
+            var currentUser = await _userManager.GetUserAsync(User);
+            
             // Validate coordinator assignment
-            if (!string.IsNullOrEmpty(eventItem.EventCoordinatorId))
+            if (!string.IsNullOrEmpty(createEventDto.EventCoordinatorId))
             {
-                var coordinator = await _userManager.FindByIdAsync(eventItem.EventCoordinatorId);
+                var coordinator = await _userManager.FindByIdAsync(createEventDto.EventCoordinatorId);
                 if (coordinator == null)
                 {
                     return BadRequest("Invalid event coordinator ID");
                 }
             }
 
-            // Generate slug if not provided
-            if (string.IsNullOrEmpty(eventItem.Slug))
+            // Validate foreign key references
+            var schoolYear = await _db.SchoolYears.FindAsync(createEventDto.SchoolYearId);
+            if (schoolYear == null)
             {
-                eventItem.Slug = Event.GenerateSlug(eventItem.Title);
+                return BadRequest("Invalid school year ID");
+            }
+
+            var eventCat = await _db.EventCats.FindAsync(createEventDto.EventCatId);
+            if (eventCat == null)
+            {
+                return BadRequest("Invalid event category ID");
+            }
+
+            if (createEventDto.EventSubTypeId.HasValue)
+            {
+                var eventSubType = await _db.EventCatSubs.FindAsync(createEventDto.EventSubTypeId.Value);
+                if (eventSubType == null)
+                {
+                    return BadRequest("Invalid event subcategory ID");
+                }
+            }
+
+            // Create Event from DTO
+            var eventItem = new Event
+            {
+                Title = createEventDto.Title,
+                Date = createEventDto.Date,
+                Description = createEventDto.Description,
+                Location = createEventDto.Location,
+                ImageUrl = createEventDto.ImageUrl,
+                Link = createEventDto.Link,
+                EventCoordinatorId = createEventDto.EventCoordinatorId,
+                Status = createEventDto.Status,
+                SetupStartTime = createEventDto.SetupStartTime,
+                EventStartTime = createEventDto.EventStartTime,
+                EventEndTime = createEventDto.EventEndTime,
+                CleanupEndTime = createEventDto.CleanupEndTime,
+                MaxAttendees = createEventDto.MaxAttendees,
+                EstimatedAttendees = createEventDto.EstimatedAttendees,
+                RequiresVolunteers = createEventDto.RequiresVolunteers,
+                RequiresSetup = createEventDto.RequiresSetup,
+                RequiresCleanup = createEventDto.RequiresCleanup,
+                Notes = createEventDto.Notes,
+                PublicInstructions = createEventDto.PublicInstructions,
+                WeatherBackupPlan = createEventDto.WeatherBackupPlan,
+                ExcelImportId = createEventDto.ExcelImportId,
+                SourceEventId = createEventDto.SourceEventId,
+                CopyGeneration = createEventDto.CopyGeneration,
+                ApprovalNotes = createEventDto.ApprovalNotes,
+                SchoolYearId = createEventDto.SchoolYearId,
+                EventCatId = createEventDto.EventCatId,
+                EventSubTypeId = createEventDto.EventSubTypeId
+            };
+
+            // Generate slug if not provided
+            if (string.IsNullOrEmpty(createEventDto.Slug))
+            {
+                eventItem.Slug = Event.GenerateSlug(createEventDto.Title);
+            }
+            else
+            {
+                eventItem.Slug = createEventDto.Slug;
             }
 
             // Ensure slug is unique within the school year
@@ -250,9 +318,11 @@ public class EventsController : ControllerBase
             if (existingSlug)
             {
                 // Append year to make it unique
-                var schoolYear = await _db.SchoolYears.FindAsync(eventItem.SchoolYearId);
-                eventItem.Slug += $"-{schoolYear?.Name?.Replace(" ", "").ToLower()}";
+                eventItem.Slug += $"-{schoolYear.Name?.Replace(" ", "").ToLower()}";
             }
+
+            // Set audit information for creation
+            await _auditService.SetCreationAuditAsync(eventItem, currentUser);
 
             _db.Events.Add(eventItem);
             await _db.SaveChangesAsync();
@@ -263,6 +333,9 @@ public class EventsController : ControllerBase
             await _db.Entry(eventItem).Reference(e => e.SchoolYear).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.EventCoordinator).LoadAsync();
             await _db.Entry(eventItem).Collection(e => e.EventDays).LoadAsync();
+
+            _logger.LogInformation("Event created: {EventId} - {EventTitle} by user {UserId}", 
+                eventItem.Id, eventItem.Title, currentUser?.Id ?? "System");
 
             return CreatedAtAction(nameof(Get), new { id = eventItem.Id }, eventItem);
         }
@@ -279,6 +352,8 @@ public class EventsController : ControllerBase
     {
         try
         {
+            var currentUser = await _userManager.GetUserAsync(User);
+            
             var sourceEvent = await _db.Events
                 .Include(e => e.EventDays)
                 .Include(e => e.EventCat)
@@ -341,6 +416,12 @@ public class EventsController : ControllerBase
                 counter++;
             }
 
+            // Set audit information for the copied event
+            await _auditService.SetCreationAuditAsync(newEvent, currentUser);
+            
+            // Override the change notes to indicate this is a copy
+            newEvent.ChangeNotes = $"Copied from event ID {sourceEvent.Id} - {sourceEvent.Title}";
+
             _db.Events.Add(newEvent);
             await _db.SaveChangesAsync();
 
@@ -380,6 +461,9 @@ public class EventsController : ControllerBase
             await _db.Entry(newEvent).Reference(e => e.SchoolYear).LoadAsync();
             await _db.Entry(newEvent).Reference(e => e.EventCoordinator).LoadAsync();
             await _db.Entry(newEvent).Collection(e => e.EventDays).LoadAsync();
+
+            _logger.LogInformation("Event copied: Source {SourceEventId} → New {NewEventId} by user {UserId}", 
+                sourceEvent.Id, newEvent.Id, currentUser?.Id ?? "System");
 
             return CreatedAtAction(nameof(Get), new { id = newEvent.Id }, newEvent);
         }
@@ -424,7 +508,7 @@ public class EventsController : ControllerBase
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<IActionResult> Put(int id, [FromBody] Event updatedEvent)
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateEventDTO updatedEventDto)
     {
         try
         {
@@ -448,49 +532,58 @@ public class EventsController : ControllerBase
             }
 
             // Validate coordinator assignment (only admins/board members can change coordinator)
-            if (!string.IsNullOrEmpty(updatedEvent.EventCoordinatorId) && updatedEvent.EventCoordinatorId != eventItem.EventCoordinatorId)
+            if (!string.IsNullOrEmpty(updatedEventDto.EventCoordinatorId) && updatedEventDto.EventCoordinatorId != eventItem.EventCoordinatorId)
             {
                 if (!userRoles.Contains("Admin") && !userRoles.Contains("BoardMember"))
                 {
                     return Forbid("Only admins and board members can reassign event coordinators");
                 }
 
-                var coordinator = await _userManager.FindByIdAsync(updatedEvent.EventCoordinatorId);
+                var coordinator = await _userManager.FindByIdAsync(updatedEventDto.EventCoordinatorId);
                 if (coordinator == null)
                 {
                     return BadRequest("Invalid event coordinator ID");
                 }
             }
 
+            // Track what fields changed for audit purposes
+            var changes = new List<string>();
+            
+            if (eventItem.Title != updatedEventDto.Title) changes.Add($"Title: '{eventItem.Title}' → '{updatedEventDto.Title}'");
+            if (eventItem.Date != updatedEventDto.Date) changes.Add($"Date: {eventItem.Date:yyyy-MM-dd} → {updatedEventDto.Date:yyyy-MM-dd}");
+            if (eventItem.Status != updatedEventDto.Status) changes.Add($"Status: {eventItem.Status} → {updatedEventDto.Status}");
+            if (eventItem.Location != updatedEventDto.Location) changes.Add($"Location: '{eventItem.Location}' → '{updatedEventDto.Location}'");
+            if (eventItem.EventCoordinatorId != updatedEventDto.EventCoordinatorId) changes.Add("Coordinator changed");
+
             // Update fields
-            eventItem.Title = updatedEvent.Title;
-            eventItem.Date = updatedEvent.Date;
-            eventItem.Description = updatedEvent.Description;
-            eventItem.Location = updatedEvent.Location;
-            eventItem.ImageUrl = updatedEvent.ImageUrl;
-            eventItem.Link = updatedEvent.Link;
-            eventItem.Status = updatedEvent.Status;
-            eventItem.EventStartTime = updatedEvent.EventStartTime;
-            eventItem.EventEndTime = updatedEvent.EventEndTime;
-            eventItem.SetupStartTime = updatedEvent.SetupStartTime;
-            eventItem.CleanupEndTime = updatedEvent.CleanupEndTime;
-            eventItem.MaxAttendees = updatedEvent.MaxAttendees;
-            eventItem.EstimatedAttendees = updatedEvent.EstimatedAttendees;
-            eventItem.RequiresVolunteers = updatedEvent.RequiresVolunteers;
-            eventItem.RequiresSetup = updatedEvent.RequiresSetup;
-            eventItem.RequiresCleanup = updatedEvent.RequiresCleanup;
-            eventItem.Notes = updatedEvent.Notes;
-            eventItem.PublicInstructions = updatedEvent.PublicInstructions;
-            eventItem.WeatherBackupPlan = updatedEvent.WeatherBackupPlan;
-            eventItem.SchoolYearId = updatedEvent.SchoolYearId;
-            eventItem.EventCatId = updatedEvent.EventCatId;
-            eventItem.EventSubTypeId = updatedEvent.EventSubTypeId;
-            eventItem.ExcelImportId = updatedEvent.ExcelImportId;
+            eventItem.Title = updatedEventDto.Title;
+            eventItem.Date = updatedEventDto.Date;
+            eventItem.Description = updatedEventDto.Description;
+            eventItem.Location = updatedEventDto.Location;
+            eventItem.ImageUrl = updatedEventDto.ImageUrl;
+            eventItem.Link = updatedEventDto.Link;
+            eventItem.Status = updatedEventDto.Status;
+            eventItem.EventStartTime = updatedEventDto.EventStartTime;
+            eventItem.EventEndTime = updatedEventDto.EventEndTime;
+            eventItem.SetupStartTime = updatedEventDto.SetupStartTime;
+            eventItem.CleanupEndTime = updatedEventDto.CleanupEndTime;
+            eventItem.MaxAttendees = updatedEventDto.MaxAttendees;
+            eventItem.EstimatedAttendees = updatedEventDto.EstimatedAttendees;
+            eventItem.RequiresVolunteers = updatedEventDto.RequiresVolunteers;
+            eventItem.RequiresSetup = updatedEventDto.RequiresSetup;
+            eventItem.RequiresCleanup = updatedEventDto.RequiresCleanup;
+            eventItem.Notes = updatedEventDto.Notes;
+            eventItem.PublicInstructions = updatedEventDto.PublicInstructions;
+            eventItem.WeatherBackupPlan = updatedEventDto.WeatherBackupPlan;
+            eventItem.SchoolYearId = updatedEventDto.SchoolYearId;
+            eventItem.EventCatId = updatedEventDto.EventCatId;
+            eventItem.EventSubTypeId = updatedEventDto.EventSubTypeId;
+            eventItem.ExcelImportId = updatedEventDto.ExcelImportId;
             
             // Update slug if title changed
-            if (eventItem.Title != updatedEvent.Title && !string.IsNullOrEmpty(updatedEvent.Title))
+            if (eventItem.Title != updatedEventDto.Title && !string.IsNullOrEmpty(updatedEventDto.Title))
             {
-                var newSlug = Event.GenerateSlug(updatedEvent.Title);
+                var newSlug = Event.GenerateSlug(updatedEventDto.Title);
                 if (newSlug != eventItem.Slug)
                 {
                     // Check if new slug is available
@@ -499,6 +592,7 @@ public class EventsController : ControllerBase
                     if (!existingSlug)
                     {
                         eventItem.Slug = newSlug;
+                        changes.Add("URL slug updated due to title change");
                     }
                 }
             }
@@ -506,10 +600,24 @@ public class EventsController : ControllerBase
             // Only admins/board members can change coordinator
             if (userRoles.Contains("Admin") || userRoles.Contains("BoardMember"))
             {
-                eventItem.EventCoordinatorId = updatedEvent.EventCoordinatorId;
+                eventItem.EventCoordinatorId = updatedEventDto.EventCoordinatorId;
             }
 
+            // Create comprehensive change notes
+            var changeNotes = !string.IsNullOrWhiteSpace(updatedEventDto.ChangeNotes) 
+                ? updatedEventDto.ChangeNotes 
+                : changes.Any() 
+                    ? $"Updated: {string.Join(", ", changes)}" 
+                    : "Event updated";
+
+            // Set audit information for update
+            await _auditService.SetUpdateAuditAsync(eventItem, currentUser, changeNotes);
+
             await _db.SaveChangesAsync();
+
+            _logger.LogInformation("Event updated: {EventId} - {EventTitle} by user {UserId}. Changes: {Changes}", 
+                eventItem.Id, eventItem.Title, currentUser?.Id ?? "System", changeNotes);
+
             return NoContent();
         }
         catch (Exception ex)

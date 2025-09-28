@@ -510,10 +510,12 @@ LuxfordPTAWeb.Client/Components/
 5. ✅ Enhanced EventsAdmin.razor with filtering and multi-day display
 
 ### **Current Sprint** (This Week) - Enhanced Admin & Templates
-1. 📝 **HIGH PRIORITY** Complete EventsEdit.razor with multi-day editing *(IN PROGRESS)*
-2. 📝 **HIGH PRIORITY** Implement "Copy from Previous Event" feature *(NOT STARTED)*
-3. 📝 **HIGH PRIORITY** Add "Copy Event" button in EventsAdmin.razor *(NOT STARTED)*
-4. 📝 **MEDIUM PRIORITY** Event template system for recurring events *(NOT STARTED)*
+1. ✅ **HIGH PRIORITY** Fixed event creation validation error with CreateEventDTO *(COMPLETED)*
+2. ✅ **HIGH PRIORITY** Fixed EventDay creation validation error with CreateEventDayDTO *(COMPLETED)*
+3. 📝 **HIGH PRIORITY** Complete EventsEdit.razor with multi-day editing *(IN PROGRESS)*
+4. 📝 **HIGH PRIORITY** Implement "Copy from Previous Event" feature *(NOT STARTED)*
+5. 📝 **HIGH PRIORITY** Add "Copy Event" button in EventsAdmin.razor *(NOT STARTED)*
+6. 📝 **MEDIUM PRIORITY** Event template system for recurring events *(NOT STARTED)*
 
 ### **Next Sprint** (Week 2) - Event Templates & Enhanced UX
 1. 📝 Event template management for recurring events (Fire Prevention Week, Book Fair, etc.)
@@ -613,6 +615,7 @@ ALTER TABLE Events ADD ChangeNotes NVARCHAR(MAX);
 - **Multi-Day Success**: ✅ Multi-day events are fully functional with complete CRUD operations
 - **Admin Interface**: ✅ Enhanced filtering and display working well with good UX
 - **Audit Trail**: ✅ Full audit tracking implemented and working
+- **Event Creation Fix**: ✅ Resolved validation error by implementing CreateEventDTO to separate API concerns from Entity Framework navigation properties
 - **Next Priority**: Focus on EventsEdit.razor completion and copy functionality
 - **Template System**: Ready to implement - database structure supports it
 - **Performance**: Current queries are efficient with proper indexing on common filters

@@ -142,8 +142,8 @@
                                                 </span>
                                             </div>
                                             <div class="btn-group ms-2">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveUp(subcat.Id)" disabled="@showSubcatModal">↑</button>
-                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveDown(subcat.Id)" disabled="@showSubcatModal">↓</button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveUp(subcat.Id)" disabled="@(!CanSubCatMoveUp(subcat) || showSubcatModal)">↑</button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveDown(subcat.Id)" disabled="@(!CanSubCatMoveDown(subcat) || showSubcatModal)">↓</button>
                                                 <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => EditSubcat(subcat)" disabled="@showSubcatModal">Edit</button>
                                             </div>
                                         </div>
@@ -681,8 +681,61 @@ else
             await LoadSubCategories(editingEventCat.Id);
     }
 
-    private void MoveUp(int id) { /* Move logic */ }
-    private void MoveDown(int id) { /* Move logic */ }
+    private async Task MoveUp(int id)
+    {
+        try
+        {
+            var response = await Http.PostAsync($"api/eventcatsub/{id}/move-up", null);
+            if (response.IsSuccessStatusCode)
+            {
+                if (editingEventCat.Id > 0)
+                    await LoadSubCategories(editingEventCat.Id);
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder sub-category.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering sub-category: {ex.Message}";
+        }
+    }
+
+    private async Task MoveDown(int id)
+    {
+        try
+        {
+            var response = await Http.PostAsync($"api/eventcatsub/{id}/move-down", null);
+            if (response.IsSuccessStatusCode)
+            {
+                if (editingEventCat.Id > 0)
+                    await LoadSubCategories(editingEventCat.Id);
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to reorder sub-category.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reordering sub-category: {ex.Message}";
+        }
+    }
+
+    private bool CanSubCatMoveUp(EventCatSubDto subCat)
+    {
+        if (subCategories == null || !subCategories.Any()) return false;
+        return subCategories.OrderBy(sc => sc.DisplayOrder).First().Id != subCat.Id;
+    }
+
+    private bool CanSubCatMoveDown(EventCatSubDto subCat)
+    {
+        if (subCategories == null || !subCategories.Any()) return false;
+        return subCategories.OrderBy(sc => sc.DisplayOrder).Last().Id != subCat.Id;
+    }
 
     public class EventCatDto
     {

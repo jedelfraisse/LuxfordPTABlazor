@@ -6,6 +6,7 @@
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Shared.Interfaces
 @using Microsoft.AspNetCore.WebUtilities
 @inherits ComponentBase
 
@@ -32,19 +33,17 @@
 		<h6 class="mb-0"><i class="bi bi-funnel"></i> Filter Events</h6>
 	</div>
 	<div class="card-body">
-
-
 		<!-- Advanced Filters -->
 		<div class="row align-items-end">
 			<div class="col-md-2">
 				<label for="schoolYearFilter" class="form-label">School Year</label>
-				<select id="schoolYearFilter" class="form-select" @onchange="FilterBySchoolYear">
+				<select id="schoolYearFilter" class="form-select" @bind="selectedSchoolYearId" @bind:after="OnSchoolYearFilterChanged">
 					<option value="0">All School Years</option>
 					@if (schoolYears != null)
 					{
 						@foreach (var year in schoolYears)
 						{
-							<option value="@year.Id" selected="@(selectedSchoolYearId == year.Id)">
+							<option value="@year.Id">
 								@year.Name
 								@if (year.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear)
 								{
@@ -61,13 +60,13 @@
 			</div>
 			<div class="col-md-2">
 				<label for="eventCatFilter" class="form-label">Event Category</label>
-				<select id="eventCatFilter" class="form-select" @onchange="FilterByEventCat">
+				<select id="eventCatFilter" class="form-select" @bind="selectedEventCatId" @bind:after="OnEventCatFilterChanged">
 					<option value="0">All Categories</option>
 					@if (eventCats != null)
 					{
 						@foreach (var eventCat in eventCats)
 						{
-							<option value="@eventCat.Id" selected="@(selectedEventCatId == eventCat.Id)">
+							<option value="@eventCat.Id">
 								@eventCat.Name
 							</option>
 						}
@@ -76,13 +75,13 @@
 			</div>
 			<div class="col-md-2">
 				<label for="eventSubCatFilter" class="form-label">Sub Category</label>
-				<select id="eventSubCatFilter" class="form-select" @onchange="FilterByEventSubCat" disabled="@(selectedEventCatId == 0)">
+				<select id="eventSubCatFilter" class="form-select" @bind="selectedEventSubCatId" @bind:after="OnEventSubCatFilterChanged" disabled="@(selectedEventCatId == 0)">
 					<option value="0">All Sub Categories</option>
 					@if (availableSubCats != null)
 					{
 						@foreach (var subCat in availableSubCats)
 						{
-							<option value="@subCat.Id" selected="@(selectedEventSubCatId == subCat.Id)">
+							<option value="@subCat.Id">
 								@subCat.Name
 							</option>
 						}
@@ -145,7 +144,6 @@
 					</button>
 				</div>
 			</div>
-
 		}
 	</div>
 </div>
@@ -200,6 +198,17 @@ else
 							@if (evt.RequiresVolunteers && string.IsNullOrEmpty(evt.ExcelImportId))
 							{
 								<span class="badge bg-info ms-2">Volunteers Needed</span>
+							}
+							@if (!string.IsNullOrEmpty(evt.CreatedBy))
+							{
+								<div class="small text-muted mt-1">
+									<text>Created: @evt.CreatedOn.ToString("MMM d") by @evt.CreatedBy.GetDisplayName()</text>
+									@if (evt.LastEditedOn != evt.CreatedOn)
+									{
+										<br />
+										<text>Modified: @evt.LastEditedOn.ToString("MMM d") by @evt.LastEditedBy.GetDisplayName()</text>
+									}
+								</div>
 							}
 						</td>
 						<td>

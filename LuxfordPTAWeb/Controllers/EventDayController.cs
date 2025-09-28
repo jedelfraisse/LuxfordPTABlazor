@@ -88,7 +88,7 @@ public class EventDayController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<EventDay>> CreateEventDay(int eventId, [FromBody] EventDay eventDay)
+    public async Task<ActionResult<EventDay>> CreateEventDay(int eventId, [FromBody] CreateEventDayDTO createEventDayDto)
     {
         try
         {
@@ -103,32 +103,54 @@ public class EventDayController : ControllerBase
                 return Forbid();
             }
 
-            // No need to set IsMultiDay; multi-day status is inferred from EventDays.Count > 1
-
-            // Set the event ID and validate day number
-            eventDay.EventId = eventId;
-            
-            if (eventDay.DayNumber <= 0)
+            // Validate that the DTO EventId matches the route parameter
+            if (createEventDayDto.EventId != eventId)
             {
-                // Auto-assign day number if not provided
-                var maxDayNumber = await _db.EventDays
-                    .Where(ed => ed.EventId == eventId)
-                    .MaxAsync(ed => (int?)ed.DayNumber) ?? 0;
-                eventDay.DayNumber = maxDayNumber + 1;
+                return BadRequest("EventId in request body must match the route parameter");
+            }
+
+            // Check if day number already exists
+            if (createEventDayDto.DayNumber > 0)
+            {
+                var existingDay = await _db.EventDays
+                    .AnyAsync(ed => ed.EventId == eventId && ed.DayNumber == createEventDayDto.DayNumber);
+                if (existingDay)
+                {
+                    return BadRequest($"Day number {createEventDayDto.DayNumber} already exists for this event");
+                }
             }
             else
             {
-                // Check if day number already exists
-                var existingDay = await _db.EventDays
-                    .AnyAsync(ed => ed.EventId == eventId && ed.DayNumber == eventDay.DayNumber);
-                if (existingDay)
-                {
-                    return BadRequest($"Day number {eventDay.DayNumber} already exists for this event");
-                }
+                // Auto-assign day number if not provided or invalid
+                var maxDayNumber = await _db.EventDays
+                    .Where(ed => ed.EventId == eventId)
+                    .MaxAsync(ed => (int?)ed.DayNumber) ?? 0;
+                createEventDayDto.DayNumber = maxDayNumber + 1;
             }
+
+            // Create EventDay from DTO
+            var eventDay = new EventDay
+            {
+                EventId = createEventDayDto.EventId,
+                DayNumber = createEventDayDto.DayNumber,
+                Date = createEventDayDto.Date,
+                DayTitle = createEventDayDto.DayTitle,
+                Description = createEventDayDto.Description,
+                Location = createEventDayDto.Location,
+                StartTime = createEventDayDto.StartTime,
+                EndTime = createEventDayDto.EndTime,
+                IsActive = createEventDayDto.IsActive,
+                SpecialInstructions = createEventDayDto.SpecialInstructions,
+                MaxAttendees = createEventDayDto.MaxAttendees,
+                EstimatedAttendees = createEventDayDto.EstimatedAttendees,
+                WeatherBackupPlan = createEventDayDto.WeatherBackupPlan
+            };
 
             _db.EventDays.Add(eventDay);
             await _db.SaveChangesAsync();
+
+            // Load the Event navigation property for the response
+            await _db.Entry(eventDay).Reference(ed => ed.Event).LoadAsync();
 
             return CreatedAtAction(nameof(GetEventDay), 
                 new { eventId = eventId, dayId = eventDay.Id }, 
@@ -142,7 +164,7 @@ public class EventDayController : ControllerBase
     }
 
     [HttpPut("{dayId}")]
-    public async Task<IActionResult> UpdateEventDay(int eventId, int dayId, [FromBody] EventDay updatedEventDay)
+    public async Task<IActionResult> UpdateEventDay(int eventId, int dayId, [FromBody] UpdateEventDayDTO updateEventDayDto)
     {
         try
         {
@@ -166,31 +188,31 @@ public class EventDayController : ControllerBase
             }
 
             // Check if day number is being changed and conflicts with existing
-            if (updatedEventDay.DayNumber != eventDay.DayNumber)
+            if (updateEventDayDto.DayNumber != eventDay.DayNumber)
             {
                 var conflictingDay = await _db.EventDays
                     .AnyAsync(ed => ed.EventId == eventId && 
-                                  ed.DayNumber == updatedEventDay.DayNumber && 
+                                  ed.DayNumber == updateEventDayDto.DayNumber && 
                                   ed.Id != dayId);
                 if (conflictingDay)
                 {
-                    return BadRequest($"Day number {updatedEventDay.DayNumber} already exists for this event");
+                    return BadRequest($"Day number {updateEventDayDto.DayNumber} already exists for this event");
                 }
             }
 
-            // Update fields
-            eventDay.DayNumber = updatedEventDay.DayNumber;
-            eventDay.Date = updatedEventDay.Date;
-            eventDay.DayTitle = updatedEventDay.DayTitle;
-            eventDay.Description = updatedEventDay.Description;
-            eventDay.Location = updatedEventDay.Location;
-            eventDay.StartTime = updatedEventDay.StartTime;
-            eventDay.EndTime = updatedEventDay.EndTime;
-            eventDay.IsActive = updatedEventDay.IsActive;
-            eventDay.SpecialInstructions = updatedEventDay.SpecialInstructions;
-            eventDay.MaxAttendees = updatedEventDay.MaxAttendees;
-            eventDay.EstimatedAttendees = updatedEventDay.EstimatedAttendees;
-            eventDay.WeatherBackupPlan = updatedEventDay.WeatherBackupPlan;
+            // Update fields from DTO
+            eventDay.DayNumber = updateEventDayDto.DayNumber;
+            eventDay.Date = updateEventDayDto.Date;
+            eventDay.DayTitle = updateEventDayDto.DayTitle;
+            eventDay.Description = updateEventDayDto.Description;
+            eventDay.Location = updateEventDayDto.Location;
+            eventDay.StartTime = updateEventDayDto.StartTime;
+            eventDay.EndTime = updateEventDayDto.EndTime;
+            eventDay.IsActive = updateEventDayDto.IsActive;
+            eventDay.SpecialInstructions = updateEventDayDto.SpecialInstructions;
+            eventDay.MaxAttendees = updateEventDayDto.MaxAttendees;
+            eventDay.EstimatedAttendees = updateEventDayDto.EstimatedAttendees;
+            eventDay.WeatherBackupPlan = updateEventDayDto.WeatherBackupPlan;
 
             await _db.SaveChangesAsync();
             return NoContent();
