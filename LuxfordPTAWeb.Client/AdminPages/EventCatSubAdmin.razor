@@ -250,7 +250,7 @@ else
 {
     <div class="modal-backdrop show"></div>
     <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.2);">
-        <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width:400px;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Sub-Category</h5>
@@ -260,15 +260,38 @@ else
                     <EditForm Model="editModel" OnValidSubmit="SaveEdit">
                         <DataAnnotationsValidator />
                         <ValidationSummary />
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <label class="form-label">Name</label>
                             <input class="form-control" @bind="editModel.Name" />
                         </div>
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <label class="form-label">Description</label>
-                            <textarea class="form-control" @bind="editModel.Description"></textarea>
+                            <textarea class="form-control" @bind="editModel.Description" rows="2"></textarea>
                         </div>
-                        <div class="mb-2 form-check">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Icon Class</label>
+                                    <input class="form-control" @bind="editModel.Icon" placeholder="bi-flag" />
+                                    <div class="form-text">Bootstrap Icons class</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Color Class</label>
+                                    <select class="form-select" @bind="editModel.ColorClass">
+                                        <option value="">Default</option>
+                                        <option value="text-primary">Blue</option>
+                                        <option value="text-success">Green</option>
+                                        <option value="text-danger">Red</option>
+                                        <option value="text-warning">Yellow</option>
+                                        <option value="text-info">Cyan</option>
+                                        <option value="text-secondary">Gray</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="subcatActive" @bind="editModel.IsActive" />
                             <label for="subcatActive" class="form-check-label">Active</label>
                         </div>
@@ -593,7 +616,9 @@ else
             Name = subcat.Name,
             Description = subcat.Description,
             DisplayOrder = subcat.DisplayOrder,
-            IsActive = subcat.IsActive
+            IsActive = subcat.IsActive,
+            Icon = subcat.Icon ?? string.Empty,
+            ColorClass = subcat.ColorClass ?? string.Empty
         };
         showSubcatModal = true;
     }
@@ -605,14 +630,47 @@ else
 
     private async Task SaveEdit()
     {
-        if (editModel.Id > 0)
-            await Http.PutAsJsonAsync($"api/eventcatsub/{editModel.Id}", editModel);
-        else
-            await Http.PostAsJsonAsync("api/eventcatsub", editModel);
+        try
+        {
+            // Create the EventCatSubCreateDTO to match what the controller expects
+            var dto = new EventCatSubCreateDTO
+            {
+                EventCatId = editModel.EventCatId,
+                Name = editModel.Name,
+                Description = editModel.Description,
+                DisplayOrder = editModel.DisplayOrder,
+                IsActive = editModel.IsActive,
+                Icon = editModel.Icon ?? string.Empty,
+                ColorClass = editModel.ColorClass ?? string.Empty
+            };
 
-        editingSubcatId = null;
-        showSubcatModal = false;
-        await LoadSubCategories(editModel.EventCatId);
+            HttpResponseMessage response;
+            if (editModel.Id > 0)
+            {
+                response = await Http.PutAsJsonAsync($"api/eventcatsub/{editModel.Id}", dto);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/eventcatsub", dto);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Sub-category saved successfully!";
+                editingSubcatId = null;
+                showSubcatModal = false;
+                await LoadSubCategories(editModel.EventCatId);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error saving sub-category: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving sub-category: {ex.Message}";
+        }
     }
 
     private async Task DeleteSubcat(int id)
@@ -667,11 +725,24 @@ else
     public class EventCatSubDto
     {
         public int Id { get; set; }
-    public int EventCatId { get; set; }
+        public int EventCatId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public int DisplayOrder { get; set; } = 0;
         public bool IsActive { get; set; } = true;
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
+    }
+
+    public class EventCatSubCreateDTO
+    {
+        public int EventCatId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
+        public string ColorClass { get; set; } = string.Empty;
     }
 }
 

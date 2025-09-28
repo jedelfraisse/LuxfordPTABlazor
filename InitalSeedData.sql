@@ -41,7 +41,7 @@ SET IDENTITY_INSERT [EventCats] OFF;
 -- =====================================================
 SET IDENTITY_INSERT [EventCatSubs] ON;
 
-INSERT INTO [EventCatSubs] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Icon], [ColorClass], [EventTypeId])
+INSERT INTO [EventCatSubs] ([Id], [Name], [Slug], [Description], [DisplayOrder], [IsActive], [Icon], [ColorClass], [EventCatId])
 VALUES 
     -- School Calendar & Closures
     (1, 'Holiday', 'holiday', 'School holidays when school is closed for all students and staff.', 0, 1, 'bi-flag', 'text-danger', 1),
