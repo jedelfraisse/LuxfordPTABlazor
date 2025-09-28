@@ -1,4 +1,5 @@
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
 @inject HttpClient Http
 
@@ -120,11 +121,11 @@
 @code {
 	[Parameter] public SchoolYear? SchoolYear { get; set; }
 	[Parameter] public List<Event>? Events { get; set; }
-	[Parameter] public EventDashboardSummary? EventSummary { get; set; }
+	[Parameter] public EventDashboardSummaryDTO? EventSummary { get; set; }
 	
 	// For internal use - will be set from Events parameter
 	private List<Event>? events => Events;
-	private EventDashboardSummary? eventSummary => EventSummary;
+	private EventDashboardSummaryDTO? eventSummary => EventSummary;
 
 	private List<DateTime> GetSchoolYearMonths()
 	{

@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
 @inject GoogleAnalyticsService GoogleAnalytics
+@inherits ComponentBase
 
 <PageTitle>Home</PageTitle>
 
@@ -351,7 +352,7 @@
 		margin: 1rem;
 	}
 	
-	@@media (min-width: 576px) {
+	@media (min-width: 576px) {
 		.modal-dialog {
 			margin: 1.75rem auto;
 		}
@@ -376,7 +377,7 @@
 	}
 	
 	/* Force scroll on mobile devices */
-	@@media (max-height: 600px) {
+	@media (max-height: 600px) {
 		.modal-dialog {
 			max-height: 95vh;
 		}
@@ -387,7 +388,7 @@
 	}
 	
 	/* Additional mobile responsiveness */
-	@@media (max-width: 768px) {
+	@media (max-width: 768px) {
 		.modal-lg {
 			max-width: 95vw;
 		}
@@ -397,95 +398,3 @@
 		}
 	}
 </style>
-
-@code {
-	private List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO> boardMembers = new();
-	private string boardYearLabel = "";
-	private bool isLoadingBoard = true;
-	private bool iselectionEvent = false;
-	private bool isCurrentYear = false;
-	private LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO? selectedMember = null;
-	private string activeTab = "position"; // Default to position tab
-	private bool hasRendered = false;
-
-	protected override async Task OnInitializedAsync()
-	{
-		isLoadingBoard = true;
-		try
-		{
-			// Get the current school year
-			var schoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
-			if (schoolYear != null)
-			{
-				isCurrentYear = schoolYear.Status == Shared.Enums.SchoolYearStatus.CurrentYear;
-				boardYearLabel = $"{schoolYear.Name}";
-
-				// Use the new public endpoint that returns AssignedUserDTO
-				boardMembers = await Http.GetFromJsonAsync<List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO>>($"api/boardpositions/public/by-schoolyear/{schoolYear.Id}") 
-					?? new List<LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO>();
-			}
-		}
-		catch
-		{
-			boardMembers = new();
-		}
-		isLoadingBoard = false;
-	}
-
-	protected override async Task OnAfterRenderAsync(bool firstRender)
-	{
-		if (firstRender && !hasRendered)
-		{
-			hasRendered = true;
-			// Track page view only after rendering is complete
-			await GoogleAnalytics.TrackPageViewAsync("/", "Home - Luxford Elementary PTA");
-		}
-	}
-
-	private async Task ShowMemberDetails(LuxfordPTAWeb.Shared.DTOs.AssignedUserDTO member)
-	{
-		if (member.HasAdditionalDetails)
-		{
-			selectedMember = member;
-
-			// Track board member modal view (safe to call after render)
-			if (hasRendered)
-			{
-				await GoogleAnalytics.TrackEventAsync("board_member_details", new 
-				{ 
-					member_name = member.DisplayName,
-					member_role = member.RoleTitle,
-					page = "home"
-				});
-			}
-
-			// Set default active tab based on available content
-			bool hasPositionDescription = !string.IsNullOrWhiteSpace(member.RoleDescription);
-			bool hasBio = !string.IsNullOrWhiteSpace(member.Bio);
-
-			if (hasPositionDescription)
-			{
-				activeTab = "position";
-			}
-			else if (hasBio)
-			{
-				activeTab = "bio";
-			}
-
-			StateHasChanged();
-		}
-	}
-
-	private void CloseModal()
-	{
-		selectedMember = null;
-		activeTab = "position";
-		StateHasChanged();
-	}
-
-	private void SetActiveTab(string tab)
-	{
-		activeTab = tab;
-		StateHasChanged();
-	}
-}

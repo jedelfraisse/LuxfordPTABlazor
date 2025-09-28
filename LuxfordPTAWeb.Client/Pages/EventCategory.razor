@@ -4,7 +4,7 @@
 
 <PageTitle>@pageTitle</PageTitle>
 
-@if (eventType == null || events == null)
+@if (eventCat == null || events == null)
 {
     <div class="alert alert-info">
         <em>Loading @Slug events...</em>
@@ -15,13 +15,13 @@ else if (!events.Any())
     <div class="card shadow-sm mb-4">
         <div class="card-body text-center">
             <div class="mb-3">
-                @if (!string.IsNullOrEmpty(eventType.Icon))
+                @if (!string.IsNullOrEmpty(eventCat.Icon))
                 {
-                    <i class="@eventType.Icon @eventType.ColorClass display-4"></i>
+                    <i class="@eventCat.Icon @eventCat.ColorClass display-4"></i>
                 }
             </div>
-            <h1 class="card-title @eventType.ColorClass">@eventType.Name</h1>
-            <p class="lead">@eventType.Description</p>
+            <h1 class="card-title @eventCat.ColorClass">@eventCat.Name</h1>
+            <p class="lead">@eventCat.Description</p>
         </div>
     </div>
     
@@ -42,13 +42,13 @@ else
     <div class="card shadow-sm mb-4">
         <div class="card-body text-center">
             <div class="mb-3">
-                @if (!string.IsNullOrEmpty(eventType.Icon))
+                @if (!string.IsNullOrEmpty(eventCat.Icon))
                 {
-                    <i class="@eventType.Icon @eventType.ColorClass display-4"></i>
+                    <i class="@eventCat.Icon @eventCat.ColorClass display-4"></i>
                 }
             </div>
-            <h1 class="card-title @eventType.ColorClass">@eventType.Name</h1>
-            <p class="lead">@eventType.Description</p>
+            <h1 class="card-title @eventCat.ColorClass">@eventCat.Name</h1>
+            <p class="lead">@eventCat.Description</p>
             <div>
                 <span class="badge bg-info me-2">
                     @events.Count @(events.Count == 1 ? "Event" : "Events")
@@ -64,14 +64,14 @@ else
     @if (upcomingEvents.Any())
     {
         <h2 class="h4 mb-3">
-            <i class="bi bi-calendar-plus @eventType.ColorClass"></i> 
-            Upcoming @eventType.Name (@upcomingEvents.Count)
+            <i class="bi bi-calendar-plus @eventCat.ColorClass"></i> 
+            Upcoming @eventCat.Name (@upcomingEvents.Count)
         </h2>
         <div class="row mb-4">
             @foreach (var evt in upcomingEvents)
             {
                 <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100 border-start border-4" style="border-left-color: @GetBorderColor(eventType.ColorClass) !important;">
+                    <div class="card h-100 border-start border-4" style="border-left-color: @GetBorderColor(eventCat.ColorClass) !important;">
                         <div class="card-body">
                             <h5 class="card-title">@evt.Title</h5>
                             <p class="text-muted mb-2">
@@ -114,7 +114,7 @@ else
     {
         <h2 class="h4 mb-3">
             <i class="bi bi-calendar-check text-muted"></i> 
-            Past @eventType.Name (@pastEvents.Count)
+            Past @eventCat.Name (@pastEvents.Count)
         </h2>
         <div class="accordion mb-4" id="pastEventsAccordion">
             <div class="accordion-item">
@@ -157,7 +157,7 @@ else
     [Parameter] public string Slug { get; set; } = string.Empty;
     
     private List<EventDto>? events;
-    private EventTypeDto? eventType;
+    private EventCatDto? eventCat;
     private string pageTitle = "Events";
 
     protected override async Task OnInitializedAsync()
@@ -181,8 +181,8 @@ else
             if (response.IsSuccessStatusCode)
             {
                 events = await response.Content.ReadFromJsonAsync<List<EventDto>>();
-                eventType = events?.FirstOrDefault()?.EventType;
-                pageTitle = eventType?.Name ?? "Events";
+                eventCat = events?.FirstOrDefault()?.EventCat;
+                pageTitle = eventCat?.Name ?? "Events";
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -226,11 +226,11 @@ else
         public string Location { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public string Link { get; set; } = string.Empty;
-        public EventTypeDto? EventType { get; set; }
+        public EventCatDto? EventCat { get; set; }
         public SchoolYearDto? SchoolYear { get; set; }
     }
 
-    public class EventTypeDto
+    public class EventCatDto
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
@@ -250,4 +250,4 @@ else
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
     }
-}}
+}

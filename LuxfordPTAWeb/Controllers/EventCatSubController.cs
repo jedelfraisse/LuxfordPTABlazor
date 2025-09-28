@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LuxfordPTAWeb.Shared.Models;
+using LuxfordPTAWeb.Shared.DTOs;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -13,22 +14,28 @@ public class EventCatSubController : ControllerBase
     public EventCatSubController(ApplicationDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IEnumerable<EventCatSub>> Get()
+    public async Task<IEnumerable<EventCatSub>> Get([FromQuery] int? eventCatId)
     {
-        return await _db.EventCatSubs
-            .Include(s => s.EventType)
-            .OrderBy(s => s.EventType.DisplayOrder)
+        var query = _db.EventCatSubs
+            .Include(s => s.EventCat)
+            .OrderBy(s => s.EventCat.DisplayOrder)
             .ThenBy(s => s.DisplayOrder)
-            .ThenBy(s => s.Name)
-            .ToListAsync();
+            .ThenBy(s => s.Name);
+
+        if (eventCatId.HasValue)
+        {
+            query = (IOrderedQueryable<EventCatSub>)query.Where(s => s.EventCatId == eventCatId.Value);
+        }
+
+        return await query.ToListAsync();
     }
 
     [HttpGet("by-category/{categoryId}")]
     public async Task<IEnumerable<EventCatSub>> GetByCategory(int categoryId)
     {
         return await _db.EventCatSubs
-            .Include(s => s.EventType)
-            .Where(s => s.EventTypeId == categoryId)
+            .Include(s => s.EventCat)
+            .Where(s => s.EventCatId == categoryId)
             .OrderBy(s => s.DisplayOrder)
             .ThenBy(s => s.Name)
             .ToListAsync();
@@ -38,7 +45,7 @@ public class EventCatSubController : ControllerBase
     public async Task<ActionResult<EventCatSub>> Get(int id)
     {
         var eventCatSub = await _db.EventCatSubs
-            .Include(s => s.EventType)
+            .Include(s => s.EventCat)
             .FirstOrDefaultAsync(s => s.Id == id);
         
         if (eventCatSub == null)
@@ -49,22 +56,27 @@ public class EventCatSubController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<EventCatSub>> Post([FromBody] EventCatSub eventCatSub)
+    public async Task<IActionResult> Create([FromBody] EventCatSubCreateDTO dto)
     {
-        // Generate slug if not provided
-        if (string.IsNullOrEmpty(eventCatSub.Slug))
-            eventCatSub.Slug = EventCatSub.GenerateSlug(eventCatSub.Name);
+        var eventCatSub = new EventCatSub
+        {
+            EventCatId = dto.EventCatId,
+            Name = dto.Name,
+            DisplayOrder = dto.DisplayOrder,
+            IsActive = dto.IsActive
+            // Do not set EventCat here; let EF Core handle the relationship via EventCatId
+        };
 
+        // Add to DB and save
         _db.EventCatSubs.Add(eventCatSub);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Get), new { id = eventCatSub.Id }, eventCatSub);
+        return Ok(eventCatSub);
     }
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<IActionResult> Put(int id, [FromBody] EventCatSub updatedSub)
+    public async Task<IActionResult> Put(int id, [FromBody] EventCatSubCreateDTO dto)
     {
         var eventCatSub = await _db.EventCatSubs.FindAsync(id);
         if (eventCatSub == null)
@@ -72,14 +84,16 @@ public class EventCatSubController : ControllerBase
             return NotFound();
         }
 
-        eventCatSub.Name = updatedSub.Name;
-        eventCatSub.Slug = string.IsNullOrEmpty(updatedSub.Slug) ? EventCatSub.GenerateSlug(updatedSub.Name) : updatedSub.Slug;
-        eventCatSub.Description = updatedSub.Description;
-        eventCatSub.DisplayOrder = updatedSub.DisplayOrder;
-        eventCatSub.IsActive = updatedSub.IsActive;
-        eventCatSub.Icon = updatedSub.Icon;
-        eventCatSub.ColorClass = updatedSub.ColorClass;
-        eventCatSub.EventTypeId = updatedSub.EventTypeId;
+        eventCatSub.Name = dto.Name;
+        eventCatSub.Description = dto.Description;
+        eventCatSub.DisplayOrder = dto.DisplayOrder;
+        eventCatSub.IsActive = dto.IsActive;
+        eventCatSub.EventCatId = dto.EventCatId;
+        // Only set Icon and ColorClass if present in DTO
+        if (!string.IsNullOrWhiteSpace(dto.Icon))
+            eventCatSub.Icon = dto.Icon;
+        if (!string.IsNullOrWhiteSpace(dto.ColorClass))
+            eventCatSub.ColorClass = dto.ColorClass;
 
         await _db.SaveChangesAsync();
         return NoContent();

@@ -1,4 +1,4 @@
-@page "/admin/event-categories"
+﻿@page "/admin/event-categories"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -129,41 +129,31 @@
                             }
                             else
                             {
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Order</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var subCat in subCategories.Where(sc => sc.EventTypeId == editingEventCat.Id).OrderBy(sc => sc.DisplayOrder))
-                                        {
-                                            <tr>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" value="@subCat.Name" @onchange="e => subCat.Name = e.Value.ToString()" />
-                                                </td>
-                                                <td>
-                                                    <input type="number" class="form-control form-control-sm" value="@subCat.DisplayOrder" @onchange="e => subCat.DisplayOrder = int.Parse(e.Value.ToString())" />
-                                                </td>
-                                                <td>
-                                                    <input type="checkbox" class="form-check-input" checked="@subCat.IsActive" @onchange="e => subCat.IsActive = (bool)e.Value" />
-                                                </td>
-                                                <td>
-                                                    <button type="button" class="btn btn-success btn-sm" @onclick="() => SaveSubCategory(subCat)"><i class="bi bi-check"></i></button>
-                                                    <button type="button" class="btn btn-danger btn-sm" @onclick="() => DeleteSubCategory(subCat.Id)"><i class="bi bi-trash"></i></button>
-                                                </td>
-                                            </tr>
-                                        }
-                                        <tr>
-                                            <td colspan="4">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSubCategory(editingEventCat.Id)"><i class="bi bi-plus"></i> Add Sub-Category</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <div class="mb-3">
+                                    <!-- Sub-category list -->
+                                    @foreach (var subcat in subCategories.OrderBy(sc => sc.DisplayOrder))
+                                    {
+                                        <div class="d-flex align-items-center mb-2 border rounded p-2 bg-light">
+                                            <div class="flex-grow-1">
+                                                <strong>@subcat.Name</strong>
+                                                <div class="text-muted small">@subcat.Description</div>
+                                                <span class="badge @(subcat.IsActive ? "bg-success" : "bg-secondary")">
+                                                    @(subcat.IsActive ? "Active" : "Inactive")
+                                                </span>
+                                            </div>
+                                            <div class="btn-group ms-2">
+                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveUp(subcat.Id)" disabled="@showSubcatModal">↑</button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => MoveDown(subcat.Id)" disabled="@showSubcatModal">↓</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => EditSubcat(subcat)" disabled="@showSubcatModal">Edit</button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSubCategory(editingEventCat.Id)">
+                                        <i class="bi bi-plus"></i> Add Sub-Category
+                                    </button>
+                                </div>
                             }
                         </div>
                     </div>
@@ -255,6 +245,44 @@ else
     </div>
 }
 
+<!-- Modal for editing sub-category -->
+@if (showSubcatModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.2);">
+        <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width:400px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Sub-Category</h5>
+                    <button type="button" class="btn-close" @onclick="CloseSubcatModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="editModel" OnValidSubmit="SaveEdit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="mb-2">
+                            <label class="form-label">Name</label>
+                            <input class="form-control" @bind="editModel.Name" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" @bind="editModel.Description"></textarea>
+                        </div>
+                        <div class="mb-2 form-check">
+                            <input type="checkbox" class="form-check-input" id="subcatActive" @bind="editModel.IsActive" />
+                            <label for="subcatActive" class="form-check-label">Active</label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">Save</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CloseSubcatModal">Cancel</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<EventCatDto>? eventCategories;
     private List<EventDto>? events;
@@ -265,6 +293,9 @@ else
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private List<EventCatSubDto>? subCategories;
+    private int? editingSubcatId = null;
+    private EventCatSubDto editModel = new();
+    private bool showSubcatModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -517,7 +548,7 @@ else
     {
         try
         {
-            subCategories = await Http.GetFromJsonAsync<List<EventCatSubDto>>($"api/eventcatsub?eventTypeId={eventCatId}");
+            subCategories = await Http.GetFromJsonAsync<List<EventCatSubDto>>($"api/eventcatsub?eventCatId={eventCatId}");
         }
         catch
         {
@@ -536,7 +567,7 @@ else
         {
             await Http.PostAsJsonAsync("api/eventcatsub", subCat);
         }
-        await LoadSubCategories(subCat.EventTypeId);
+    await LoadSubCategories(subCat.EventCatId);
     }
 
     private async Task DeleteSubCategory(int subCatId)
@@ -549,8 +580,51 @@ else
     private void AddSubCategory(int eventCatId)
     {
         if (subCategories == null) subCategories = new List<EventCatSubDto>();
-        subCategories.Add(new EventCatSubDto { EventTypeId = eventCatId, Name = "", DisplayOrder = subCategories.Count + 1, IsActive = true });
+    subCategories.Add(new EventCatSubDto { EventCatId = eventCatId, Name = "", DisplayOrder = subCategories.Count + 1, IsActive = true });
     }
+
+    private void EditSubcat(EventCatSubDto subcat)
+    {
+        editingSubcatId = subcat.Id;
+        editModel = new EventCatSubDto
+        {
+            Id = subcat.Id,
+            EventCatId = subcat.EventCatId,
+            Name = subcat.Name,
+            Description = subcat.Description,
+            DisplayOrder = subcat.DisplayOrder,
+            IsActive = subcat.IsActive
+        };
+        showSubcatModal = true;
+    }
+
+    private void CloseSubcatModal()
+    {
+        showSubcatModal = false;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editModel.Id > 0)
+            await Http.PutAsJsonAsync($"api/eventcatsub/{editModel.Id}", editModel);
+        else
+            await Http.PostAsJsonAsync("api/eventcatsub", editModel);
+
+        editingSubcatId = null;
+        showSubcatModal = false;
+        await LoadSubCategories(editModel.EventCatId);
+    }
+
+    private async Task DeleteSubcat(int id)
+    {
+        await Http.DeleteAsync($"api/eventcatsub/{id}");
+        editingSubcatId = null;
+        if (editingEventCat.Id > 0)
+            await LoadSubCategories(editingEventCat.Id);
+    }
+
+    private void MoveUp(int id) { /* Move logic */ }
+    private void MoveDown(int id) { /* Move logic */ }
 
     public class EventCatDto
     {
@@ -588,12 +662,14 @@ else
         public string Icon { get; set; } = string.Empty;
         [System.ComponentModel.DataAnnotations.StringLength(30, ErrorMessage = "Color class cannot be longer than 30 characters")]
         public string ColorClass { get; set; } = string.Empty;
+
     }
     public class EventCatSubDto
     {
         public int Id { get; set; }
-        public int EventTypeId { get; set; }
+    public int EventCatId { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public int DisplayOrder { get; set; } = 0;
         public bool IsActive { get; set; } = true;
     }
