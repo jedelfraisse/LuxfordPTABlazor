@@ -1,0 +1,166 @@
+@page "/Account/Welcome"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using LuxfordPTAWeb.Data
+@using LuxfordPTAWeb.Shared.Models
+@using System.Security.Claims
+
+@attribute [Authorize]
+
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Welcome to Luxford PTA!</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white text-center">
+                    <h1 class="card-title mb-0">
+                        <i class="bi bi-house-heart me-2"></i>
+                        Welcome to Luxford PTA!
+                    </h1>
+                </div>
+                <div class="card-body">
+                    @if (currentUser != null)
+                    {
+                        <div class="text-center mb-4">
+                            <h2 class="text-primary">Hello, @currentUser.FirstName!</h2>
+                            <p class="lead">We're excited to have you as part of our PTA community.</p>
+                            
+                            @if (userPicture != null)
+                            {
+                                <img src="@userPicture" alt="Profile Picture" class="rounded-circle mb-3" style="width: 80px; height: 80px;" />
+                            }
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-calendar-event display-4 text-primary mb-2"></i>
+                                        <h5>Upcoming Events</h5>
+                                        <p>Stay updated with school events and activities.</p>
+                                        <a href="/events" class="btn btn-primary">View Events</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-people display-4 text-success mb-2"></i>
+                                        <h5>Get Involved</h5>
+                                        <p>Volunteer for events and help make a difference.</p>
+                                        <a href="/volunteer" class="btn btn-success">Volunteer Opportunities</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <h6><i class="bi bi-info-circle me-2"></i>Your Account Status</h6>
+                            <p class="mb-1"><strong>Email:</strong> @currentUser.Email</p>
+                            <p class="mb-1"><strong>Role:</strong> @string.Join(", ", userRoles)</p>
+                            <p class="mb-0"><strong>Member Since:</strong> @(currentUser.JoinDate?.ToString("MMMM yyyy") ?? "Recently joined")</p>
+                        </div>
+
+                        @if (isFirstLogin)
+                        {
+                            <div class="alert alert-success mt-3">
+                                <h6><i class="bi bi-check-circle me-2"></i>Account Created Successfully!</h6>
+                                <p class="mb-0">Your account has been created and linked with Google. You can now access all PTA resources and events.</p>
+                            </div>
+                        }
+
+                        <div class="text-center mt-4">
+                            <button class="btn btn-outline-primary me-2" @onclick="ContinueToDashboard">
+                                <i class="bi bi-arrow-right me-1"></i> Continue to Dashboard
+                            </button>
+                            <a href="/Account/Manage" class="btn btn-outline-secondary">
+                                <i class="bi bi-gear me-1"></i> Account Settings
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading your profile...</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- PTA Information Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-square me-2"></i>About Luxford PTA</h5>
+                </div>
+                <div class="card-body">
+                    <p>The Luxford Elementary PTA is dedicated to supporting our students, teachers, and school community. We organize events, fundraisers, and volunteer opportunities throughout the school year.</p>
+                    
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-2">
+                            <i class="bi bi-envelope text-primary"></i>
+                            <div><small>Contact us at info@luxfordpta.org</small></div>
+                        </div>
+                        <div class="col-md-4 text-center mb-2">
+                            <i class="bi bi-clock text-primary"></i>
+                            <div><small>Meetings: First Tuesday monthly</small></div>
+                        </div>
+                        <div class="col-md-4 text-center mb-2">
+                            <i class="bi bi-geo-alt text-primary"></i>
+                            <div><small>Luxford Elementary School</small></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ApplicationUser? currentUser;
+    private List<string> userRoles = new();
+    private string? userPicture;
+    private bool isFirstLogin;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            currentUser = await UserManager.GetUserAsync(authState.User);
+            if (currentUser != null)
+            {
+                userRoles = (await UserManager.GetRolesAsync(currentUser)).ToList();
+                
+                // Get user picture from Google claims if available
+                userPicture = authState.User.FindFirst("urn:google:picture")?.Value;
+                
+                // Check if this is a first login (account created recently)
+                isFirstLogin = currentUser.JoinDate.HasValue && currentUser.JoinDate > DateTime.UtcNow.AddMinutes(-5);
+            }
+        }
+    }
+
+    private void ContinueToDashboard()
+    {
+        if (!string.IsNullOrEmpty(ReturnUrl))
+        {
+            NavigationManager.NavigateTo(ReturnUrl);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}

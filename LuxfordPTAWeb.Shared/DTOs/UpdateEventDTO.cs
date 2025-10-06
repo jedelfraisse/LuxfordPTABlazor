@@ -50,4 +50,8 @@ public class UpdateEventDTO
     
     // NEW: Audit information for the update
     public string ChangeNotes { get; set; } = string.Empty; // Optional notes about what was changed
+
+    // NEW: Markdown and HTML description rendering
+    public string DescriptionMarkdown { get; set; } = string.Empty;
+    public string DescriptionHtml { get; set; } = string.Empty;
 }

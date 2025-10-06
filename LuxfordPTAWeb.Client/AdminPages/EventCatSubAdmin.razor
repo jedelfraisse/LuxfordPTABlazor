@@ -211,7 +211,7 @@
 									}
 								</div>
 								<div class="mt-2">
-									<button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => AddSubCategory(editingEventCat.Id)">
+									<button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => ShowCreateSubCategoryModal(editingEventCat.Id)">
 										<i class="bi bi-plus"></i> Add Sub-Category
 									</button>
 								</div>
@@ -693,10 +693,19 @@ else if (!showForm)
 			await LoadSubCategories(editingEventCat.Id);
 	}
 
-	private void AddSubCategory(int eventCatId)
+	private async Task ShowCreateSubCategoryModal(int eventCatId)
 	{
-		if (subCategories == null) subCategories = new List<EventCatSubDto>();
-		subCategories.Add(new EventCatSubDto { EventCatId = eventCatId, Name = "", DisplayOrder = subCategories.Count + 1, IsActive = true });
+		editModel = new EventCatSubDto {
+			Id = 0,
+			EventCatId = eventCatId,
+			Name = string.Empty,
+			Description = string.Empty,
+			DisplayOrder = (subCategories?.Count ?? 0) + 1,
+			IsActive = true,
+			Icon = string.Empty,
+			ColorClass = string.Empty
+		};
+		showSubcatModal = true;
 	}
 
 	private void EditSubcat(EventCatSubDto subcat)

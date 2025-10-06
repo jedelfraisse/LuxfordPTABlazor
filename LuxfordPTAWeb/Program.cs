@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 
 namespace LuxfordPTAWeb;
 
@@ -64,6 +65,7 @@ public class Program
 		builder.Services.AddScoped<IdentityRedirectManager>();
 		builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
+		// UPDATED: Configure authentication with Google OAuth support
 		builder.Services.AddAuthentication(options =>
 			{
 				options.DefaultScheme = IdentityConstants.ApplicationScheme;
@@ -71,18 +73,52 @@ public class Program
 			})
 			.AddIdentityCookies();
 
+		// Add Google OAuth to the authentication builder
+		builder.Services.AddAuthentication()
+			.AddGoogle(options =>
+			{
+				// PTA Tech Note: These credentials come from Google Cloud Console
+				// To update: Go to console.cloud.google.com > APIs & Services > Credentials
+				options.ClientId = "998181497111-fr7mbk8itlfetjbuov48irgr3155stfr.apps.googleusercontent.com";
+				options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? 
+					throw new InvalidOperationException("Google Client Secret not configured. Add 'Authentication:Google:ClientSecret' to appsettings.Development.json or appsettings.Production.json");
+				
+				// Request additional user profile information
+				options.Scope.Add("profile");
+				options.Scope.Add("email");
+				
+				// Set the correct callback path to match your redirect URI
+				options.CallbackPath = "/oauth2callback";
+
+				// Optional: Restrict to your organization's domain only
+				// Uncomment the next line to only allow @luxfordpta.org email addresses
+				// Pull from appsettings OnlyLuxfordEmail to enable/disable
+				if (builder.Configuration.GetValue<bool>("Authentication:Google:OnlyLuxfordEmail"))
+					options.AuthorizationEndpoint += "?hd=luxfordpta.org";
+				
+				// Save tokens for API calls (optional - needed if you want to call Google APIs later)
+				options.SaveTokens = true;
+			});
+
 		var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 		builder.Services.AddDbContext<ApplicationDbContext>(options =>
 			options.UseSqlServer(connectionString));
 		builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-		builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
+		// UPDATED: Configure Identity to support external logins
+		builder.Services.AddIdentityCore<ApplicationUser>(options => 
+			{
+				// PTA Tech Note: These settings control user registration requirements
+				options.SignIn.RequireConfirmedAccount = false; // Changed: Allow Google users to login immediately
+				options.User.RequireUniqueEmail = true; // Ensure unique emails
+			})
 			.AddRoles<IdentityRole>()
 			.AddEntityFrameworkStores<ApplicationDbContext>()
 			.AddSignInManager()
 			.AddDefaultTokenProviders();
 
 		builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IEmailSenderService, LuxfordPTAWeb.Services.EmailSenderService>();
 
 		builder.Services.AddScoped<SchoolYearSupport>();
 
@@ -96,15 +132,23 @@ public class Program
 		var googleAnalyticsOptions = builder.Configuration.GetSection("GoogleAnalytics").Get<GoogleAnalyticsOptions>() ?? new GoogleAnalyticsOptions();
 		builder.Services.AddSingleton(googleAnalyticsOptions);
 
+		// Configure backup settings
+		builder.Services.Configure<LuxfordPTAWeb.Services.BackupSettings>(
+			builder.Configuration.GetSection(LuxfordPTAWeb.Services.BackupSettings.SectionName));
+
 		// Register Cookie Consent and Google Analytics services  
 		builder.Services.AddScoped<ICookieConsentService, CookieConsentService>();
 		builder.Services.AddScoped<GoogleAnalyticsService>();
+
+		// Register backup services
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IDatabaseBackupService, LuxfordPTAWeb.Services.DatabaseBackupService>();
+		builder.Services.AddHostedService<LuxfordPTAWeb.Services.ScheduledBackupService>();
 
 		builder.Services.AddCors(options =>
 		{
 			options.AddPolicy("AllowBlazorClient", policy =>
 				policy.WithOrigins("https://localhost:7123",
-								"https://luxfordpta.delfraisse.com")
+								"https://luxfordpta.org") // Added production domain
 					  .AllowAnyHeader()
 					  .AllowAnyMethod());
 		});
@@ -247,7 +291,8 @@ public class Program
 					try
 					{
 						var errorFile = Path.Combine(env.ContentRootPath, $"migration-error-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-						File.WriteAllText(errorFile,
+						File.WriteAllText(
+							errorFile,
 							$"=== Critical Migration Error at {DateTime.Now} ===\n" +
 							$"Error: {ex.Message}\n" +
 							$"Exception type: {ex.GetType().Name}\n" +
@@ -255,7 +300,8 @@ public class Program
 
 						if (ex.InnerException != null)
 						{
-							File.AppendAllText(errorFile,
+							File.AppendAllText(
+								errorFile,
 								$"Inner exception: {ex.InnerException.Message}\n" +
 								$"Inner exception type: {ex.InnerException.GetType().Name}\n");
 						}
@@ -293,6 +339,11 @@ public class Program
 		}
 
 		app.UseHttpsRedirection();
+		
+		// IMPORTANT: Authentication must come before authorization
+		app.UseAuthentication();
+		app.UseAuthorization();
+		
 		app.UseAntiforgery();
 
 		app.MapStaticAssets();

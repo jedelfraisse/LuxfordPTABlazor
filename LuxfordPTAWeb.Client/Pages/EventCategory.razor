@@ -75,7 +75,8 @@ else
                         <div class="card-body">
                             <h5 class="card-title">@evt.Title</h5>
                             <p class="text-muted mb-2">
-                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
+                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy") @if(evt.Date.TimeOfDay != TimeSpan.Zero){<span>@evt.Date.ToString("h:mm tt")</span>}
+                                @if(evt.Date.Date == DateTime.Now.Date){<span class="badge bg-warning ms-2">Tonight!</span>}
                             </p>
                             @if (!string.IsNullOrWhiteSpace(evt.Location))
                             {
@@ -83,7 +84,10 @@ else
                                     <i class="bi bi-geo-alt"></i> @evt.Location
                                 </p>
                             }
-                            <p class="card-text">@TruncateDescription(evt.Description, 100)</p>
+                            @if (!string.IsNullOrWhiteSpace(evt.Description))
+                            {
+                                <div class="card-text scrollable-content" style="max-height:180px;">@evt.Description</div>
+                            }
                             @if (!string.IsNullOrWhiteSpace(evt.Link))
                             {
                                 <a href="@evt.Link" class="btn btn-sm btn-outline-primary" target="_blank">
@@ -193,14 +197,6 @@ else
         {
             events = new List<EventDto>();
         }
-    }
-
-    private string TruncateDescription(string description, int maxLength)
-    {
-        if (string.IsNullOrEmpty(description) || description.Length <= maxLength)
-            return description;
-        
-        return description.Substring(0, maxLength - 3) + "...";
     }
 
     private string GetBorderColor(string colorClass)

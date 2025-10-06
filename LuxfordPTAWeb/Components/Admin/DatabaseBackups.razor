@@ -1,0 +1,341 @@
+@page "/admin/database-backups"
+@using Microsoft.AspNetCore.Authorization
+@using LuxfordPTAWeb.Services
+@attribute [Authorize(Roles = "Admin")]
+
+@inject IDatabaseBackupService BackupService
+@inject IJSRuntime JSRuntime
+@inject ILogger<DatabaseBackups> Logger
+
+<PageTitle>Database Backups - Admin</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="bi bi-database me-2"></i>
+                    Database Backups
+                </h1>
+                <button class="btn btn-primary" @onclick="CreateBackup" disabled="@isCreatingBackup">
+                    @if (isCreatingBackup)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        <span>Creating Backup...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-plus-circle me-1"></i>
+                        <span>Create Backup</span>
+                    }
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="alert @(statusMessage.Contains("Error") ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+                    @statusMessage
+                    <button type="button" class="btn-close" @onclick="ClearStatusMessage"></button>
+                </div>
+            }
+
+            <!-- Backup Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">@backups.Count</h4>
+                                    <p class="card-text">Total Backups</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-archive display-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">@GetTotalBackupSize()</h4>
+                                    <p class="card-text">Total Size</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-hdd display-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">@(backups.Any() ? backups.First().CreatedDate.ToString("MM/dd") : "N/A")</h4>
+                                    <p class="card-text">Latest Backup</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-clock display-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">Daily</h4>
+                                    <p class="card-text">Auto Backup</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="bi bi-arrow-repeat display-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup List -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list me-2"></i>
+                        Available Backups
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading backups...</p>
+                        </div>
+                    }
+                    else if (!backups.Any())
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-inbox display-1 text-muted"></i>
+                            <h4 class="text-muted">No Backups Found</h4>
+                            <p class="text-muted">Create your first backup using the button above.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Created</th>
+                                        <th>Size</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var backup in backups)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <i class="bi bi-file-earmark-zip me-2"></i>
+                                                <strong>@(string.IsNullOrEmpty(backup.DisplayName) ? backup.FileName : backup.DisplayName)</strong>
+                                                @if (backup.FileName.Contains("Daily_Backup"))
+                                                {
+                                                    <span class="badge bg-primary ms-2">Auto</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @backup.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss")
+                                                <br />
+                                                <small class="text-muted">@GetTimeAgo(backup.CreatedDate)</small>
+                                            </td>
+                                            <td>@backup.SizeFormatted</td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(backup.Description))
+                                                {
+                                                    <small>@backup.Description</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="/api/backup/download/@backup.FileName" class="btn btn-sm btn-outline-primary" download>
+                                                        <i class="bi bi-download me-1"></i>Download
+                                                    </a>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteBackup(backup.FileName)">
+                                                        <i class="bi bi-trash me-1"></i>Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Backup Instructions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Backup Instructions for PTA Tech Leads
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-gear-fill me-2"></i>Automatic Backups</h6>
+                            <ul class="mb-3">
+                                <li>Daily backups run automatically at 2:00 AM</li>
+                                <li>Old backups are cleaned up after 30 days</li>
+                                <li>Configure in appsettings.json under "BackupSettings"</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-hand-index-fill me-2"></i>Manual Backups</h6>
+                            <ul class="mb-3">
+                                <li>Click "Create Backup" for immediate backup</li>
+                                <li>Useful before major updates or changes</li>
+                                <li>Download backups for off-site storage</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Important:</strong> For production sites, consider storing backups in cloud storage (Azure Blob, Google Drive, etc.) for additional safety.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<BackupInfo> backups = new();
+    private bool isLoading = true;
+    private bool isCreatingBackup = false;
+    private string statusMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBackupsAsync();
+    }
+
+    private async Task LoadBackupsAsync()
+    {
+        try
+        {
+            isLoading = true;
+            backups = await BackupService.GetBackupListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load backups");
+            statusMessage = $"Error loading backups: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateBackup()
+    {
+        try
+        {
+            isCreatingBackup = true;
+            statusMessage = "";
+
+            var backupFileName = await BackupService.CreateBackupAsync();
+            statusMessage = $"Backup created successfully: {backupFileName}";
+
+            await LoadBackupsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create backup");
+            statusMessage = $"Error creating backup: {ex.Message}";
+        }
+        finally
+        {
+            isCreatingBackup = false;
+        }
+    }
+
+    private async Task DeleteBackup(string fileName)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+            $"Are you sure you want to delete the backup '{fileName}'? This action cannot be undone.");
+
+        if (confirmed)
+        {
+            try
+            {
+                var success = await BackupService.DeleteBackupAsync(fileName);
+                if (success)
+                {
+                    statusMessage = $"Backup '{fileName}' deleted successfully.";
+                    await LoadBackupsAsync();
+                }
+                else
+                {
+                    statusMessage = $"Error: Failed to delete backup '{fileName}'.";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to delete backup {FileName}", fileName);
+                statusMessage = $"Error deleting backup: {ex.Message}";
+            }
+        }
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = "";
+    }
+
+    private string GetTotalBackupSize()
+    {
+        var totalBytes = backups.Sum(b => b.SizeBytes);
+        return FormatFileSize(totalBytes);
+    }
+
+    private string GetTimeAgo(DateTime date)
+    {
+        var timeSpan = DateTime.Now - date;
+        
+        if (timeSpan.TotalDays >= 1)
+            return $"{(int)timeSpan.TotalDays} days ago";
+        if (timeSpan.TotalHours >= 1)
+            return $"{(int)timeSpan.TotalHours} hours ago";
+        if (timeSpan.TotalMinutes >= 1)
+            return $"{(int)timeSpan.TotalMinutes} minutes ago";
+        
+        return "Just now";
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

@@ -125,4 +125,7 @@ public class Event : IAuditableEntity
 
 	// Flexible sponsor/event/level relationships
 	public ICollection<SponsorAssignment> SponsorAssignments { get; set; } = new List<SponsorAssignment>();
+
+	public string DescriptionMarkdown { get; set; } = string.Empty;
+	public string DescriptionHtml { get; set; } = string.Empty;
 }

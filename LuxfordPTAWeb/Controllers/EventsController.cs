@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Markdig;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -342,6 +343,11 @@ public class EventsController : ControllerBase
                 eventItem.Slug += $"-{schoolYear.Name?.Replace(" ", "").ToLower()}";
             }
 
+            // Markdown conversion and sanitization
+            var pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
+            eventItem.DescriptionMarkdown = createEventDto.DescriptionMarkdown ?? string.Empty;
+            eventItem.DescriptionHtml = Markdig.Markdown.ToHtml(eventItem.DescriptionMarkdown, pipeline);
+
             // Set audit information for creation
             await _auditService.SetCreationAuditAsync(eventItem, currentUser);
 
@@ -623,6 +629,11 @@ public class EventsController : ControllerBase
             {
                 eventItem.EventCoordinatorId = updatedEventDto.EventCoordinatorId;
             }
+
+            // Markdown conversion and sanitization
+            var pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
+            eventItem.DescriptionMarkdown = updatedEventDto.DescriptionMarkdown ?? string.Empty;
+            eventItem.DescriptionHtml = Markdig.Markdown.ToHtml(eventItem.DescriptionMarkdown, pipeline);
 
             // Create comprehensive change notes
             var changeNotes = !string.IsNullOrWhiteSpace(updatedEventDto.ChangeNotes) 

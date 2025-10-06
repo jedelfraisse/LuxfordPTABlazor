@@ -10,6 +10,7 @@
         "dependencies": {
           "LuxfordPTAWeb.Client": "1.0.0",
           "LuxfordPTAWeb.Shared": "1.0.0",
+          "Markdig": "0.42.0",
           "Microsoft.AspNetCore.Components.WebAssembly.Server": "9.0.8",
           "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": "9.0.8",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "9.0.8",
@@ -60,6 +61,14 @@
           "lib/net6.0/Humanizer.dll": {
             "assemblyVersion": "2.14.0.0",
             "fileVersion": "2.14.1.48190"
+          }
+        }
+      },
+      "Markdig/0.42.0": {
+        "runtime": {
+          "lib/net9.0/Markdig.dll": {
+            "assemblyVersion": "0.42.0.0",
+            "fileVersion": "0.42.0.0"
           }
         }
       },
@@ -1260,6 +1269,13 @@
       "sha512": "sha512-lQKvtaTDOXnoVJ20ibTuSIOf2i0uO0MPbDhd1jm238I+U/2ZnRENj0cktKZhtchBMtCUSRQ5v4xBCUbKNmyVMw==",
       "path": "humanizer.core/2.14.1",
       "hashPath": "humanizer.core.2.14.1.nupkg.sha512"
+    },
+    "Markdig/0.42.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-tINdftVfbTujqfPXrQOSl9/6XCS2Y4Zwz+i7UPBgxRNnDtI1CjyQ5UA/5sKoSOmfECyWkTztY/vbcc/u1DA8nA==",
+      "path": "markdig/0.42.0",
+      "hashPath": "markdig.0.42.0.nupkg.sha512"
     },
     "Microsoft.AspNetCore.Authentication/2.3.0": {
       "type": "package",

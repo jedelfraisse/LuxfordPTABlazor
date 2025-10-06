@@ -63,7 +63,10 @@ public class EventCatSubController : ControllerBase
             EventCatId = dto.EventCatId,
             Name = dto.Name,
             DisplayOrder = dto.DisplayOrder,
-            IsActive = dto.IsActive
+            IsActive = dto.IsActive,
+            Description = dto.Description ?? string.Empty,
+            Icon = dto.Icon ?? string.Empty,
+            ColorClass = dto.ColorClass ?? string.Empty
             // Do not set EventCat here; let EF Core handle the relationship via EventCatId
         };
 

@@ -10,6 +10,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="MailKit" Version="4.14.0" />
+		<PackageReference Include="Markdig" Version="0.42.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.9" />
 		<ProjectReference Include="..\LuxfordPTAWeb.Client\LuxfordPTAWeb.Client.csproj" />
 		<ProjectReference Include="..\LuxfordPTAWeb.Shared\LuxfordPTAWeb.Shared.csproj" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />

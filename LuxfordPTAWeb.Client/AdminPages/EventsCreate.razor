@@ -70,9 +70,17 @@ else if (createEventDto != null)
                     </div>
 
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" rows="4" @bind="createEventDto.Description"></textarea>
+                        <label for="descriptionMarkdown" class="form-label">Description (Markdown Supported)</label>
+                        <textarea class="form-control" id="descriptionMarkdown" rows="6" @bind="createEventDto.DescriptionMarkdown" placeholder="Enter event details using markdown formatting..."></textarea>
+                        <div class="form-text">You can use <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a> for formatting. HTML is not allowed and will be ignored.</div>
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(createEventDto.DescriptionMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Live Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@createEventDto.DescriptionMarkdown" />
+                        </div>
+                    }
 
                     <div class="row mb-3">
                         <div class="col-md-6">

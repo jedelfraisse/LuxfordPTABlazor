@@ -594,6 +594,16 @@ h1:focus {
     }
 }
 
+/* Admin Events Table Row Minimum Height */
+.admin-events-row {
+    min-height: 80px;
+}
+
+/* Admin Events Table Cell Minimum Height */
+.admin-events-cell {
+    min-height: 80px;
+}
+
 /* Large Desktop Styles */
 @media (min-width: 1200px) {
     .pta-logo, .pta-mascot, .sponsor-logo {

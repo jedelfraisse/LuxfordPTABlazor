@@ -15,6 +15,9 @@ public class CreateEventDTO
 
     public string Description { get; set; } = string.Empty;
 
+    public string DescriptionMarkdown { get; set; } = string.Empty;
+    public string DescriptionHtml { get; set; } = string.Empty;
+
     public string Location { get; set; } = string.Empty;
 
     public string ImageUrl { get; set; } = string.Empty;
