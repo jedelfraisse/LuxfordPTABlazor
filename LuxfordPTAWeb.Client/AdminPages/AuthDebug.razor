@@ -1,0 +1,138 @@
+@page "/admin/auth-debug"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject HttpClient Http
+
+<PageTitle>Authentication Debug</PageTitle>
+
+<h2>Authentication Debug Information</h2>
+
+@if (authState != null)
+{
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Authentication Status</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Is Authenticated:</strong> @authState.User.Identity?.IsAuthenticated</p>
+            <p><strong>Authentication Type:</strong> @authState.User.Identity?.AuthenticationType</p>
+            <p><strong>Name:</strong> @authState.User.Identity?.Name</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Claims</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var claim in authState.User.Claims)
+                    {
+                        <tr>
+                            <td>@claim.Type</td>
+                            <td>@claim.Value</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>Roles</h5>
+        </div>
+        <div class="card-body">
+            @{
+                var roles = authState.User.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role").ToList();
+            }
+            @if (roles.Any())
+            {
+                <ul>
+                    @foreach (var role in roles)
+                    {
+                        <li>@role.Value</li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="text-danger">No roles found!</p>
+            }
+            
+            <hr />
+            
+            <p><strong>Is in Admin role:</strong> @authState.User.IsInRole("Admin")</p>
+            <p><strong>Is in BoardMember role:</strong> @authState.User.IsInRole("BoardMember")</p>
+            <p><strong>Is in Volunteer role:</strong> @authState.User.IsInRole("Volunteer")</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5>OAuth2 Status Test</h5>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-primary" @onclick="TestOAuth2Status">Test OAuth2 Status Endpoint</button>
+            
+            @if (!string.IsNullOrEmpty(oauth2TestResult))
+            {
+                <div class="alert alert-info mt-3">
+                    <pre>@oauth2TestResult</pre>
+                </div>
+            }
+            
+            @if (!string.IsNullOrEmpty(oauth2Error))
+            {
+                <div class="alert alert-danger mt-3">
+                    <pre>@oauth2Error</pre>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <p>Loading authentication information...</p>
+}
+
+@code {
+    private AuthenticationState? authState;
+    private string? oauth2TestResult;
+    private string? oauth2Error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    }
+
+    private async Task TestOAuth2Status()
+    {
+        oauth2TestResult = null;
+        oauth2Error = null;
+
+        try
+        {
+            var response = await Http.GetAsync("/oauth2/status");
+            
+            oauth2TestResult = $"Status Code: {response.StatusCode}\n";
+            oauth2TestResult += $"Content-Type: {response.Content.Headers.ContentType?.MediaType}\n\n";
+            
+            var content = await response.Content.ReadAsStringAsync();
+            oauth2TestResult += $"Response:\n{content}";
+        }
+        catch (Exception ex)
+        {
+            oauth2Error = $"Exception: {ex.Message}\n\n{ex.StackTrace}";
+        }
+    }
+}

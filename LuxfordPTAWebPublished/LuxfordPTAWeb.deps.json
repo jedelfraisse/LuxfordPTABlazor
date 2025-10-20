@@ -10,7 +10,9 @@
         "dependencies": {
           "LuxfordPTAWeb.Client": "1.0.0",
           "LuxfordPTAWeb.Shared": "1.0.0",
+          "MailKit": "4.14.0",
           "Markdig": "0.42.0",
+          "Microsoft.AspNetCore.Authentication.Google": "9.0.9",
           "Microsoft.AspNetCore.Components.WebAssembly.Server": "9.0.8",
           "Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore": "9.0.8",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "9.0.8",
@@ -56,11 +58,31 @@
           }
         }
       },
+      "BouncyCastle.Cryptography/2.6.1": {
+        "runtime": {
+          "lib/net6.0/BouncyCastle.Cryptography.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.6.1.59591"
+          }
+        }
+      },
       "Humanizer.Core/2.14.1": {
         "runtime": {
           "lib/net6.0/Humanizer.dll": {
             "assemblyVersion": "2.14.0.0",
             "fileVersion": "2.14.1.48190"
+          }
+        }
+      },
+      "MailKit/4.14.0": {
+        "dependencies": {
+          "MimeKit": "4.14.0",
+          "System.Formats.Asn1": "9.0.8"
+        },
+        "runtime": {
+          "lib/net8.0/MailKit.dll": {
+            "assemblyVersion": "4.14.0.0",
+            "fileVersion": "4.14.0.0"
           }
         }
       },
@@ -100,6 +122,14 @@
           "Microsoft.AspNetCore.Authentication.Abstractions": "2.3.0",
           "Microsoft.AspNetCore.Http": "2.3.0",
           "Microsoft.AspNetCore.Http.Extensions": "2.3.0"
+        }
+      },
+      "Microsoft.AspNetCore.Authentication.Google/9.0.9": {
+        "runtime": {
+          "lib/net9.0/Microsoft.AspNetCore.Authentication.Google.dll": {
+            "assemblyVersion": "9.0.9.0",
+            "fileVersion": "9.0.925.42003"
+          }
         }
       },
       "Microsoft.AspNetCore.Authorization/9.0.8": {
@@ -946,6 +976,18 @@
           }
         }
       },
+      "MimeKit/4.14.0": {
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.1",
+          "System.Security.Cryptography.Pkcs": "8.0.1"
+        },
+        "runtime": {
+          "lib/net8.0/MimeKit.dll": {
+            "assemblyVersion": "4.14.0.0",
+            "fileVersion": "4.14.0.0"
+          }
+        }
+      },
       "Mono.TextTemplating/3.0.0": {
         "dependencies": {
           "System.CodeDom": "6.0.0"
@@ -1263,12 +1305,26 @@
       "path": "azure.identity/1.11.4",
       "hashPath": "azure.identity.1.11.4.nupkg.sha512"
     },
+    "BouncyCastle.Cryptography/2.6.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-vZsG2YILhthgRqO+ZVgRff4ZFKKTl0v7kqaVBLCtRvpREhfBP33pcWrdA3PRYgWuFL1RxiUFvjMUHTdBZlJcoA==",
+      "path": "bouncycastle.cryptography/2.6.1",
+      "hashPath": "bouncycastle.cryptography.2.6.1.nupkg.sha512"
+    },
     "Humanizer.Core/2.14.1": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-lQKvtaTDOXnoVJ20ibTuSIOf2i0uO0MPbDhd1jm238I+U/2ZnRENj0cktKZhtchBMtCUSRQ5v4xBCUbKNmyVMw==",
       "path": "humanizer.core/2.14.1",
       "hashPath": "humanizer.core.2.14.1.nupkg.sha512"
+    },
+    "MailKit/4.14.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-x1J8KIXGP8bWiiLox9g/hSdecqdDcOr9mZa4lumPjT1rvd+mnVm2pOOB4sYgABYcwW2uI7mAQMk7M+4OBD9iiA==",
+      "path": "mailkit/4.14.0",
+      "hashPath": "mailkit.4.14.0.nupkg.sha512"
     },
     "Markdig/0.42.0": {
       "type": "package",
@@ -1304,6 +1360,13 @@
       "sha512": "sha512-gnLnKGawBjqBnU9fEuel3VcYAARkjyONAliaGDfMc8o8HBtfh+HrOPEoR8Xx4b2RnMb7uxdBDOvEAC7sul79ig==",
       "path": "microsoft.aspnetcore.authentication.core/2.3.0",
       "hashPath": "microsoft.aspnetcore.authentication.core.2.3.0.nupkg.sha512"
+    },
+    "Microsoft.AspNetCore.Authentication.Google/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-cVElw5JwIib+frt6G/Zp4cSEFl1eE4gGIm0ICmkDJM16uePQDuWrFho5SoHHybnASspMyuI8y0S/miysHL1nmA==",
+      "path": "microsoft.aspnetcore.authentication.google/9.0.9",
+      "hashPath": "microsoft.aspnetcore.authentication.google.9.0.9.nupkg.sha512"
     },
     "Microsoft.AspNetCore.Authorization/9.0.8": {
       "type": "package",
@@ -1878,6 +1941,13 @@
       "sha512": "sha512-hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A==",
       "path": "microsoft.win32.systemevents/6.0.0",
       "hashPath": "microsoft.win32.systemevents.6.0.0.nupkg.sha512"
+    },
+    "MimeKit/4.14.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-g0LtsMC8DCTkc030C3UgVqbltOJmV5cz4AX8ASowz2ZA+lxopXSYtC1XXYmenxy606aWFLwi5Xy4cC/zyYjbjQ==",
+      "path": "mimekit/4.14.0",
+      "hashPath": "mimekit.4.14.0.nupkg.sha512"
     },
     "Mono.TextTemplating/3.0.0": {
       "type": "package",

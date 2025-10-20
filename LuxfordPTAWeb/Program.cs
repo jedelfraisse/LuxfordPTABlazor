@@ -66,20 +66,22 @@ public class Program
 		builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
 		// UPDATED: Configure authentication with Google OAuth support
-		builder.Services.AddAuthentication(options =>
+		var authBuilder = builder.Services.AddAuthentication(options =>
 			{
 				options.DefaultScheme = IdentityConstants.ApplicationScheme;
 				options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-			})
-			.AddIdentityCookies();
-
-		// Add Google OAuth to the authentication builder
-		builder.Services.AddAuthentication()
-			.AddGoogle(options =>
-			{
+			});
+		
+		authBuilder.AddIdentityCookies();
+		
+		// Add Google OAuth to the same authentication builder
+		// TEMPORARILY DISABLED for troubleshooting
+		/*authBuilder.AddGoogle(options =>
+		{
 				// PTA Tech Note: These credentials come from Google Cloud Console
 				// To update: Go to console.cloud.google.com > APIs & Services > Credentials
-				options.ClientId = "998181497111-fr7mbk8itlfetjbuov48irgr3155stfr.apps.googleusercontent.com";
+				options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ??
+					throw new InvalidOperationException("Google Client ID not configured. Add 'Authentication:Google:ClientId' to appsettings.Development.json or appsettings.Production.json");
 				options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? 
 					throw new InvalidOperationException("Google Client Secret not configured. Add 'Authentication:Google:ClientSecret' to appsettings.Development.json or appsettings.Production.json");
 				
@@ -98,7 +100,7 @@ public class Program
 				
 				// Save tokens for API calls (optional - needed if you want to call Google APIs later)
 				options.SaveTokens = true;
-			});
+			});*/
 
 		var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 		builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -117,8 +119,15 @@ public class Program
 			.AddSignInManager()
 			.AddDefaultTokenProviders();
 
-		builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+		builder.Services.AddScoped<IEmailSender<ApplicationUser>, LuxfordPTAWeb.Services.IdentityEmailSender>();
 		builder.Services.AddScoped<LuxfordPTAWeb.Services.IEmailSenderService, LuxfordPTAWeb.Services.EmailSenderService>();
+
+		// Configure OAuth2 settings for Gmail SMTP
+		builder.Services.Configure<OAuth2Settings>(
+			builder.Configuration.GetSection(OAuth2Settings.SectionName));
+
+		// Register OAuth2 service for Gmail SMTP authentication
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IGoogleSmtpOAuthService, LuxfordPTAWeb.Services.GoogleSmtpOAuthService>();
 
 		builder.Services.AddScoped<SchoolYearSupport>();
 
@@ -346,14 +355,14 @@ public class Program
 		
 		app.UseAntiforgery();
 
-		app.MapStaticAssets();
-		app.MapRazorComponents<App>()
-			.AddInteractiveServerRenderMode()
-			.AddInteractiveWebAssemblyRenderMode()
-			.AddAdditionalAssemblies(typeof(Client._Imports).Assembly);
+	app.MapStaticAssets();
+	app.MapRazorComponents<App>()
+		.AddInteractiveServerRenderMode()
+		.AddInteractiveWebAssemblyRenderMode()
+		.AddAdditionalAssemblies(typeof(Client._Imports).Assembly);
 
-		// Map controller endpoints
-		app.MapControllers();
+	// Map controller endpoints
+	app.MapControllers();
 		app.MapAdditionalIdentityEndpoints();
 
 		await app.RunAsync();

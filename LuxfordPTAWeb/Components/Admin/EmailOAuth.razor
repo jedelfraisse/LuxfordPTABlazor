@@ -1,0 +1,507 @@
+@page "/admin/email-oauth"
+@using Microsoft.AspNetCore.Authorization
+@using System.Net
+@using LuxfordPTAWeb.Services
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+<PageTitle>Gmail OAuth2 Setup - Luxford PTA</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="bi bi-envelope-lock me-2"></i>
+                Gmail OAuth2 Configuration
+            </h2>
+            <p class="text-muted">
+                Secure email authentication without storing passwords. Coffee-powered SMTP ahead! ?
+            </p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            <i class="bi @(isError ? "bi-exclamation-triangle" : "bi-check-circle") me-2"></i>
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Status Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header @(oauthStatus?.Authenticated == true ? "bg-success" : "bg-warning") text-white">
+                    <h5 class="mb-0">
+                        <i class="bi @(oauthStatus?.Authenticated == true ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
+                        Current Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (loading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Checking OAuth2 status...</p>
+                        </div>
+                    }
+                    else if (oauthStatus != null)
+                    {
+                        @if (oauthStatus.Authenticated)
+                        {
+                            <div class="alert alert-success">
+                                <strong>? Authenticated</strong>
+                                <p class="mb-0">@oauthStatus.Message</p>
+                            </div>
+
+                            @if (oauthStatus.ExpiresAt.HasValue)
+                            {
+                                var expiresIn = oauthStatus.ExpiresAt.Value - DateTime.UtcNow;
+                                <div class="mb-3">
+                                    <label class="form-label text-muted">Token Expires</label>
+                                    <div class="fw-bold">
+                                        @oauthStatus.ExpiresAt.Value.ToLocalTime().ToString("g")
+                                    </div>
+                                    <small class="text-muted">
+                                        In @Math.Round(expiresIn.TotalHours, 1) hours
+                                    </small>
+                                </div>
+                            }
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Auto-Refresh</label>
+                                <div>
+                                    @if (oauthStatus.HasRefreshToken)
+                                    {
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>Enabled
+                                        </span>
+                                        <div class="text-muted small mt-1">
+                                            Token will automatically refresh before expiry
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>Not Available
+                                        </span>
+                                        <div class="text-muted small mt-1">
+                                            Re-authorization will be needed when token expires
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <button class="btn btn-danger" @onclick="RevokeTokens" disabled="@loading">
+                                <i class="bi bi-trash me-2"></i>Revoke & Re-authorize
+                            </button>
+
+                            <hr class="my-4" />
+
+                            <!-- Quick Email Test -->
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="bi bi-envelope-check me-2"></i>Send Test Email
+                                    </h6>
+                                    <p class="small text-muted mb-3">Verify OAuth is working by sending a quick test email</p>
+                                    
+                                    <div class="mb-2">
+                                        <label for="testEmailTo" class="form-label small">Recipient Email:</label>
+                                        <input type="email" 
+                                               id="testEmailTo" 
+                                               class="form-control form-control-sm" 
+                                               @bind="testEmailTo" 
+                                               placeholder="recipient@example.com"
+                                               disabled="@sendingTestEmail" />
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="testEmailMessage" class="form-label small">Message:</label>
+                                        <textarea id="testEmailMessage" 
+                                                  class="form-control form-control-sm" 
+                                                  rows="3" 
+                                                  @bind="testEmailMessage" 
+                                                  placeholder="Enter a short test message..."
+                                                  disabled="@sendingTestEmail"></textarea>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(testEmailStatus))
+                                    {
+                                        <div class="alert @(testEmailSuccess ? "alert-success" : "alert-danger") alert-sm mb-2">
+                                            <small>@testEmailStatus</small>
+                                        </div>
+                                    }
+                                    
+                                    <button class="btn btn-sm btn-primary" 
+                                            @onclick="SendTestEmail" 
+                                            disabled="@(sendingTestEmail || string.IsNullOrWhiteSpace(testEmailTo))">
+                                        @if (sendingTestEmail)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                            <text>Sending...</text>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-send me-1"></i>
+                                            <text>Send Test Email</text>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                <strong>?? Not Configured</strong>
+                                <p class="mb-0">@oauthStatus.Message</p>
+                            </div>
+
+                            <p>
+                                OAuth2 authentication is not set up. Click the button below to begin the authorization flow.
+                            </p>
+
+                            <button class="btn btn-primary btn-lg" @onclick="BeginAuthorization">
+                                <i class="bi bi-key me-2"></i>Authorize with Google
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger">
+                            <strong>? Error</strong>
+                            <p class="mb-0">Failed to check OAuth2 status. Please check logs.</p>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshStatus" disabled="@loading">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Status
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        How It Works
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>What is OAuth2?</h6>
+                    <p class="small">
+                        OAuth2 is a secure authentication method that allows the application to send emails
+                        through Gmail without storing your password. Instead, Google provides temporary tokens
+                        that automatically refresh.
+                    </p>
+
+                    <h6 class="mt-3">Benefits</h6>
+                    <ul class="small">
+                        <li><strong>More Secure:</strong> No passwords in config files</li>
+                        <li><strong>Better Reliability:</strong> Won't break when you change password</li>
+                        <li><strong>Auto-Renewal:</strong> Tokens refresh automatically</li>
+                        <li><strong>Audit Trail:</strong> Google tracks app access</li>
+                    </ul>
+
+                    <h6 class="mt-3">Prerequisites</h6>
+                    <div class="alert alert-light small">
+                        <ol class="mb-0">
+                            <li>Gmail API enabled in Google Cloud Console</li>
+                            <li>OAuth2 Client ID and Secret configured</li>
+                            <li>Redirect URI: <code>/oauth2/callback</code></li>
+                            <li>Scope: <code>https://mail.google.com/</code></li>
+                        </ol>
+                    </div>
+
+                    <h6 class="mt-3">Authorization Flow</h6>
+                    <ol class="small">
+                        <li>Click "Authorize with Google"</li>
+                        <li>Sign in to Google account</li>
+                        <li>Grant email sending permissions</li>
+                        <li>Redirected back with success confirmation</li>
+                        <li>Tokens stored securely on server</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Reference Card -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear me-2"></i>
+                        Configuration Reference
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Required Settings</h6>
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted">Client ID</td>
+                                        <td><code>OAuth2Settings:ClientId</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Client Secret</td>
+                                        <td><code>OAuth2Settings:ClientSecret</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Redirect URI</td>
+                                        <td><code>OAuth2Settings:RedirectUri</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Enable OAuth2</td>
+                                        <td><code>OAuth2Settings:EnableOAuth2</code></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Important Notes</h6>
+                            <div class="alert alert-warning small mb-0">
+                                <ul class="mb-0">
+                                    <li>Store Client Secret in user secrets (dev) or secure config (prod)</li>
+                                    <li>Redirect URI must match Google Cloud Console exactly</li>
+                                    <li>Tokens are stored in <code>Data/gmail-token.json</code></li>
+                                    <li>Admin role required for authorization</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+private bool loading = true;
+private string? statusMessage;
+private bool isError = false;
+private OAuth2StatusResponse? oauthStatus;
+
+// Test email fields
+private string testEmailTo = "";
+private string testEmailMessage = "";
+private bool sendingTestEmail = false;
+private string? testEmailStatus;
+private bool testEmailSuccess = false;
+
+[Inject] private NavigationManager Navigation { get; set; } = default!;
+[Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+[Inject] private IGoogleSmtpOAuthService? OAuthService { get; set; }
+[Inject] private LuxfordPTAWeb.Services.IEmailSenderService? EmailService { get; set; }
+
+[SupplyParameterFromQuery(Name = "success")]
+private string? SuccessParam { get; set; }
+
+[SupplyParameterFromQuery(Name = "error")]
+private string? ErrorParam { get; set; }
+
+[SupplyParameterFromQuery(Name = "errorDescription")]
+private string? ErrorDescriptionParam { get; set; }
+
+protected override async Task OnInitializedAsync()
+{
+    // Add diagnostic info
+    var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+    var isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+    var isAdmin = authState.User.IsInRole("Admin");
+        
+    Console.WriteLine($"EmailOAuth - Is Authenticated: {isAuthenticated}, Is Admin: {isAdmin}");
+    Console.WriteLine($"EmailOAuth - User Name: {authState.User.Identity?.Name}");
+    Console.WriteLine($"EmailOAuth - OAuth Service Available: {OAuthService != null}");
+
+    // Check for OAuth callback results
+    if (SuccessParam == "true")
+    {
+        statusMessage = "?? OAuth2 authorization successful! Gmail SMTP is now configured and ready to use.";
+        isError = false;
+    }
+    else if (!string.IsNullOrEmpty(ErrorParam))
+    {
+        statusMessage = $"? OAuth2 Authorization Failed\n\nError: {ErrorParam}\n{ErrorDescriptionParam}";
+        isError = true;
+    }
+        
+    await RefreshStatus();
+}
+
+    private async Task RefreshStatus()
+    {
+        loading = true;
+        statusMessage = null;
+
+        try
+        {
+            if (OAuthService == null)
+            {
+                statusMessage = "? OAuth2 Service Not Available\n\n" +
+                              "The OAuth2 service could not be injected. This page must run in server mode.";
+                isError = true;
+                loading = false;
+                return;
+            }
+
+            Console.WriteLine("EmailOAuth - Calling OAuth service directly");
+            
+            var hasValidCredentials = await OAuthService.HasValidCredentialsAsync();
+            
+            if (hasValidCredentials)
+            {
+                var token = await OAuthService.GetValidTokenAsync();
+                
+                oauthStatus = new OAuth2StatusResponse
+                {
+                    Authenticated = true,
+                    ExpiresAt = token?.ExpiresAt,
+                    HasRefreshToken = token?.CanRefresh ?? false,
+                    Message = "? Gmail SMTP OAuth2 is configured and working. Token secured. ?"
+                };
+                
+                Console.WriteLine($"EmailOAuth - Successfully loaded OAuth2 status: Authenticated=True");
+            }
+            else
+            {
+                oauthStatus = new OAuth2StatusResponse
+                {
+                    Authenticated = false,
+                    Message = "?? OAuth2 not configured or token expired. Authorization required."
+                };
+                
+                Console.WriteLine("EmailOAuth - OAuth2 not configured");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"EmailOAuth - Error: {ex}");
+            statusMessage = $"? Error Checking OAuth2 Status\n\n" +
+                          $"Type: {ex.GetType().Name}\n" +
+                          $"Message: {ex.Message}\n\n" +
+                          $"Stack Trace:\n{ex.StackTrace}";
+            isError = true;
+            oauthStatus = null;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void BeginAuthorization()
+    {
+        // Redirect to authorization endpoint
+        Navigation.NavigateTo("/oauth2/authorize", forceLoad: true);
+    }
+
+    private async Task RevokeTokens()
+    {
+        if (!confirm("Are you sure you want to revoke the OAuth2 tokens? You will need to re-authorize."))
+        {
+            return;
+        }
+
+        loading = true;
+        statusMessage = null;
+
+        try
+        {
+            if (OAuthService == null)
+            {
+                statusMessage = "OAuth2 service not available";
+                isError = true;
+                loading = false;
+                return;
+            }
+
+            await OAuthService.ClearTokensAsync();
+            
+            statusMessage = "? Tokens revoked successfully. Please re-authorize.";
+            isError = false;
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error revoking tokens: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private bool confirm(string message)
+    {
+        // In a real implementation, use JS interop for confirm dialog
+        return true;
+    }
+
+    private async Task SendTestEmail()
+    {
+        if (string.IsNullOrWhiteSpace(testEmailTo))
+        {
+            testEmailStatus = "Please enter a recipient email address.";
+            testEmailSuccess = false;
+            return;
+        }
+
+        sendingTestEmail = true;
+        testEmailStatus = null;
+
+        try
+        {
+            if (EmailService == null)
+            {
+                testEmailStatus = "Email service not available.";
+                testEmailSuccess = false;
+                return;
+            }
+
+            var subject = "Luxford PTA - OAuth2 Test Email";
+            var body = string.IsNullOrWhiteSpace(testEmailMessage) 
+                ? "This is a test email sent via Gmail OAuth2 from the Luxford PTA admin panel."
+                : testEmailMessage;
+
+            await EmailService.SendEmailAsync(testEmailTo, subject, body, isHtml: false);
+
+            testEmailStatus = $"? Test email sent successfully to {testEmailTo}!";
+            testEmailSuccess = true;
+
+            // Clear the form
+            testEmailTo = "";
+            testEmailMessage = "";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Test email error: {ex}");
+            testEmailStatus = $"? Failed to send email: {ex.Message}";
+            testEmailSuccess = false;
+        }
+        finally
+        {
+            sendingTestEmail = false;
+        }
+    }
+
+    private class OAuth2StatusResponse
+    {
+        public bool Authenticated { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public bool HasRefreshToken { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+}

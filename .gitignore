@@ -17,6 +17,10 @@ LuxfordPTAWeb/appsettings.Production.json
 LuxfordPTAWebPublished/appsettings.Development.json
 LuxfordPTAWebPublished/appsettings.Production.json
 
+# OAuth2 tokens - NEVER commit these!
+**/Data/gmail-token.json
+**/gmail-token.json
+
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

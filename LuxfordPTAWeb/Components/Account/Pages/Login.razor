@@ -17,7 +17,7 @@
     <div class="col-lg-6">
         <section>
             <StatusMessage Message="@errorMessage" />
-            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+            <EditForm Model="Input" FormName="loginForm" method="post" OnValidSubmit="LoginUser">
                 <DataAnnotationsValidator />
                 <h2>PTA Board Member & Admin Access</h2>
                 <hr />
@@ -52,40 +52,51 @@
             </EditForm>
         </section>
         
-        <!-- Google OAuth Login Section -->
+        @* TEMPORARILY DISABLED: Google OAuth Login Section
         <div class="mt-4">
             <hr />
             <h3 class="text-center mb-3">Or sign in with Google</h3>
             <ExternalLoginPicker />
         </div>
+        *@
         
         <div class="alert alert-info mt-4">
             <h6>Need an account?</h6>
-            <p class="mb-0">You can create an account by signing in with Google, or contact PTA administrators for a standard account.</p>
+            <p class="mb-0">Contact PTA administrators for an account.</p>
         </div>
     </div>
 </div>
 
 @code {
-    private string? errorMessage;
+private string? errorMessage;
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+[CascadingParameter]
+private HttpContext HttpContext { get; set; } = default!;
 
-    [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+[SupplyParameterFromForm]
+private InputModel Input { get; set; } = new();
 
-    [SupplyParameterFromQuery]
-    private string? ReturnUrl { get; set; }
+[SupplyParameterFromQuery]
+private string? ReturnUrl { get; set; }
 
-    protected override async Task OnInitializedAsync()
+protected override async Task OnInitializedAsync()
+{
+    // Only clear external cookies if we haven't started streaming the response yet
+    if (HttpMethods.IsGet(HttpContext.Request.Method) && !HttpContext.Response.HasStarted)
     {
-        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        try
         {
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
         }
+        catch (InvalidOperationException)
+        {
+            // If response has already started, we can't modify cookies
+            // This is fine - the cookie will be cleared on next request
+            Logger.LogWarning("Could not clear external authentication cookie - response already started");
+        }
     }
+}
 
     public async Task LoginUser()
     {
