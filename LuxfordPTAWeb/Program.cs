@@ -396,7 +396,7 @@ public class Program
 				FirstName = "Jonathan",
 				LastName = "Delfraisse"
 			};
-			await userManager.CreateAsync(adminUser, "Admin123!");
+			await userManager.CreateAsync(adminUser, "JamesBond#007!");
 			await userManager.AddToRoleAsync(adminUser, "Admin");
 		}
 	}

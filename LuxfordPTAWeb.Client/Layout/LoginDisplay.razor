@@ -6,9 +6,10 @@
 
 <AuthorizeView>
     <Authorized>
+        <div style="margin-right: 10px">Welcome @GetDisplayName(context.User)!</div>
         <div class="dropdown">
             <button class="btn btn-outline-primary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-person-circle"></i> @context.User.Identity?.Name
+                <i class="bi bi-person-circle"></i> @GetDisplayName(context.User)
             </button>
             <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="Account/Manage"><i class="bi bi-gear"></i> Manage Account</a></li>
@@ -30,6 +31,7 @@
         </div>
     </Authorized>
     <NotAuthorized>
+        <div style="margin-right: 10px">Welcome Guest!</div>
         <a href="Account/Login?returnUrl=@Uri.EscapeDataString(currentUrl)" class="btn btn-primary btn-sm">
             <i class="bi bi-person-plus"></i> Login
         </a>
@@ -42,5 +44,16 @@
     protected override void OnInitialized()
     {
         currentUrl = NavigationManager.Uri;
+    }
+
+    private string GetDisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var first = user.FindFirst("given_name")?.Value;
+        var last = user.FindFirst("family_name")?.Value;
+        if (!string.IsNullOrWhiteSpace(first) && !string.IsNullOrWhiteSpace(last))
+            return $"{first} {last}";
+        if (!string.IsNullOrWhiteSpace(first))
+            return first;
+        return user.Identity?.Name ?? "User";
     }
 }

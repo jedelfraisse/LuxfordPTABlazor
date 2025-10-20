@@ -15,8 +15,29 @@
 		<div class="w-100 text-center pta-top-banner">
 			<div class="pta-banner-line1">Virginia Congress Of Parents And Teachers</div>
 			<div class="pta-banner-line2">Luxford Elementary PTA</div>
+			<!-- Year Selection and Login Row - Side by side on larger screens -->
+			<div class="d-flex justify-content-center align-items-center flex-wrap gap-3">
+				<div class="school-year-banner d-flex align-items-center" style="gap:0.5rem;">
+					@if (ShowPrevArrow)
+					{
+						<button class="btn btn-link p-0 m-0" @onclick="PrevYear" title="Previous Year" style="font-size:1.2rem;min-width:unset;min-height:unset;line-height:1;">←</button>
+					}
+					<span class="fw-bold text-primary mx-1" style="font-size:0.95rem;">@CurrentYearText</span>
+					@if (SelectedSchoolYearInfo != null)
+					{
+						<span class="text-muted mx-1 d-none d-sm-inline" style="font-size:0.8rem;">
+							Reflections:
+							<NavLink href="/reflections" class="text-decoration-underline text-reset" style="cursor:pointer;">@SelectedSchoolYearInfo.ReflectionsTheme</NavLink>
+						</span>
+					}
+					@if (ShowNextArrow)
+					{
+						<button class="btn btn-link p-0 m-0" @onclick="NextYear" title="Next Year" style="font-size:1.2rem;min-width:unset;min-height:unset;line-height:1;">→</button>
+					}
+				</div>
+			</div>
 		</div>
-		
+
 		<div class="col-12">
 			<!-- Header Box -->
 			<div class="pta-header-box mb-3">
@@ -41,38 +62,16 @@
 						</NavLink>
 					</div>
 				</div>
-				
-				<!-- Year Selection and Login Row - Side by side on larger screens -->
-				<div class="d-flex justify-content-center align-items-center flex-wrap gap-3 mb-3">
-					<div class="school-year-banner d-flex align-items-center bg-white shadow-sm rounded-pill px-2 py-1 border border-primary">
-						@if (ShowPrevArrow)
-						{
-							<button class="btn btn-sm btn-outline-primary rounded-pill me-1" @onclick="PrevYear" title="Previous Year" style="width:28px;height:28px;line-height:1;font-size:0.8rem;">
-								<i class="bi bi-chevron-left"></i>
-							</button>
-						}
-						<span class="fw-bold text-primary mx-1" style="font-size:0.95rem;">@CurrentYearText</span>
-						@if (SelectedSchoolYearInfo != null)
-						{
-							<span class="text-muted mx-1 d-none d-sm-inline" style="font-size:0.8rem;">Reflections: @SelectedSchoolYearInfo.ReflectionsTheme</span>
-						}
-						@if (ShowNextArrow)
-						{
-							<button class="btn btn-sm btn-outline-primary rounded-pill ms-1" @onclick="NextYear" title="Next Year" style="width:28px;height:28px;line-height:1;font-size:0.8rem;">
-								<i class="bi bi-chevron-right"></i>
-							</button>
-						}
-					</div>
-					<div class="login-display-container">
-						<LoginDisplay />
-					</div>
+				<div class="login-display-container pta-nav-horizontal">
+					<LoginDisplay />
 				</div>
-				
+
+
 				<!-- Navigation Row - Desktop horizontal, Mobile hamburger -->
 				<nav class="pta-header-nav mb-2">
 					<!-- Hamburger Button (Hidden on desktop) -->
-					<button class="hamburger-btn d-lg-none btn btn-outline-primary" 
-							@onclick="ToggleMenu" 
+					<button class="hamburger-btn d-lg-none btn btn-outline-primary"
+							@onclick="ToggleMenu"
 							aria-label="Toggle navigation menu"
 							aria-expanded="@isMenuOpen">
 						<span class="hamburger-icon">
@@ -82,7 +81,7 @@
 						</span>
 						Menu
 					</button>
-					
+
 					<!-- Desktop Navigation (Hidden on mobile/tablet) -->
 					<div class="pta-nav-horizontal d-none d-lg-flex">
 						<NavLink href="/" class="pta-nav-link text-purple" aria-label="Home" title="Home" Match="NavLinkMatch.All">
@@ -119,7 +118,7 @@
 					</div>
 				}
 			</div>
-			
+
 			<!-- Content Area with responsive padding -->
 			<div class="content-wrapper">
 				<div class="card-body">
@@ -193,9 +192,9 @@
 </div>
 
 <style>
-.text-purple {
-    color: #7F4592 !important;
-}
+	.text-purple {
+		color: #7F4592 !important;
+	}
 </style>
 
 @code {
