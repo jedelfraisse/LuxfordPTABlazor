@@ -71,6 +71,11 @@
                 errorMessage = "Event not found.";
                 return;
             }
+
+            eventModel.DescriptionMarkdown = string.IsNullOrWhiteSpace(eventModel.DescriptionMarkdown)
+                ? eventModel.Description ?? string.Empty
+                : eventModel.DescriptionMarkdown;
+            eventModel.MoreDetailsMarkdown ??= string.Empty;
             
             // Set the subcategory ID for the dropdown
             eventSubCategoryId = eventModel.EventSubTypeId ?? 0;
@@ -379,7 +384,7 @@
                 Id = eventModel.Id,
                 Title = eventModel.Title,
                 Date = primaryDay.Date,
-                Description = eventModel.Description,
+                Description = eventModel.DescriptionMarkdown ?? string.Empty,
                 Location = eventModel.Location,
                 ImageUrl = eventModel.ImageUrl,
                 Link = eventModel.Link,
@@ -403,6 +408,7 @@
                 EventCatId = eventModel.EventCatId,
                 EventSubTypeId = eventSubCategoryId > 0 ? eventSubCategoryId : null,
                 ExcelImportId = eventModel.ExcelImportId,
+                DescriptionMarkdown = eventModel.DescriptionMarkdown ?? string.Empty,
                 MoreDetailsMarkdown = eventModel.MoreDetailsMarkdown,
                 MoreDetailsHtml = eventModel.MoreDetailsHtml,
                 FlyerUrl = eventModel.FlyerUrl,
@@ -732,14 +738,30 @@ else if (eventModel != null)
                     </div>
 
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" rows="4" @bind="eventModel.Description"></textarea>
+                        <label for="descriptionMarkdown" class="form-label">Description (Markdown Supported)</label>
+                        <textarea class="form-control" id="descriptionMarkdown" rows="6" @bind="eventModel.DescriptionMarkdown" placeholder="Enter event details using markdown formatting..."></textarea>
+                        <div class="form-text">You can use <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a> for formatting. HTML is not allowed and will be ignored.</div>
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(eventModel.DescriptionMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Live Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@eventModel.DescriptionMarkdown" />
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label for="moreDetails" class="form-label">More Details (Markdown)</label>
                         <textarea class="form-control" id="moreDetails" rows="4" @bind="eventModel.MoreDetailsMarkdown" placeholder="Additional event details, agenda, reminders, etc."></textarea>
+                        <div class="form-text">This is optional. Use Markdown for formatting extended event details.</div>
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(eventModel.MoreDetailsMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">More Details Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@eventModel.MoreDetailsMarkdown" />
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label class="form-label">Event Flyer</label>

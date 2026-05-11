@@ -133,7 +133,15 @@ else if (createEventDto != null)
                     <div class="mb-3">
                         <label for="moreDetailsMarkdown" class="form-label">More Details (Markdown)</label>
                         <textarea class="form-control" id="moreDetailsMarkdown" rows="4" @bind="createEventDto.MoreDetailsMarkdown" placeholder="Optional extended details shown on the event details page."></textarea>
+                        <div class="form-text">This is optional. Use Markdown for formatting extended event details.</div>
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(createEventDto.MoreDetailsMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">More Details Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@createEventDto.MoreDetailsMarkdown" />
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label for="flyerUrl" class="form-label">Flyer URL (optional)</label>
@@ -968,6 +976,7 @@ else if (createEventDto != null)
             createEventDto.Date = allDays.Min(d => d.Date);
             createEventDto.EventStartTime = allDays.Min(d => d.StartTime ?? d.Date.AddHours(9));
             createEventDto.EventEndTime = allDays.Max(d => d.EndTime ?? d.Date.AddHours(15));
+            createEventDto.Description = createEventDto.DescriptionMarkdown ?? string.Empty;
             
             HttpResponseMessage response = await Http.PostAsJsonAsync("api/events", createEventDto);
             if (response.IsSuccessStatusCode)
