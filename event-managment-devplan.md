@@ -1,21 +1,7 @@
 ﻿# 🎪 Luxford PTA Event Management System - Development Plan
 
 ## 📋 Project Overview
-Building a comprehensive event management system for the Luxford PTA that handles event creation, volunteer coordination, and public display of events with integration points for SignUpGenius, Givebacks membership, and Google Cloud services.
-
-## Last Year Newsletters to be added somewhere in the site:
-
-- September 2024: https://secure.smore.com/n/n1x35s
-- October 2024: https://secure.smore.com/n/1hpa0
-- November 2024: https://secure.smore.com/n/80zfh
-- December 2024: https://secure.smore.com/n/w25qj
-- January 2025: https://secure.smore.com/n/uf8p7
-- February 2025: https://secure.smore.com/n/5zje1
-- March 2025: https://secure.smore.com/n/gx3bd
-- April 2025:
-- May 2025: https://secure.smore.com/n/tf42xc
-- June 2025: https://secure.smore.com/n/ka96s
-
+Building a comprehensive event management system for the Luxford PTA that handles event creation, volunteer coordination, and public display of events with integration points for SignUpGenius, Givebacks membership, and Google Cloud services. Newsletters are out of scope; this plan focuses on events only.
 
 ## 🎯 Project Phases
 
@@ -96,8 +82,8 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [x] Better category/subcategory selection with filtering
   - [ ] **NEW** Event type templates (recurring events like Fire Prevention Week) *(Phase 2)*
   - [ ] **NEW** Smart defaults based on event category/subcategory *(Phase 2)*
-  - [ ] **NEW** Copy from previous event functionality with better filtering *(Phase 2)*
-  - [ ] **NEW** Bulk event creation for series (e.g., weekly reading programs) *(Phase 2*
+  - [ ] **NEW** Copy to New Event functionality that creates an editable draft from an existing event *(Phase 2)*
+  - [ ] **NEW** Bulk event creation for series (e.g., weekly reading programs) *(Phase 2)*
   
 - [x] **EventsEdit.razor (ENHANCED)** *(COMPLETED)*
   - [x] Basic event editing with pre-populated data
@@ -142,9 +128,9 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [x] API endpoint: `GET /api/events/available-for-copy`
   - [x] Multi-day event copying (copy all days with date offset)
   - [x] Preserve relationships between original and copies
-  - [ ] "Copy from Previous Event" in EventsCreate.razor *(Phase 2)*
-  - [ ] "Copy Event" button in EventsAdmin.razor *(Phase 2)*
-  - [ ] Template-based copying for recurring annual events *(Phase 2)*
+  - [ ] "Copy to New Event" in EventsCreate.razor *(Phase 2)*
+  - [ ] "Copy to New Event" button in EventsAdmin.razor *(Phase 2)*
+  - [ ] Template-based copying for recurring annual events including stations and other copyable components *(Phase 2)*
 
 - [x] **Smart Event Resolution (ENHANCED)** *(COMPLETED)*
   - [x] `GET /api/events/by-slug/{slug}` - Smart event instance resolution
@@ -230,16 +216,18 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Event history/audit trail viewer
   - [ ] Better form validation and error handling
 
-- [ ] **Copy from Previous Event Feature** *(HIGH PRIORITY)*
-  - [ ] "Copy from Previous Event" in EventsCreate.razor with advanced filtering
-  - [ ] "Copy Event" button in EventsAdmin.razor for quick duplication
+- [ ] **Copy to New Event Feature** *(HIGH PRIORITY)*
+  - [ ] "Copy to New Event" in EventsCreate.razor creates a new editable draft prefilled from the source event
+  - [ ] "Copy to New Event" button in EventsAdmin.razor for quick draft creation
+  - [ ] New copied events default to draft (`Planning`) and stay editable after creation
   - [ ] Multi-day event copying options (all days, specific days, etc.)
-  - [ ] Template-based event creation for recurring events
+  - [ ] Template-based event creation for recurring events, including stations and other copyable components from prior events
 
 - [ ] **Event Templates System** *(MEDIUM PRIORITY)*
   - [ ] EventTemplate model for recurring annual events
   - [ ] Template categories (Fire Prevention Week, Book Fair, Spirit Week, etc.)
   - [ ] Pre-filled templates with default settings
+  - [ ] Include stations and other copyable event components from prior events
   - [ ] Template management interface for admins
 
 #### 2.2 Station Management System (ENHANCED)
@@ -305,6 +293,185 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] **NEW** Day-specific rules for multi-day events
   - [ ] Rule templates
   - [ ] Copy rules from source events
+
+## 🛰️ Phase 2.5: Real-Time Event Controls & Displays ⏱️ *NEW – After Phase 2, Before Phase 3*
+
+### 📡 Overview
+To support interactive events such as Talent Show, Bingo Night, Elections, PTA Meetings, and Breakfast Events (Muffins With Moms / Donuts With Dad), the system will introduce a modular real-time control framework. This framework integrates with the existing Event model and multi-day architecture without replacing or conflicting with any existing features.
+
+This system adds:
+
+- Attachable Event Controls (modular functional units)
+- Controller Mode for event operators (admin-only)
+- Display Mode for public screens (no login required)
+- SignalR-based real-time communication/control between controller and display/tools pages
+- Role-based displays (host, backstage, performer, audience)
+- Live/Test modes for rehearsals vs. live events
+
+---
+
+### 🧩 2.5.1 Event Controls System (NEW)
+
+#### EventControl Model (NEW)
+
+- [ ] Add `EventControl` model  
+  - [ ] `EventId` (FK to Event)  
+  - [ ] `ControlType` (string)  
+  - [ ] `SettingsJson` (control-specific configuration)  
+  - [ ] `DisplayName`  
+  - [ ] `SequenceOrder`  
+
+#### Event Model Integration (NEW)
+
+- [ ] Add `List<EventControl>` to `Event`  
+- [ ] UI for adding/removing controls in `EventsEdit.razor`  
+- [ ] Template support for default controls  
+
+---
+
+### 🖥️ 2.5.2 Controller Page (NEW)
+
+**Route:** `/events/{slug}/control`
+
+- [ ] Password-protected (Admin/Board/Coordinator)  
+- [ ] Live/Test mode toggle  
+- [ ] List of displays waiting to be paired  
+- [ ] Assign displays to specific controls  
+- [ ] Tabs/subpages for each attached control  
+- [ ] Real-time updates via SignalR  
+- [ ] Control-specific actions (e.g., “Next Performer”, “Call Bingo Number”)  
+
+---
+
+### 📺 2.5.3 Display Page (NEW)
+
+**Route:** `/display`
+
+- [ ] No login required  
+- [ ] Connects to SignalR  
+- [ ] Receives 5-character pairing code  
+- [ ] Shows “Waiting for controller…”  
+- [ ] Assigned to a control by the controller  
+- [ ] Renders that control’s UI  
+- [ ] Supports multiple display roles (host, backstage, performer, audience)  
+
+---
+
+### 🔌 2.5.4 SignalR Hub (NEW)
+
+- [ ] Display registration  
+- [ ] Pairing code generation  
+- [ ] Broadcast control state  
+- [ ] Route updates to displays assigned to specific controls  
+- [ ] Maintain Live/Test isolation  
+- [ ] Handle reconnects and state restoration  
+
+---
+
+### 🎛️ 2.5.5 Control Types (NEW)
+
+#### Reusable Controls
+
+- [ ] `SponsorDisplayControl`  
+- [ ] `AgendaControl`  
+- [ ] `NoteTakerControl`  
+- [ ] `SlideshowControl`  
+- [ ] `QRCodeControl`  
+- [ ] `CountdownTimerControl`  
+
+#### Event-Specific Controls
+
+- [ ] `TalentAuditionControl`  
+- [ ] `TalentShowControl`  
+- [ ] `PerformerBackstageControl`  
+- [ ] `HostTeleprompterControl`  
+- [ ] `ActTimerControl`  
+- [ ] `KaraokeVideoControl`  
+- [ ] `BingoControl`  
+- [ ] `ElectionControl`  
+
+---
+
+### 🎤 2.5.6 Example Event Configurations (NEW)
+
+#### Muffins With Moms / Donuts With Dad
+
+- Controls: `SponsorDisplayControl`, `AgendaControl`  
+- Displays: Optional sponsor loop  
+
+#### PTA Meeting
+
+- Controls: `AgendaControl`, `NoteTakerControl`, `SlideshowControl`  
+
+#### Talent Show (Main Event)
+
+- Controls:  
+  - `TalentShowControl`  
+  - `SponsorDisplayControl`  
+  - `HostTeleprompterControl`  
+  - `PerformerBackstageControl`  
+  - `ActTimerControl`  
+  - `KaraokeVideoControl` (optional)  
+- Displays: Main projector, host iPad, backstage iPad, performer iPad, hallway sponsor TV  
+
+#### Talent Show Auditions
+
+- Controls: `TalentAuditionControl`, `NoteTakerControl`, `ScheduleControl`  
+
+#### Bingo Night
+
+- Controls: `BingoControl`, `SponsorDisplayControl`  
+
+#### Election Event
+
+- Controls: `ElectionControl`, `AgendaControl`, `NoteTakerControl`  
+
+---
+
+### 🗓️ 2.5.7 School Year Transition Control (PLANNED)
+
+A future `SchoolYearTransitionControl` will support:
+
+- [ ] Election checklist  
+- [ ] Officer transitions  
+- [ ] Budget rollover  
+- [ ] Committee resets  
+- [ ] Event archive  
+- [ ] Volunteer reset  
+- [ ] Sponsor reset  
+- [ ] Calendar reset  
+
+---
+
+### 🚀 2.5.8 Implementation Order (Recommended)
+
+#### Phase A — Core Framework
+
+- [ ] `EventControl` model  
+- [ ] SignalR hub  
+- [ ] Display page  
+- [ ] Controller page  
+- [ ] `SponsorDisplayControl`  
+
+#### Phase B — Talent Show
+
+- [ ] `TalentAuditionControl`  
+- [ ] `TalentShowControl`  
+- [ ] `PerformerBackstageControl`  
+- [ ] `HostTeleprompterControl`  
+- [ ] `ActTimerControl`  
+- [ ] `KaraokeVideoControl`  
+
+#### Phase C — Elections
+
+- [ ] `ElectionControl`  
+- [ ] `AgendaControl` integration  
+- [ ] `NoteTakerControl` integration  
+
+#### Phase D — School Year Transition
+
+- [ ] `SchoolYearTransitionControl`  
+- [ ] Data archive/reset tools  
 
 ### 🤝 **Phase 3: Volunteer & Integration Systems** ⏱️ *Week 5-6*
 **Status: ⏳ Planned**
@@ -514,90 +681,17 @@ LuxfordPTAWeb.Client/Components/
 2. ✅ **HIGH PRIORITY** Fixed EventDay creation validation error with CreateEventDayDTO *(COMPLETED)*
 3. ✅ **HIGH PRIORITY** Implemented event category permissions and coordinator requirements *(COMPLETED)*
 4. ✅ **HIGH PRIORITY** Complete EventsEdit.razor with multi-day editing *(COMPLETED)*
-5. 📝 **HIGH PRIORITY** Implement "Copy from Previous Event" feature *(NOT STARTED)*
-6. 📝 **HIGH PRIORITY** Add "Copy Event" button in EventsAdmin.razor *(NOT STARTED)*
-7. 📝 **MEDIUM PRIORITY** Event template system for recurring events *(NOT STARTED)*
-
-## 📊 Progress Tracking (UPDATED)
-
-- **Phase 1**: 🟢 **100% Complete** (Multi-day foundation, enhanced admin, approval workflow complete)
-- **Phase 2**: ⏳ **40% Complete** (Multi-day editing complete, copy/template features not started)
-- **Phase 3**: ⏳ Not Started
-- **Phase 4**: ⏳ Not Started
-- **Phase 5**: ⏳ Not Started
-- **Phase 6**: 📋 Future
-
-
-## 🔧 Technical Specifications (UPDATED)
-
-### Database Schema - COMPLETED ✅
-```sql
--- EventDay table (COMPLETED)
-CREATE TABLE EventDays (
-    Id INT IDENTITY(1,1) PRIMARY KEY,
-    EventId INT FOREIGN KEY REFERENCES Events(Id),
-    DayNumber INT NOT NULL,
-    Date DATETIME2 NOT NULL,
-    DayTitle NVARCHAR(255),
-    Description NVARCHAR(MAX),
-    Location NVARCHAR(500),
-    StartTime DATETIME2,
-    EndTime DATETIME2,
-    IsActive BIT DEFAULT 1,
-    SpecialInstructions NVARCHAR(MAX),
-    MaxAttendees INT,
-    EstimatedAttendees INT,
-    WeatherBackupPlan NVARCHAR(MAX)
-);
-
--- Enhanced Events table (COMPLETED)
-ALTER TABLE Events ADD Slug NVARCHAR(255);
-ALTER TABLE Events ADD SourceEventId INT;
-ALTER TABLE Events ADD CopyGeneration INT DEFAULT 0;
-ALTER TABLE Events ADD ApprovedByUserId NVARCHAR(450);
-ALTER TABLE Events ADD ApprovedDate DATETIME2;
-ALTER TABLE Events ADD ApprovalNotes NVARCHAR(MAX);
-ALTER TABLE Events ADD CreatedBy NVARCHAR(MAX);
-ALTER TABLE Events ADD CreatedOn DATETIME2;
-ALTER TABLE Events ADD LastEditedBy NVARCHAR(MAX);
-ALTER TABLE Events ADD LastEditedOn DATETIME2;
-ALTER TABLE Events ADD ChangeNotes NVARCHAR(MAX);
-```
-
-### Multi-Day Event Examples - IMPLEMENTED ✅
-1. **Fire Prevention Week (Oct 6-12, 2025)**
-   - Primary Day: Fire Safety Education (classroom visits)
-   - Day 2: Fire Truck Demonstration  
-   - Day 3: Escape Plan Workshop
-   - Day 4: Fire Department Tour
-   - Day 5: Fire Safety Fair
-
-2. **Book Fair Week** - READY FOR IMPLEMENTATION ✅
-   - Day 1-3: Student Shopping Days
-   - Day 4: Family Night
-   - Day 5: Teacher Preview
-
-3. **Spirit Week** - READY FOR IMPLEMENTATION ✅
-   - Monday: Pajama Day
-   - Tuesday: Crazy Hair Day  
-   - Wednesday: Twin Day
-   - Thursday: Sports Day
-   - Friday: School Colors Day
-
-### Security & Permissions - IMPLEMENTED ✅
-- **Event Coordinators**: Can create/edit assigned events, manage multi-day events, view approval status ✅
-- **Board Members**: Can approve PTA events, view all pending approvals, manage event templates ✅
-- **Admins**: Can approve all events, manage approval workflow, full multi-day event management ✅
-- **Principal**: Can approve school-related events *(future enhancement)*
-- **Public**: Can only view Active, InProgress, WrapUp, and Completed events ✅
+5. 📝 **HIGH PRIORITY** Implement "Copy to New Event" feature *(NOT STARTED)*
+6. 📝 **HIGH PRIORITY** Add "Copy to New Event" button in EventsAdmin.razor *(NOT STARTED)*
+7. 📝 **MEDIUM PRIORITY** Event template system for recurring events with stations/components *(NOT STARTED)*
 
 ## 🤔 Updated Open Questions & Decisions
 
-1. **Event Templates**: Should we prioritize templates for Fire Prevention Week, Book Fair, and Spirit Week first?
-2. **Copy UI Location**: Where should the "Copy Event" functionality be most prominently displayed?
-3. **Edit Interface**: Should multi-day event editing be on the same page or separate tabs?
-4. **School Year Transitions**: When should the system switch to showing the next school year?
-5. **Event Templates**: Should templates include default volunteer roles and station setups?
+1. **Event Templates**: Prioritize templates for Fire Prevention Week, Book Fair, and Spirit Week first.
+2. **Copy UI Location**: "Copy to New Event" should be prominent in both EventsCreate and EventsAdmin.
+3. **Copy Behavior**: Copy should create a draft (`Planning`) with title/details prefilled and editable after creation.
+4. **Edit Interface**: Should multi-day event editing be on the same page or separate tabs?
+5. **Template Scope**: Templates should include stations and other copyable components from prior events.
 6. **Calendar Integration**: Should we build a full calendar view or integrate with existing calendar systems?
 
 ## 📝 Updated Implementation Notes
@@ -606,37 +700,13 @@ ALTER TABLE Events ADD ChangeNotes NVARCHAR(MAX);
 - **Admin Interface**: ✅ Enhanced filtering and display working well with good UX
 - **Audit Trail**: ✅ Full audit tracking implemented and working
 - **Event Creation Fix**: ✅ Resolved validation error by implementing CreateEventDTO to separate API concerns from Entity Framework navigation properties
-- **Next Priority**: Focus on EventsEdit.razor completion and copy functionality
+- **Next Priority**: Focus on "Copy to New Event" draft workflow and template/component copying
 - **Template System**: Ready to implement - database structure supports it
 - **Performance**: Current queries are efficient with proper indexing on common filters
-
-## 🎪 Recently Completed Multi-Day Event Features ✅
-
-### Core Multi-Day Functionality - COMPLETED
-- **Event Model**: Full multi-day support with EventDays collection
-- **EventDay Model**: Complete day-specific information storage
-- **Database**: Proper foreign key relationships and constraints
-- **API Controllers**: Full CRUD operations for events and days
-- **Permission System**: Proper role-based access control
-- **UI Components**: Full multi-day creation and management interface
-
-### Admin Interface Enhancements - COMPLETED
-- **Advanced Filtering**: School year, category, subcategory filtering
-- **Quick Filters**: Status-based filtering with live counts
-- **Multi-Day Display**: Day count badges and date ranges
-- **Event Statistics**: Real-time dashboard with multi-day analytics
-- **Audit Tracking**: Creator and modification history display
-
-### Copy & Template Foundation - COMPLETED  
-- **Event Copying**: Full multi-day event duplication with day offset
-- **Slug System**: URL-friendly event identification
-- **Source Tracking**: Relationship tracking between copies
-- **Smart Resolution**: Intelligent event instance selection
-- **Audit Integration**: Full change tracking for copied events
 
 ---
 
 **Last Updated**: 01/16/25 
-**Current Sprint**: Phase 2 - Enhanced Admin Interface & Event Templates  
-**Next Review**: After EventsEdit.razor completion and copy functionality implementation  
+**Current Sprint**: Phase 2 - Enhanced Admin Interface, Copy to New Event, and Event Templates  
+**Next Review**: After "Copy to New Event" implementation and template/component copying  
 **Repository**: [LuxfordPTABlazor](https://github.com/jedelfraisse/LuxfordPTABlazor)
