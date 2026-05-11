@@ -1,0 +1,501 @@
+@page "/admin/event-templates"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Enums
+
+<PageTitle>Manage Event Templates</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-collection"></i> Manage Event Templates</h1>
+    <div>
+        <a href="/admin/events" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+        <button class="btn btn-primary" @onclick="StartCreateTemplate">
+            <i class="bi bi-plus"></i> Add Template
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (showForm && editingTemplate != null)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingTemplate.Id > 0 ? "Edit" : "Create") Event Template</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingTemplate" OnValidSubmit="SaveTemplate">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Template Name *</label>
+                        <InputText class="form-control" @bind-Value="editingTemplate.Name" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Description</label>
+                        <InputText class="form-control" @bind-Value="editingTemplate.Description" />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Event Category *</label>
+                        <InputSelect class="form-select" @bind-Value="editingTemplate.EventCatId" @bind:after="OnCategoryChanged">
+                            <option value="0">Select Category</option>
+                            @foreach (var category in eventCategories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Event Sub-Category</label>
+                        <InputSelect class="form-select" @bind-Value="editingTemplate.EventSubTypeId">
+                            <option value="">None</option>
+                            @foreach (var subCategory in GetAvailableSubCategories(editingTemplate.EventCatId))
+                            {
+                                <option value="@subCategory.Id">@subCategory.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Default Title</label>
+                        <InputText class="form-control" @bind-Value="editingTemplate.DefaultTitle" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Default Location</label>
+                        <InputText class="form-control" @bind-Value="editingTemplate.DefaultLocation" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Default Description (Markdown)</label>
+                    <InputTextArea class="form-control" rows="3" @bind-Value="editingTemplate.DefaultDescriptionMarkdown" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Default More Details (Markdown)</label>
+                    <InputTextArea class="form-control" rows="3" @bind-Value="editingTemplate.DefaultMoreDetailsMarkdown" />
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="editingTemplate.RequiresVolunteers" />
+                            <label class="form-check-label">Volunteers Needed</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="editingTemplate.RequiresSetup" />
+                            <label class="form-check-label">Requires Setup</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="editingTemplate.RequiresCleanup" />
+                            <label class="form-check-label">Requires Cleanup</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="editingTemplate.IsActive" />
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" type="submit" disabled="@isSaving">Save Template</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelEdit">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Templates</h5>
+    </div>
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <em>Loading templates...</em>
+        }
+        else if (!templates.Any())
+        {
+            <div class="alert alert-info mb-0">No templates found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Subcategory</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var template in templates.OrderBy(t => t.Name))
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@template.Name</strong>
+                                    @if (!string.IsNullOrWhiteSpace(template.Description))
+                                    {
+                                        <div class="text-muted small">@template.Description</div>
+                                    }
+                                </td>
+                                <td>@template.EventCat?.Name</td>
+                                <td>@template.EventCatSub?.Name</td>
+                                <td>
+                                    <span class="badge @(template.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(template.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" @onclick="() => StartEditTemplate(template)">Edit</button>
+                                        <button class="btn btn-outline-success" @onclick="() => StartCreateEventFromTemplate(template)">Create Event</button>
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteTemplate(template.Id)">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showCreateEventPanel && selectedTemplateForCreate != null)
+{
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Create Event from Template: @selectedTemplateForCreate.Name</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="createEventRequest" OnValidSubmit="CreateEventFromTemplate">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">School Year *</label>
+                        <InputSelect class="form-select" @bind-Value="createEventRequest.SchoolYearId">
+                            <option value="0">Select School Year</option>
+                            @foreach (var schoolYear in schoolYears.OrderByDescending(sy => sy.StartDate))
+                            {
+                                <option value="@schoolYear.Id">@schoolYear.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Date *</label>
+                        <InputDate class="form-control" @bind-Value="createEventRequest.Date" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Title Override</label>
+                        <InputText class="form-control" @bind-Value="createEventRequest.TitleOverride" />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Location Override</label>
+                        <InputText class="form-control" @bind-Value="createEventRequest.LocationOverride" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Description Override</label>
+                        <InputText class="form-control" @bind-Value="createEventRequest.DescriptionOverride" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" type="submit" disabled="@isCreatingEvent">Create Event</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelCreateEventFromTemplate">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EventTemplate> templates = new();
+    private List<EventCat> eventCategories = new();
+    private List<EventCatSub> eventSubCategories = new();
+    private List<SchoolYear> schoolYears = new();
+
+    private EventTemplate? editingTemplate;
+    private bool showForm = false;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool isCreatingEvent = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private bool showCreateEventPanel = false;
+    private EventTemplate? selectedTemplateForCreate;
+    private CreateEventFromTemplateDTO createEventRequest = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            templates = await Http.GetFromJsonAsync<List<EventTemplate>>("api/eventtemplate?includeInactive=true") ?? new();
+            eventCategories = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat") ?? new();
+            eventSubCategories = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub") ?? new();
+            schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears") ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading template data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartCreateTemplate()
+    {
+        editingTemplate = new EventTemplate
+        {
+            IsActive = true,
+            EventCatId = 0
+        };
+        showForm = true;
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private void StartEditTemplate(EventTemplate template)
+    {
+        editingTemplate = new EventTemplate
+        {
+            Id = template.Id,
+            Name = template.Name,
+            Description = template.Description,
+            IsActive = template.IsActive,
+            EventCatId = template.EventCatId,
+            EventSubTypeId = template.EventSubTypeId,
+            DefaultTitle = template.DefaultTitle,
+            DefaultLocation = template.DefaultLocation,
+            DefaultDescriptionMarkdown = template.DefaultDescriptionMarkdown,
+            DefaultMoreDetailsMarkdown = template.DefaultMoreDetailsMarkdown,
+            RequiresVolunteers = template.RequiresVolunteers,
+            RequiresSetup = template.RequiresSetup,
+            RequiresCleanup = template.RequiresCleanup
+        };
+        showForm = true;
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private async Task SaveTemplate()
+    {
+        if (editingTemplate == null)
+        {
+            return;
+        }
+
+        if (editingTemplate.EventCatId <= 0 || string.IsNullOrWhiteSpace(editingTemplate.Name))
+        {
+            errorMessage = "Template name and category are required.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            HttpResponseMessage response;
+            if (editingTemplate.Id <= 0)
+            {
+                response = await Http.PostAsJsonAsync("api/eventtemplate", editingTemplate);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/eventtemplate/{editingTemplate.Id}", editingTemplate);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"Error saving template: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+
+            successMessage = "Template saved.";
+            showForm = false;
+            editingTemplate = null;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving template: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteTemplate(int templateId)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/eventtemplate/{templateId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"Error deleting template: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+
+            successMessage = "Template deleted.";
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting template: {ex.Message}";
+        }
+    }
+
+    private void CancelEdit()
+    {
+        showForm = false;
+        editingTemplate = null;
+    }
+
+    private void OnCategoryChanged()
+    {
+        if (editingTemplate == null)
+        {
+            return;
+        }
+
+        if (editingTemplate.EventSubTypeId.HasValue)
+        {
+            var stillValid = eventSubCategories.Any(sc =>
+                sc.EventCatId == editingTemplate.EventCatId &&
+                sc.Id == editingTemplate.EventSubTypeId.Value);
+            if (!stillValid)
+            {
+                editingTemplate.EventSubTypeId = null;
+            }
+        }
+    }
+
+    private IEnumerable<EventCatSub> GetAvailableSubCategories(int eventCatId)
+    {
+        return eventSubCategories
+            .Where(sc => sc.EventCatId == eventCatId && sc.IsActive)
+            .OrderBy(sc => sc.DisplayOrder)
+            .ThenBy(sc => sc.Name);
+    }
+
+    private void StartCreateEventFromTemplate(EventTemplate template)
+    {
+        selectedTemplateForCreate = template;
+        showCreateEventPanel = true;
+
+        var currentSchoolYearId = schoolYears
+            .FirstOrDefault(sy => sy.Status == SchoolYearStatus.CurrentYear)?.Id ?? 0;
+
+        createEventRequest = new CreateEventFromTemplateDTO
+        {
+            SchoolYearId = currentSchoolYearId,
+            Date = DateTime.Today.AddDays(14)
+        };
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CancelCreateEventFromTemplate()
+    {
+        selectedTemplateForCreate = null;
+        showCreateEventPanel = false;
+    }
+
+    private async Task CreateEventFromTemplate()
+    {
+        if (selectedTemplateForCreate == null)
+        {
+            return;
+        }
+
+        if (createEventRequest.SchoolYearId <= 0)
+        {
+            errorMessage = "Please select a school year.";
+            return;
+        }
+
+        isCreatingEvent = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/eventtemplate/{selectedTemplateForCreate.Id}/create-event",
+                createEventRequest);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"Error creating event from template: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+
+            var createdEvent = await response.Content.ReadFromJsonAsync<Event>();
+            if (createdEvent != null)
+            {
+                successMessage = "Event created from template.";
+                showCreateEventPanel = false;
+                selectedTemplateForCreate = null;
+                NavigationManager.NavigateTo($"/admin/events/edit/{createdEvent.Id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating event from template: {ex.Message}";
+        }
+        finally
+        {
+            isCreatingEvent = false;
+        }
+    }
+}
