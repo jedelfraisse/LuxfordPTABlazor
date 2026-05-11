@@ -114,9 +114,14 @@ else
                             }
                             @if (HasDetailsOrFlyer(evt))
                             {
-                                <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary ms-2">
-                                    More Details
-                                </a>
+                                @if (IsFlyerOnly(evt))
+                                {
+                                    <a href="@evt.FlyerUrl" class="btn btn-sm btn-outline-secondary ms-2" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                }
+                                else
+                                {
+                                    <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary ms-2">More Details</a>
+                                }
                             }
                         </div>
                         <div class="card-footer bg-transparent">
@@ -171,7 +176,14 @@ else
                                             }
                                             @if (HasDetailsOrFlyer(evt))
                                             {
-                                                <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary">More Details</a>
+                                                @if (IsFlyerOnly(evt))
+                                                {
+                                                    <a href="@evt.FlyerUrl" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary">More Details</a>
+                                                }
                                             }
                                         </div>
                                     </div>
@@ -289,6 +301,11 @@ else
     private static bool HasDetailsOrFlyer(EventDto evt)
     {
         return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) || !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+    }
+
+    private static bool IsFlyerOnly(EventDto evt)
+    {
+        return string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) && !string.IsNullOrWhiteSpace(evt.FlyerUrl);
     }
 
     private static string GetEventDetailsUrl(EventDto evt)

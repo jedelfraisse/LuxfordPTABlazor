@@ -102,9 +102,14 @@
                             @if (HasDetailsOrFlyer(evt))
                             {
                                 <div class="mt-2">
-                                    <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">
-                                        More Details
-                                    </a>
+                                    @if (IsFlyerOnly(evt))
+                                    {
+                                        <a class="btn btn-sm btn-outline-primary" href="@evt.FlyerUrl" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                    }
+                                    else
+                                    {
+                                        <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">More Details</a>
+                                    }
                                 </div>
                             }
                         </div>
@@ -211,7 +216,14 @@ else
                                         @if (HasDetailsOrFlyer(nextEvent))
                                         {
                                             <div class="mt-2">
-                                                <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                @if (IsFlyerOnly(nextEvent))
+                                                {
+                                                    <a href="@nextEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                }
                                             </div>
                                         }
                                     }
@@ -267,7 +279,14 @@ else
                                         @if (HasDetailsOrFlyer(nextGeneralEvent))
                                         {
                                             <div class="mt-2">
-                                                <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                @if (IsFlyerOnly(nextGeneralEvent))
+                                                {
+                                                    <a href="@nextGeneralEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                }
                                             </div>
                                         }
                                     </div>
@@ -320,7 +339,14 @@ else
                                 @if (HasDetailsOrFlyer(nextEvent))
                                 {
                                     <div class="mt-2">
-                                        <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                        @if (IsFlyerOnly(nextEvent))
+                                        {
+                                            <a href="@nextEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                        }
+                                        else
+                                        {
+                                            <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                        }
                                     </div>
                                 }
                             }
@@ -637,6 +663,11 @@ else
     private static bool HasDetailsOrFlyer(Event evt)
     {
         return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) || !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+    }
+
+    private static bool IsFlyerOnly(Event evt)
+    {
+        return string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) && !string.IsNullOrWhiteSpace(evt.FlyerUrl);
     }
 
     private static string GetEventDetailsUrl(Event evt)
