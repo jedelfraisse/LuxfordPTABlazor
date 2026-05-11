@@ -16,6 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<EventCat> EventCats { get; set; }
 	public DbSet<SponsorAssignment> SponsorAssignments { get; set; }
 	public DbSet<EventCatSub> EventCatSubs { get; set; }
+	public DbSet<EventTemplate> EventTemplates { get; set; }
 	public DbSet<ProgramCard> ProgramCards { get; set; }
 
 	// Summit Proposal: Bug Reports
@@ -141,6 +142,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		builder.Entity<EventDay>()
 			.HasIndex(ed => new { ed.EventId, ed.DayNumber })
 			.IsUnique();
+
+		builder.Entity<EventTemplate>()
+			.HasOne(t => t.EventCat)
+			.WithMany()
+			.HasForeignKey(t => t.EventCatId)
+			.OnDelete(DeleteBehavior.Restrict);
+
+		builder.Entity<EventTemplate>()
+			.HasOne(t => t.EventCatSub)
+			.WithMany()
+			.HasForeignKey(t => t.EventSubTypeId)
+			.OnDelete(DeleteBehavior.SetNull);
+
+		builder.Entity<EventTemplate>()
+			.HasIndex(t => new { t.IsActive, t.EventCatId });
 	}
 
 	public static async Task SeedBoardPositionTitlesAsync(ApplicationDbContext db)
