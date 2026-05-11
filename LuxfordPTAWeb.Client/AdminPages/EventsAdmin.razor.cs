@@ -22,6 +22,7 @@ public partial class EventsAdmin : ComponentBase
     private int selectedEventSubCatId = 0;
     private int selectedSchoolYearId = 0;
     private string selectedQuickFilter = "all";
+    private string loadError = string.Empty;
 
     private string GetCreateEventUrl()
     {
@@ -37,6 +38,8 @@ public partial class EventsAdmin : ComponentBase
             url += "?" + string.Join("&", queryParams);
         return url;
     }
+
+    private string GetCopyEventUrl(int eventId) => $"/admin/events/create?copyFromId={eventId}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,23 +74,101 @@ public partial class EventsAdmin : ComponentBase
     {
         try
         {
+            loadError = string.Empty;
+
             // Get events with optional school year filtering
             var url = selectedSchoolYearId > 0
                 ? $"api/events/all-admin?schoolYearId={selectedSchoolYearId}"
                 : "api/events/all-admin";
 
-            allEvents = await Http.GetFromJsonAsync<List<Event>>(url);
+            var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                    response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    if (TryReloadAfterSessionExpiry())
+                    {
+                        return;
+                    }
+                }
+
+                allEvents = new List<Event>();
+                filteredEvents = new List<Event>();
+                loadError = await GetApiErrorMessage(response, "Unable to load events.");
+                return;
+            }
+
+            var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            if (!mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            {
+                if (TryReloadAfterSessionExpiry())
+                {
+                    return;
+                }
+
+                allEvents = new List<Event>();
+                filteredEvents = new List<Event>();
+                loadError = "Unable to load events. Your session may have expired. Refresh the page and sign in again.";
+                return;
+            }
+
+            allEvents = await response.Content.ReadFromJsonAsync<List<Event>>();
             if (allEvents == null)
             {
                 allEvents = new List<Event>();
             }
             ApplyFilters();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             allEvents = new List<Event>();
             filteredEvents = new List<Event>();
+            loadError = $"Unable to load events. {ex.Message}";
         }
+    }
+
+    private static async Task<string> GetApiErrorMessage(HttpResponseMessage response, string fallbackMessage)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return $"{fallbackMessage} Server returned {(int)response.StatusCode}.";
+            }
+
+            if (content.StartsWith("<", StringComparison.Ordinal))
+            {
+                return $"{fallbackMessage} Your session may have expired. Refresh the page and sign in again.";
+            }
+
+            return $"{fallbackMessage} Server returned {(int)response.StatusCode}. {content}";
+        }
+        catch
+        {
+            return $"{fallbackMessage} Server returned {(int)response.StatusCode}.";
+        }
+    }
+
+    private bool TryReloadAfterSessionExpiry()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.ContainsKey("sessionReloaded"))
+        {
+            return false;
+        }
+
+        var queryParameters = query.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.ToString());
+        queryParameters["sessionReloaded"] = "1";
+
+        var reloadUri = QueryHelpers.AddQueryString(uri.GetLeftPart(UriPartial.Path), queryParameters);
+        NavigationManager.NavigateTo(reloadUri, forceLoad: true);
+        return true;
     }
 
     private async Task LoadEventSummary()
@@ -276,7 +357,7 @@ public partial class EventsAdmin : ComponentBase
 
         if (selectedEventSubCatId > 0)
         {
-            filtered = filtered.Where(e => e.EventCatSub?.Id == selectedEventSubCatId);
+            filtered = filtered.Where(e => e.EventSubTypeId == selectedEventSubCatId);
         }
 
         filteredEvents = filtered.ToList();
@@ -341,6 +422,21 @@ public partial class EventsAdmin : ComponentBase
         }
 
         return parts.Any() ? string.Join(" ", parts) : "";
+    }
+
+    private string GetEventSubCategoryName(Event evt)
+    {
+        if (evt.EventCatSub != null)
+        {
+            return evt.EventCatSub.Name;
+        }
+
+        if (evt.EventSubTypeId > 0)
+        {
+            return allEventSubCats?.FirstOrDefault(sc => sc.Id == evt.EventSubTypeId)?.Name ?? string.Empty;
+        }
+
+        return string.Empty;
     }
 
     private string GetStatusBadgeClass(EventStatus status) => status switch

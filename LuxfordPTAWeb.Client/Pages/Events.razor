@@ -56,13 +56,31 @@
                         <div class="card-body">
                             <h6 class="card-title">@evt.Title</h6>
                             <p class="text-muted mb-2">
-                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy") @if(evt.Date.TimeOfDay != TimeSpan.Zero){<span>@evt.Date.ToString("h:mm tt")</span>}
+                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
+                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(evt)))
+                                {
+                                    <span class="ms-1"><i class="bi bi-clock"></i> @GetSingleDayTimeText(evt)</span>
+                                }
                                 @if(evt.Date.Date == DateTime.Now.Date){<span class="badge bg-warning ms-2">Tonight!</span>}
                             </p>
                             @if (!string.IsNullOrWhiteSpace(evt.Location))
                             {
                                 <p class="text-muted mb-2">
                                     <i class="bi bi-geo-alt"></i> @evt.Location
+                                </p>
+                            }
+                            @if (evt.RequiresVolunteers)
+                            {
+                                <p class="text-muted mb-2">
+                                    <i class="bi bi-people"></i>
+                                    @if (!string.IsNullOrWhiteSpace(evt.ExcelImportId))
+                                    {
+                                        <a href="@evt.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                    }
+                                    else
+                                    {
+                                        <span>@GetVolunteerSignupText(evt)</span>
+                                    }
                                 </p>
                             }
                             @if (!string.IsNullOrWhiteSpace(evt.DescriptionHtml))
@@ -153,6 +171,22 @@ else
                                             <br>
                                             <span class="text-muted">
                                                 <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
+                                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextEvent)))
+                                                {
+                                                    <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextEvent)
+                                                }
+                                                @if (nextEvent.RequiresVolunteers)
+                                                {
+                                                    <br><i class="bi bi-people"></i>
+                                                    @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
+                                                    {
+                                                        <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@GetVolunteerSignupText(nextEvent)</span>
+                                                    }
+                                                }
                                                 @if (!string.IsNullOrEmpty(nextEvent.Location))
                                                 {
                                                     <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
@@ -192,6 +226,22 @@ else
                                             <br>
                                             <span class="text-muted">
                                                 <i class="bi bi-calendar"></i> @nextGeneralEvent.Date.ToString("MMM d, yyyy")
+                                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextGeneralEvent)))
+                                                {
+                                                    <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextGeneralEvent)
+                                                }
+                                                @if (nextGeneralEvent.RequiresVolunteers)
+                                                {
+                                                    <br><i class="bi bi-people"></i>
+                                                    @if (!string.IsNullOrWhiteSpace(nextGeneralEvent.ExcelImportId))
+                                                    {
+                                                        <a href="@nextGeneralEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@GetVolunteerSignupText(nextGeneralEvent)</span>
+                                                    }
+                                                }
                                             </span>
                                         </div>
                                         @if (eventsWithoutSubcat.Count() > 1)
@@ -214,6 +264,22 @@ else
                                     <h6 class="text-primary mb-1">@(isCurrentSchoolYear ? "Next Event" : "Event"): @nextEvent.Title</h6>
                                     <div class="small text-muted">
                                         <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
+                                        @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextEvent)))
+                                        {
+                                            <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextEvent)
+                                        }
+                                        @if (nextEvent.RequiresVolunteers)
+                                        {
+                                            <br><i class="bi bi-people"></i>
+                                            @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
+                                            {
+                                                <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                            }
+                                            else
+                                            {
+                                                <span>@GetVolunteerSignupText(nextEvent)</span>
+                                            }
+                                        }
                                         @if (!string.IsNullOrEmpty(nextEvent.Location))
                                         {
                                             <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
@@ -495,5 +561,50 @@ else
             return description;
         
         return description.Substring(0, maxLength - 3) + "...";
+    }
+
+    private static string GetSingleDayTimeText(Event evt)
+    {
+        if (evt.EventDays?.Count > 1)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime == default || evt.EventEndTime == default)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime.TimeOfDay == TimeSpan.Zero && evt.EventEndTime.TimeOfDay == TimeSpan.Zero)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime.TimeOfDay == evt.EventEndTime.TimeOfDay)
+        {
+            return evt.EventStartTime.ToString("h:mm tt");
+        }
+
+        return $"{evt.EventStartTime:h:mm tt} - {evt.EventEndTime:h:mm tt}";
+    }
+
+    private static string GetVolunteerSignupText(Event evt)
+    {
+        if (evt.SignupWindowStart.HasValue && evt.SignupWindowEnd.HasValue)
+        {
+            return $"Signups: {evt.SignupWindowStart.Value:MMM d h:mm tt} - {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
+        }
+
+        if (evt.SignupWindowStart.HasValue)
+        {
+            return $"Signups open: {evt.SignupWindowStart.Value:MMM d h:mm tt}";
+        }
+
+        if (evt.SignupWindowEnd.HasValue)
+        {
+            return $"Signups close: {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
+        }
+
+        return "Volunteers needed";
     }
 }

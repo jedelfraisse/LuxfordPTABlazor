@@ -36,6 +36,8 @@ public class UpdateEventDTO
     public bool RequiresVolunteers { get; set; } = false;
     public bool RequiresSetup { get; set; } = false;
     public bool RequiresCleanup { get; set; } = false;
+    public DateTime? SignupWindowStart { get; set; }
+    public DateTime? SignupWindowEnd { get; set; }
     
     // Additional information fields
     public string Notes { get; set; } = string.Empty;

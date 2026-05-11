@@ -391,6 +391,8 @@
                 RequiresVolunteers = eventModel.RequiresVolunteers,
                 RequiresSetup = eventModel.RequiresSetup,
                 RequiresCleanup = eventModel.RequiresCleanup,
+                SignupWindowStart = eventModel.SignupWindowStart,
+                SignupWindowEnd = eventModel.SignupWindowEnd,
                 Notes = eventModel.Notes,
                 PublicInstructions = eventModel.PublicInstructions,
                 WeatherBackupPlan = eventModel.WeatherBackupPlan,
@@ -572,6 +574,51 @@
         var category = eventCategories.FirstOrDefault(c => c.Id == eventModel.EventCatId);
         return category?.CoordinatorRequirement == EventCoordinatorRequirement.Required;
     }
+
+    private string GetSelectedCategoryHint()
+    {
+        if (eventModel?.EventCatId <= 0 || eventCategories == null)
+        {
+            return string.Empty;
+        }
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == eventModel.EventCatId);
+        if (category == null)
+        {
+            return string.Empty;
+        }
+
+        var description = category.Description?.Trim() ?? string.Empty;
+        var examples = eventSubcategories?
+            .Where(sc => sc.EventCatId == category.Id && sc.IsActive)
+            .OrderBy(sc => sc.DisplayOrder)
+            .Take(3)
+            .Select(sc => sc.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList() ?? new List<string>();
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return examples.Any() ? $"Examples: {string.Join(", ", examples)}." : string.Empty;
+        }
+
+        return examples.Any()
+            ? $"{description} Examples: {string.Join(", ", examples)}."
+            : description;
+    }
+
+    private string GetSelectedSubcategoryHint()
+    {
+        if (eventSubCategoryId <= 0 || eventSubcategories == null)
+        {
+            return string.Empty;
+        }
+
+        return eventSubcategories
+            .FirstOrDefault(sc => sc.Id == eventSubCategoryId)?
+            .Description?
+            .Trim() ?? string.Empty;
+    }
 }
 
 <PageTitle>Edit Event</PageTitle>
@@ -673,6 +720,10 @@ else if (eventModel != null)
                                     }
                                 }
                             </select>
+                            @if (!string.IsNullOrWhiteSpace(GetSelectedCategoryHint()))
+                            {
+                                <div class="form-text text-muted">@GetSelectedCategoryHint()</div>
+                            }
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -688,6 +739,10 @@ else if (eventModel != null)
                                     }
                                 }
                             </select>
+                            @if (!string.IsNullOrWhiteSpace(GetSelectedSubcategoryHint()))
+                            {
+                                <div class="form-text text-muted">@GetSelectedSubcategoryHint()</div>
+                            }
                         </div>
                         <div class="col-md-6">
                             <label for="location" class="form-label">Location</label>
@@ -794,9 +849,40 @@ else if (eventModel != null)
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
                         <label class="form-check-label" for="requiresVolunteers">
-                            Requires Volunteers
+                            Volunteers Needed
                         </label>
                     </div>
+                    @if (eventModel.RequiresVolunteers)
+                    {
+                        <div class="card mb-4 border-warning">
+                            <div class="card-header">
+                                <strong><i class="bi bi-people"></i> Volunteer Details</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Volunteer Signup Link</label>
+                                    <input type="url" class="form-control" @bind="eventModel.ExcelImportId" placeholder="https://www.signupgenius.com/go/..." />
+                                    <div class="form-text">Store the volunteer signup URL for this event.</div>
+                                </div>
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Signup Opens</label>
+                                        <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowStart" @bind:format="yyyy-MM-ddTHH:mm" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Signup Closes</label>
+                                        <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowEnd" @bind:format="yyyy-MM-ddTHH:mm" />
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(eventModel.ExcelImportId))
+                                {
+                                    <div class="alert alert-info">
+                                        <a href="@eventModel.ExcelImportId" target="_blank">View Volunteer Signup</a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
 

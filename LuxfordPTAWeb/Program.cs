@@ -6,6 +6,7 @@ using LuxfordPTAWeb.Data;
 using LuxfordPTAWeb.Shared.Configuration;
 using LuxfordPTAWeb.Shared.Models;
 using LuxfordPTAWeb.Shared.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,11 @@ public class Program
 			});
 		
 		authBuilder.AddIdentityCookies();
+		builder.Services.ConfigureApplicationCookie(options =>
+		{
+			options.ExpireTimeSpan = TimeSpan.FromDays(14);
+			options.SlidingExpiration = true;
+		});
 		
 		// Add Google OAuth to the same authentication builder
 		// TEMPORARILY DISABLED for troubleshooting

@@ -35,6 +35,54 @@
     </div>
 }
 
+@if (sourceEventToCopy != null)
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
+        <div>
+            <i class="bi bi-files me-2"></i>
+            <strong>Copy mode:</strong> editing a draft prefilled from <strong>@sourceEventToCopy.Title</strong>.
+        </div>
+        <a href="/admin/events/create" class="btn btn-outline-secondary btn-sm">
+            Start from scratch
+        </a>
+    </div>
+}
+
+@if (createEventDto != null)
+{
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-files"></i> Copy to New Event</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Search source events</label>
+                    <input class="form-control" @bind="copySourceSearch" placeholder="Search title or school year..." />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Source event</label>
+                    <select class="form-select" @bind="selectedCopySourceEventId">
+                        <option value="0">Select event to copy</option>
+                        @foreach (var sourceEvent in GetFilteredCopySourceEvents())
+                        {
+                            <option value="@sourceEvent.Id">@GetCopySourceLabel(sourceEvent)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="button" class="btn btn-outline-primary" @onclick="LoadSelectedCopySource" disabled="@(selectedCopySourceEventId == 0 || isLoadingCopySources)">
+                        Load Copy
+                    </button>
+                </div>
+            </div>
+            <div class="form-text mt-2">
+                Loads an existing event into this form as a new editable draft. Target school year/category can still be changed before save.
+            </div>
+        </div>
+    </div>
+}
+
 @if (isLoading)
 {
     <div class="alert alert-info">
@@ -108,6 +156,10 @@ else if (createEventDto != null)
                                     }
                                 }
                             </select>
+                            @if (!string.IsNullOrWhiteSpace(GetSelectedCategoryHint()))
+                            {
+                                <div class="form-text text-muted">@GetSelectedCategoryHint()</div>
+                            }
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -123,6 +175,10 @@ else if (createEventDto != null)
                                     }
                                 }
                             </select>
+                            @if (!string.IsNullOrWhiteSpace(GetSelectedSubcategoryHint()))
+                            {
+                                <div class="form-text text-muted">@GetSelectedSubcategoryHint()</div>
+                            }
                         </div>
                         <div class="col-md-6">
                             <label for="location" class="form-label">Location</label>
@@ -229,7 +285,7 @@ else if (createEventDto != null)
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="createEventDto.RequiresVolunteers">
                         <label class="form-check-label" for="requiresVolunteers">
-                            Requires Volunteers
+                            Volunteers Needed
                         </label>
                     </div>
                     @if (createEventDto.RequiresVolunteers)
@@ -245,12 +301,22 @@ else if (createEventDto != null)
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">SignUpGenius Link</label>
-                                    <input type="url" class="form-control" @bind="signUpGeniusLink" placeholder="https://www.signupgenius.com/go/..." />
+                                    <input type="url" class="form-control" @bind="createEventDto.ExcelImportId" placeholder="https://www.signupgenius.com/go/..." />
                                 </div>
-                                @if (!string.IsNullOrWhiteSpace(signUpGeniusLink))
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Signup Opens</label>
+                                        <input type="datetime-local" class="form-control" @bind="createEventDto.SignupWindowStart" @bind:format="yyyy-MM-ddTHH:mm" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Signup Closes</label>
+                                        <input type="datetime-local" class="form-control" @bind="createEventDto.SignupWindowEnd" @bind:format="yyyy-MM-ddTHH:mm" />
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(createEventDto.ExcelImportId))
                                 {
                                     <div class="alert alert-info">
-                                        <a href="@signUpGeniusLink" target="_blank">View Volunteer Signup</a>
+                                        <a href="@createEventDto.ExcelImportId" target="_blank">View Volunteer Signup</a>
                                     </div>
                                 }
                                 <!-- Future: Integrate SignUpGenius API or scraping for slots -->
@@ -412,7 +478,6 @@ else if (createEventDto != null)
 
 @code {
     private int volunteerSpots = 0;
-    private string signUpGeniusLink = string.Empty;
     private CreateEventDTO? createEventDto;
     private EventDay primaryDay = new();
     private List<EventDay> additionalDays = new();
@@ -420,11 +485,16 @@ else if (createEventDto != null)
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
     private List<ApplicationUser>? availableCoordinators;
+    private List<Event>? availableCopySourceEvents;
+    private Event? sourceEventToCopy;
     private bool isLoading = true;
     private bool isSaving = false;
+    private bool isLoadingCopySources = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private int eventSubCategoryId = 0;
+    private int selectedCopySourceEventId = 0;
+    private string copySourceSearch = string.Empty;
     
     // Primary day time tracking
     private bool primaryDayIsAllDay = true;
@@ -440,20 +510,34 @@ else if (createEventDto != null)
     {
         await LoadDropdownData();
 
-        // Read query parameters for schoolYearId, eventCatId, and eventSubCatId
+        // Read query parameters for schoolYearId, eventCatId, eventSubCatId, and copy mode
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
         int schoolYearId = 0;
         int eventCatId = 0;
         int eventSubCatId = 0;
+        int copyFromId = 0;
         if (query.TryGetValue("schoolYearId", out var syVal))
             int.TryParse(syVal, out schoolYearId);
         if (query.TryGetValue("eventCatId", out var catVal))
             int.TryParse(catVal, out eventCatId);
         if (query.TryGetValue("eventSubCatId", out var subCatVal))
             int.TryParse(subCatVal, out eventSubCatId);
+        if (query.TryGetValue("copyFromId", out var copyVal))
+            int.TryParse(copyVal, out copyFromId);
+        if (query.TryGetValue("sourceEventId", out var sourceEventVal))
+            int.TryParse(sourceEventVal, out copyFromId);
 
-        InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId);
+        if (copyFromId > 0)
+        {
+            await LoadSourceEvent(copyFromId, schoolYearId, eventCatId, eventSubCatId);
+        }
+        else
+        {
+            InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId);
+        }
+
+        await LoadAvailableCopySourceEvents();
         isLoading = false;
     }
     
@@ -471,50 +555,184 @@ else if (createEventDto != null)
             errorMessage = $"Error loading data: {ex.Message}";
         }
     }
-    
-    private void InitializeNewEvent(int schoolYearId = 0, int eventCatId = 0, int eventSubCatId = 0)
+
+    private async Task LoadSourceEvent(int sourceEventId, int schoolYearId = 0, int eventCatId = 0, int eventSubCatId = 0)
     {
+        try
+        {
+            sourceEventToCopy = await Http.GetFromJsonAsync<Event>($"api/events/{sourceEventId}");
+            if (sourceEventToCopy == null)
+            {
+                errorMessage = "The event selected for copying could not be found.";
+                InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId);
+                sourceEventToCopy = null;
+                return;
+            }
+
+            selectedCopySourceEventId = sourceEventToCopy.Id;
+            InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId, sourceEventToCopy);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading source event: {ex.Message}";
+            InitializeNewEvent(schoolYearId, eventCatId, eventSubCatId);
+            sourceEventToCopy = null;
+        }
+    }
+
+    private async Task LoadAvailableCopySourceEvents()
+    {
+        try
+        {
+            isLoadingCopySources = true;
+            var excludeParam = createEventDto?.SchoolYearId > 0
+                ? $"?excludeSchoolYearId={createEventDto.SchoolYearId}"
+                : string.Empty;
+
+            availableCopySourceEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/available-for-copy{excludeParam}") ?? new();
+        }
+        catch
+        {
+            availableCopySourceEvents = new();
+        }
+        finally
+        {
+            isLoadingCopySources = false;
+        }
+    }
+    
+    private void InitializeNewEvent(int schoolYearId = 0, int eventCatId = 0, int eventSubCatId = 0, Event? sourceEvent = null)
+    {
+        var baseDate = sourceEvent?.EventDays?.Any() == true
+            ? sourceEvent.EventDays.OrderBy(d => d.DayNumber).First().Date
+            : sourceEvent?.Date ?? DateTime.Today.AddDays(7);
+
         createEventDto = new CreateEventDTO
         {
-            Title = "",
-            Description = "",
-            Location = "",
+            Title = sourceEvent?.Title ?? string.Empty,
+            Description = sourceEvent?.Description ?? string.Empty,
+            DescriptionMarkdown = sourceEvent?.DescriptionMarkdown ?? sourceEvent?.Description ?? string.Empty,
+            DescriptionHtml = sourceEvent?.DescriptionHtml ?? string.Empty,
+            Location = sourceEvent?.Location ?? string.Empty,
+            ImageUrl = sourceEvent?.ImageUrl ?? string.Empty,
+            Link = sourceEvent?.Link ?? string.Empty,
+            EventCoordinatorId = sourceEvent?.EventCoordinatorId,
             Status = EventStatus.Planning,
-            Date = DateTime.Today.AddDays(7), // Default to next week
-            EventStartTime = DateTime.Today.AddDays(7).AddHours(9), // 9 AM
-            EventEndTime = DateTime.Today.AddDays(7).AddHours(15), // 3 PM
-            RequiresVolunteers = false,
-            RequiresSetup = false,
-            RequiresCleanup = false,
-            SchoolYearId = schoolYearId > 0 ? schoolYearId : 0,
-            EventCatId = eventCatId > 0 ? eventCatId : 0
+            Date = baseDate,
+            EventStartTime = sourceEvent?.EventStartTime ?? baseDate.AddHours(9),
+            EventEndTime = sourceEvent?.EventEndTime ?? baseDate.AddHours(15),
+            SetupStartTime = sourceEvent?.SetupStartTime,
+            CleanupEndTime = sourceEvent?.CleanupEndTime,
+            MaxAttendees = sourceEvent?.MaxAttendees,
+            EstimatedAttendees = sourceEvent?.EstimatedAttendees,
+            RequiresVolunteers = sourceEvent?.RequiresVolunteers ?? false,
+            RequiresSetup = sourceEvent?.RequiresSetup ?? false,
+            RequiresCleanup = sourceEvent?.RequiresCleanup ?? false,
+            SignupWindowStart = sourceEvent?.SignupWindowStart,
+            SignupWindowEnd = sourceEvent?.SignupWindowEnd,
+            Notes = sourceEvent?.Notes ?? string.Empty,
+            PublicInstructions = sourceEvent?.PublicInstructions ?? string.Empty,
+            WeatherBackupPlan = sourceEvent?.WeatherBackupPlan ?? string.Empty,
+            ExcelImportId = sourceEvent?.ExcelImportId,
+            Slug = string.Empty,
+            SourceEventId = sourceEvent?.Id,
+            CopyGeneration = sourceEvent != null ? sourceEvent.CopyGeneration + 1 : 0,
+            SchoolYearId = schoolYearId > 0 ? schoolYearId : sourceEvent?.SchoolYearId ?? 0,
+            EventCatId = eventCatId > 0 ? eventCatId : sourceEvent?.EventCatId ?? 0
         };
         
         // Set the eventSubCategoryId from query parameter
-        eventSubCategoryId = eventSubCatId > 0 ? eventSubCatId : 0;
+        eventSubCategoryId = eventSubCatId > 0 ? eventSubCatId : sourceEvent?.EventSubTypeId ?? 0;
         
         // Initialize primary day
-        primaryDay = new EventDay
-        {
-            DayNumber = 1,
-            Date = DateTime.Today.AddDays(7),
-            DayTitle = "",
-            Description = "",
-            Location = "",
-            IsActive = true,
-            EventId = 0
-        };
-        
-        // Reset additional days and tracking
         additionalDays.Clear();
         dayStartTimes.Clear();
         dayEndTimes.Clear();
         dayIsAllDay.Clear();
-        
-        // Initialize primary day time tracking
-        primaryDayIsAllDay = true;
-        primaryDayStartTime = "09:00";
-        primaryDayEndTime = "15:00";
+
+        if (sourceEvent?.EventDays?.Any() == true)
+        {
+            var orderedDays = sourceEvent.EventDays.OrderBy(d => d.DayNumber).ToList();
+            primaryDay = CloneEventDayForCreate(orderedDays.First());
+            InitializePrimaryDayTracking(primaryDay);
+
+            foreach (var day in orderedDays.Skip(1))
+            {
+                var clonedDay = CloneEventDayForCreate(day);
+                additionalDays.Add(clonedDay);
+                InitializeAdditionalDayTracking(clonedDay);
+            }
+        }
+        else
+        {
+            primaryDay = new EventDay
+            {
+                DayNumber = 1,
+                Date = baseDate,
+                DayTitle = sourceEvent?.EventDays?.Any() == true ? sourceEvent.EventDays.OrderBy(d => d.DayNumber).First().DayTitle : string.Empty,
+                Description = string.Empty,
+                Location = sourceEvent?.Location ?? string.Empty,
+                IsActive = true,
+                EventId = 0,
+                SpecialInstructions = string.Empty,
+                MaxAttendees = null,
+                EstimatedAttendees = null,
+                WeatherBackupPlan = string.Empty
+            };
+
+            primaryDayIsAllDay = sourceEvent == null;
+            primaryDayStartTime = primaryDay.Date.AddHours(9).ToString("HH:mm");
+            primaryDayEndTime = primaryDay.Date.AddHours(15).ToString("HH:mm");
+
+            if (sourceEvent != null)
+            {
+                primaryDay.StartTime = sourceEvent.EventStartTime;
+                primaryDay.EndTime = sourceEvent.EventEndTime;
+                primaryDayIsAllDay = sourceEvent.EventStartTime == sourceEvent.EventEndTime;
+                primaryDayStartTime = sourceEvent.EventStartTime.ToString("HH:mm");
+                primaryDayEndTime = sourceEvent.EventEndTime.ToString("HH:mm");
+            }
+            else
+            {
+                primaryDay.StartTime = null;
+                primaryDay.EndTime = null;
+            }
+        }
+    }
+
+    private static EventDay CloneEventDayForCreate(EventDay sourceDay)
+    {
+        return new EventDay
+        {
+            Id = 0,
+            EventId = 0,
+            DayNumber = sourceDay.DayNumber,
+            Date = sourceDay.Date,
+            DayTitle = sourceDay.DayTitle,
+            Description = sourceDay.Description,
+            Location = sourceDay.Location,
+            StartTime = sourceDay.StartTime,
+            EndTime = sourceDay.EndTime,
+            IsActive = sourceDay.IsActive,
+            SpecialInstructions = sourceDay.SpecialInstructions,
+            MaxAttendees = sourceDay.MaxAttendees,
+            EstimatedAttendees = sourceDay.EstimatedAttendees,
+            WeatherBackupPlan = sourceDay.WeatherBackupPlan
+        };
+    }
+
+    private void InitializePrimaryDayTracking(EventDay day)
+    {
+        primaryDayIsAllDay = day.StartTime == null;
+        primaryDayStartTime = day.StartTime?.ToString("HH:mm") ?? "09:00";
+        primaryDayEndTime = day.EndTime?.ToString("HH:mm") ?? "15:00";
+    }
+
+    private void InitializeAdditionalDayTracking(EventDay day)
+    {
+        dayIsAllDay[day.DayNumber] = day.StartTime == null;
+        dayStartTimes[day.DayNumber] = day.StartTime?.ToString("HH:mm") ?? "09:00";
+        dayEndTimes[day.DayNumber] = day.EndTime?.ToString("HH:mm") ?? "15:00";
     }
 
     private void AddAdditionalDay()
@@ -828,6 +1046,50 @@ else if (createEventDto != null)
         StateHasChanged();
     }
 
+    private IEnumerable<Event> GetFilteredCopySourceEvents()
+    {
+        if (availableCopySourceEvents == null)
+        {
+            return Enumerable.Empty<Event>();
+        }
+
+        var query = availableCopySourceEvents.AsEnumerable();
+
+        if (createEventDto?.EventCatId > 0)
+        {
+            query = query.Where(e => e.EventCatId == createEventDto.EventCatId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(copySourceSearch))
+        {
+            query = query.Where(e =>
+                e.Title.Contains(copySourceSearch, StringComparison.OrdinalIgnoreCase) ||
+                (e.SchoolYear?.Name?.Contains(copySourceSearch, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        return query.OrderByDescending(e => e.Date).ThenBy(e => e.Title);
+    }
+
+    private string GetCopySourceLabel(Event evt)
+    {
+        var schoolYear = evt.SchoolYear?.Name ?? "Unknown Year";
+        return $"{evt.Title} ({schoolYear}) - {evt.Date:MMM d, yyyy}";
+    }
+
+    private async Task LoadSelectedCopySource()
+    {
+        if (selectedCopySourceEventId <= 0)
+        {
+            return;
+        }
+
+        await LoadSourceEvent(
+            selectedCopySourceEventId,
+            createEventDto?.SchoolYearId ?? 0,
+            createEventDto?.EventCatId ?? 0,
+            eventSubCategoryId);
+    }
+
     private void CancelEdit()
     {
         NavigationManager.NavigateTo("/admin/events");
@@ -849,5 +1111,50 @@ else if (createEventDto != null)
 
         var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
         return category?.CoordinatorRequirement == EventCoordinatorRequirement.Required;
+    }
+
+    private string GetSelectedCategoryHint()
+    {
+        if (createEventDto?.EventCatId <= 0 || eventCategories == null)
+        {
+            return string.Empty;
+        }
+
+        var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
+        if (category == null)
+        {
+            return string.Empty;
+        }
+
+        var description = category.Description?.Trim() ?? string.Empty;
+        var examples = eventSubcategories?
+            .Where(sc => sc.EventCatId == category.Id && sc.IsActive)
+            .OrderBy(sc => sc.DisplayOrder)
+            .Take(3)
+            .Select(sc => sc.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList() ?? new List<string>();
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return examples.Any() ? $"Examples: {string.Join(", ", examples)}." : string.Empty;
+        }
+
+        return examples.Any()
+            ? $"{description} Examples: {string.Join(", ", examples)}."
+            : description;
+    }
+
+    private string GetSelectedSubcategoryHint()
+    {
+        if (eventSubCategoryId <= 0 || eventSubcategories == null)
+        {
+            return string.Empty;
+        }
+
+        return eventSubcategories
+            .FirstOrDefault(sc => sc.Id == eventSubCategoryId)?
+            .Description?
+            .Trim() ?? string.Empty;
     }
 }

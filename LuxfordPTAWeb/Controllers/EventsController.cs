@@ -292,6 +292,12 @@ public class EventsController : ControllerBase
                 }
             }
 
+            if (createEventDto.SignupWindowStart.HasValue && createEventDto.SignupWindowEnd.HasValue &&
+                createEventDto.SignupWindowStart > createEventDto.SignupWindowEnd)
+            {
+                return BadRequest("Volunteer signup start must be before the signup end.");
+            }
+
             // Create Event from DTO
             var eventItem = new Event
             {
@@ -312,6 +318,8 @@ public class EventsController : ControllerBase
                 RequiresVolunteers = createEventDto.RequiresVolunteers,
                 RequiresSetup = createEventDto.RequiresSetup,
                 RequiresCleanup = createEventDto.RequiresCleanup,
+                SignupWindowStart = createEventDto.SignupWindowStart,
+                SignupWindowEnd = createEventDto.SignupWindowEnd,
                 Notes = createEventDto.Notes,
                 PublicInstructions = createEventDto.PublicInstructions,
                 WeatherBackupPlan = createEventDto.WeatherBackupPlan,
@@ -423,6 +431,12 @@ public class EventsController : ControllerBase
                 RequiresVolunteers = sourceEvent.RequiresVolunteers,
                 RequiresSetup = sourceEvent.RequiresSetup,
                 RequiresCleanup = sourceEvent.RequiresCleanup,
+                SignupWindowStart = sourceEvent.SignupWindowStart.HasValue
+                    ? UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.SignupWindowStart.Value)
+                    : null,
+                SignupWindowEnd = sourceEvent.SignupWindowEnd.HasValue
+                    ? UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.SignupWindowEnd.Value)
+                    : null,
                 Notes = sourceEvent.Notes,
                 PublicInstructions = sourceEvent.PublicInstructions,
                 WeatherBackupPlan = sourceEvent.WeatherBackupPlan,
@@ -558,6 +572,12 @@ public class EventsController : ControllerBase
                 return Forbid();
             }
 
+            if (updatedEventDto.SignupWindowStart.HasValue && updatedEventDto.SignupWindowEnd.HasValue &&
+                updatedEventDto.SignupWindowStart > updatedEventDto.SignupWindowEnd)
+            {
+                return BadRequest("Volunteer signup start must be before the signup end.");
+            }
+
             // Validate coordinator assignment (only admins/board members can change coordinator)
             if (!string.IsNullOrEmpty(updatedEventDto.EventCoordinatorId) && updatedEventDto.EventCoordinatorId != eventItem.EventCoordinatorId)
             {
@@ -599,6 +619,8 @@ public class EventsController : ControllerBase
             eventItem.RequiresVolunteers = updatedEventDto.RequiresVolunteers;
             eventItem.RequiresSetup = updatedEventDto.RequiresSetup;
             eventItem.RequiresCleanup = updatedEventDto.RequiresCleanup;
+            eventItem.SignupWindowStart = updatedEventDto.SignupWindowStart;
+            eventItem.SignupWindowEnd = updatedEventDto.SignupWindowEnd;
             eventItem.Notes = updatedEventDto.Notes;
             eventItem.PublicInstructions = updatedEventDto.PublicInstructions;
             eventItem.WeatherBackupPlan = updatedEventDto.WeatherBackupPlan;

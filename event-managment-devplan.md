@@ -82,7 +82,7 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [x] Better category/subcategory selection with filtering
   - [ ] **NEW** Event type templates (recurring events like Fire Prevention Week) *(Phase 2)*
   - [ ] **NEW** Smart defaults based on event category/subcategory *(Phase 2)*
-  - [ ] **NEW** Copy to New Event functionality that creates an editable draft from an existing event *(Phase 2)*
+  - [x] **NEW** Copy to New Event functionality that creates an editable draft from an existing event *(Phase 2)*
   - [ ] **NEW** Bulk event creation for series (e.g., weekly reading programs) *(Phase 2)*
   
 - [x] **EventsEdit.razor (ENHANCED)** *(COMPLETED)*
@@ -128,8 +128,8 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [x] API endpoint: `GET /api/events/available-for-copy`
   - [x] Multi-day event copying (copy all days with date offset)
   - [x] Preserve relationships between original and copies
-  - [ ] "Copy to New Event" in EventsCreate.razor *(Phase 2)*
-  - [ ] "Copy to New Event" button in EventsAdmin.razor *(Phase 2)*
+  - [x] "Copy to New Event" in EventsCreate.razor *(Phase 2)*
+  - [x] "Copy to New Event" button in EventsAdmin.razor *(Phase 2)*
   - [ ] Template-based copying for recurring annual events including stations and other copyable components *(Phase 2)*
 
 - [x] **Smart Event Resolution (ENHANCED)** *(COMPLETED)*
@@ -215,11 +215,13 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Approval workflow status display and actions
   - [ ] Event history/audit trail viewer
   - [ ] Better form validation and error handling
+  - [ ] **NEW** Use TinyMCE editor with markdown-only storage (no HTML) for multi-line text fields (Event Description and similar)
+  - [ ] **NEW** Update public pages to render markdown from those fields consistently
 
 - [ ] **Copy to New Event Feature** *(HIGH PRIORITY)*
-  - [ ] "Copy to New Event" in EventsCreate.razor creates a new editable draft prefilled from the source event
-  - [ ] "Copy to New Event" button in EventsAdmin.razor for quick draft creation
-  - [ ] New copied events default to draft (`Planning`) and stay editable after creation
+  - [x] "Copy to New Event" in EventsCreate.razor creates a new editable draft prefilled from the source event
+  - [x] "Copy to New Event" button in EventsAdmin.razor for quick draft creation
+  - [x] New copied events default to draft (`Planning`) and stay editable after creation
   - [ ] Multi-day event copying options (all days, specific days, etc.)
   - [ ] Template-based event creation for recurring events, including stations and other copyable components from prior events
 
@@ -229,6 +231,11 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Pre-filled templates with default settings
   - [ ] Include stations and other copyable event components from prior events
   - [ ] Template management interface for admins
+
+- [ ] **Event Details & Flyer Enhancements** *(MEDIUM PRIORITY)*
+  - [ ] Add "More Details" controller/page flow for extended event information
+  - [ ] Add optional event flyer upload/attachment support
+  - [ ] Show flyer/details link on event pages when either details or flyer exists
 
 #### 2.2 Station Management System (ENHANCED)
 - [ ] **EventStation Model**
@@ -495,12 +502,16 @@ A future `SchoolYearTransitionControl` will support:
   - [ ] RoleName
   - [ ] Description
   - [ ] Capacity
+  - [x] **NEW** SignupWindowStart (date/time volunteers can start signing up)
+  - [x] **NEW** SignupWindowEnd (date/time volunteer signup closes)
   - [ ] SignUpGeniusTemplateLink
   - [ ] GivebacksGoal
   - [ ] CustomFields (JSON)
 
 - [ ] **Role Management UI (ENHANCED)**
   - [ ] Create/edit roles within events
+  - [x] **NEW** Volunteer signup availability date range UI (start/end)
+  - [x] **NEW** Wording update from "Requires Volunteers" to "Volunteers Needed" (or "Can Use Volunteers" where appropriate)
   - [ ] **NEW** Day-specific volunteer roles
   - [ ] Assign volunteers to roles
   - [ ] Role-specific requirements and permissions
@@ -681,8 +692,8 @@ LuxfordPTAWeb.Client/Components/
 2. ✅ **HIGH PRIORITY** Fixed EventDay creation validation error with CreateEventDayDTO *(COMPLETED)*
 3. ✅ **HIGH PRIORITY** Implemented event category permissions and coordinator requirements *(COMPLETED)*
 4. ✅ **HIGH PRIORITY** Complete EventsEdit.razor with multi-day editing *(COMPLETED)*
-5. 📝 **HIGH PRIORITY** Implement "Copy to New Event" feature *(NOT STARTED)*
-6. 📝 **HIGH PRIORITY** Add "Copy to New Event" button in EventsAdmin.razor *(NOT STARTED)*
+5. ✅ **HIGH PRIORITY** Implement "Copy to New Event" feature *(COMPLETED)*
+6. ✅ **HIGH PRIORITY** Add "Copy to New Event" button in EventsAdmin.razor *(COMPLETED)*
 7. 📝 **MEDIUM PRIORITY** Event template system for recurring events with stations/components *(NOT STARTED)*
 
 ## 🤔 Updated Open Questions & Decisions
@@ -693,6 +704,8 @@ LuxfordPTAWeb.Client/Components/
 4. **Edit Interface**: Should multi-day event editing be on the same page or separate tabs?
 5. **Template Scope**: Templates should include stations and other copyable components from prior events.
 6. **Calendar Integration**: Should we build a full calendar view or integrate with existing calendar systems?
+7. **Details Page Control**: Add a configurable control for whether an event/category should use a dedicated details page.
+8. **Flyer Storage/Hosting**: Should flyers be stored in-app (blob/file store) or linked from an external source?
 
 ## 📝 Updated Implementation Notes
 
@@ -700,7 +713,7 @@ LuxfordPTAWeb.Client/Components/
 - **Admin Interface**: ✅ Enhanced filtering and display working well with good UX
 - **Audit Trail**: ✅ Full audit tracking implemented and working
 - **Event Creation Fix**: ✅ Resolved validation error by implementing CreateEventDTO to separate API concerns from Entity Framework navigation properties
-- **Next Priority**: Focus on "Copy to New Event" draft workflow and template/component copying
+- **Next Priority**: Focus on event templates (stations/components), volunteer signup windows, and markdown editor rollout
 - **Template System**: Ready to implement - database structure supports it
 - **Performance**: Current queries are efficient with proper indexing on common filters
 
@@ -708,5 +721,5 @@ LuxfordPTAWeb.Client/Components/
 
 **Last Updated**: 01/16/25 
 **Current Sprint**: Phase 2 - Enhanced Admin Interface, Copy to New Event, and Event Templates  
-**Next Review**: After "Copy to New Event" implementation and template/component copying  
+**Next Review**: After event template foundations and volunteer signup-window implementation  
 **Repository**: [LuxfordPTABlazor](https://github.com/jedelfraisse/LuxfordPTABlazor)
