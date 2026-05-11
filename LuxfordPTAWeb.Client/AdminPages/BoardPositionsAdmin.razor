@@ -1,0 +1,60 @@
+@page "/admin/board-positions"
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Client.Components.Admin
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+
+<PageTitle>Manage Board Positions</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1><i class="bi bi-person-badge"></i> Manage Board Positions</h1>
+	<a href="/admin" class="btn btn-outline-secondary">
+		<i class="bi bi-arrow-left"></i> Back to Dashboard
+	</a>
+</div>
+
+<!-- School Year Context -->
+@if (selectedSchoolYear != null)
+{
+	<div class="alert alert-info mb-4">
+		<i class="bi bi-calendar3"></i> Managing board positions for <strong>@selectedSchoolYear.Name</strong>
+	</div>
+	
+	<OfficersCommitteeChairsWidget SchoolYear="@selectedSchoolYear" AvailableUsers="@availableUsers" />
+}
+else
+{
+	<div class="alert alert-warning">
+		<h6><i class="bi bi-calendar-x"></i> No School Year Selected</h6>
+		<p>Please select a school year to manage board positions.</p>
+		<a href="/admin/school-years" class="btn btn-outline-warning">
+			<i class="bi bi-calendar3"></i> Manage School Years
+		</a>
+	</div>
+}
+
+@code {
+	private SchoolYear? selectedSchoolYear;
+	private List<ApplicationUser> availableUsers = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			selectedSchoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+			
+			// Load available users
+			availableUsers = (await Http.GetFromJsonAsync<List<ApplicationUser>>("api/users") ?? new List<ApplicationUser>())
+				.OrderBy(u => u.LastName)
+				.ThenBy(u => u.FirstName)
+				.ToList();
+		}
+		catch (Exception)
+		{
+			// Handle errors silently
+		}
+	}
+}

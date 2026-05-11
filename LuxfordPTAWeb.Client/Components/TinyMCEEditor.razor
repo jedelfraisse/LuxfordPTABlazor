@@ -1,0 +1,63 @@
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JS
+
+<textarea @ref="editorElement" @bind="Value"></textarea>
+
+@code {
+    private ElementReference editorElement;
+    private string _value = string.Empty;
+
+    [Parameter]
+    public string Value
+    {
+        get => _value;
+        set
+        {
+            if (_value != value)
+            {
+                _value = value;
+                ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string EditorId { get; set; } = "tinymce-editor-" + Guid.NewGuid().ToString();
+
+    [Parameter]
+    public int Height { get; set; } = 300;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeTinyMCE();
+        }
+    }
+
+    private async Task InitializeTinyMCE()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("initTinyMCE", Height);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing TinyMCE: {ex.Message}");
+        }
+    }
+
+    public async Task<string> GetContent()
+    {
+        return await JS.InvokeAsync<string>("getTinyMCEContent");
+    }
+
+    public async Task SetContent(string content)
+    {
+        await JS.InvokeVoidAsync("setTinyMCEContent", content);
+        Value = content;
+    }
+}

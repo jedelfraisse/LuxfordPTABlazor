@@ -1,45 +1,50 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Web
+@using LuxfordPTAWeb.Client.Components
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
 
 <AuthorizeView>
-    <Authorized>
-        <div style="margin-right: 10px">Welcome @GetDisplayName(context.User)!</div>
-        <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-person-circle"></i> @GetDisplayName(context.User)
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="Account/Manage"><i class="bi bi-gear"></i> Manage Account</a></li>
-                @if (context.User.IsInRole("Admin") || context.User.IsInRole("BoardMember"))
-                {
-                    <li><a class="dropdown-item" href="admin"><i class="bi bi-shield-lock text-danger"></i> Admin Dashboard</a></li>
-                }
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <form action="Account/Logout" method="post" class="d-inline">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="dropdown-item text-danger">
-                            <i class="bi bi-box-arrow-right"></i> Logout
-                        </button>
-                    </form>
-                </li>
-            </ul>
+	<Authorized>
+		<div style="margin-right: 10px">Welcome @GetDisplayName(context.User)!</div>
+        <div>
+            <a href="Account/Manage" class="text-decoration-none"><i class="bi bi-gear"></i> Manage Account</a>
         </div>
-    </Authorized>
-    <NotAuthorized>
-        <div style="margin-right: 10px">Welcome Guest!</div>
-        <a href="Account/Login?returnUrl=@Uri.EscapeDataString(currentUrl)" class="btn btn-primary btn-sm">
-            <i class="bi bi-person-plus"></i> Login
-        </a>
-    </NotAuthorized>
+        @if (context.User.IsInRole("Admin") || context.User.IsInRole("BoardMember"))
+		{
+			<div><a href="admin" class="text-decoration-none"><i class="bi bi-shield-lock text-danger"></i> Admin Dashboard</a></div>
+		}
+        @if (context.User.IsInRole("Admin") || context.User.IsInRole("Trusted"))
+        {
+            <div>
+                <button class="btn btn-link text-decoration-none p-0" @onclick="OpenBugReportModal">
+                    <i class="bi bi-bug"></i> Bug Report
+                </button>
+            </div>
+            <BugReportModal IsOpen="isBugReportModalOpen" IsOpenChanged="OnBugReportModalChanged" />
+        }
+		<div>
+			<form action="Account/Logout" method="post" class="d-inline">
+				<AntiforgeryToken />
+				<input type="hidden" name="ReturnUrl" value="@currentUrl" />
+				<button type="submit" class="btn btn-link text-danger p-0 m-0 text-decoration-none">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+			</form>
+		</div>
+	</Authorized>
+	<NotAuthorized>
+		<div style="margin-right: 10px">Welcome Guest!</div>
+		<a href="Account/Login?returnUrl=@Uri.EscapeDataString(currentUrl)" class="btn btn-primary btn-sm">
+			<i class="bi bi-person-plus"></i> Login
+		</a>
+	</NotAuthorized>
 </AuthorizeView>
 
 @code {
     private string currentUrl = string.Empty;
+    private bool isBugReportModalOpen = false;
 
     protected override void OnInitialized()
     {
@@ -55,5 +60,15 @@
         if (!string.IsNullOrWhiteSpace(first))
             return first;
         return user.Identity?.Name ?? "User";
+    }
+
+    private void OpenBugReportModal()
+    {
+        isBugReportModalOpen = true;
+    }
+
+    private void OnBugReportModalChanged(bool value)
+    {
+        isBugReportModalOpen = value;
     }
 }

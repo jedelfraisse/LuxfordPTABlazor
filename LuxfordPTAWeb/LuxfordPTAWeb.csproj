@@ -26,6 +26,8 @@
 		<Folder Include="Migrations\" />
 		<Folder Include="Views\OAuth2\" />
 		<Folder Include="wwwroot\events\" />
+		<Folder Include="wwwroot\images\programs\" />
+		<Folder Include="wwwroot\programfiles\" />
 	</ItemGroup>
 
 </Project>

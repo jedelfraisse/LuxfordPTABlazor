@@ -1,0 +1,119 @@
+﻿@using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning-subtle">
+                    <h5 class="modal-title">Summit Proposal: Report a Bug, Suggest an Enhancement, or Bemoan the UX</h5>
+                    <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (SubmitSuccess)
+                    {
+                        <div class="alert alert-success">
+                            Your proposal has been submitted to the Grand Council of Dragons (aka the PTA Tech Team).
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-3">
+                            <span>🔍 @BugCount reports already filed for this page — <a href="/admin/bugs?page=@Report.PageRoute" target="_blank">View them</a></span>
+                        </div>
+                        <EditForm Model="Report" OnValidSubmit="HandleSubmit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="mb-3">
+                                <label class="form-label">Page Name</label>
+                                <InputText class="form-control" @bind-Value="Report.PageName" disabled />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Page Route</label>
+                                <InputText class="form-control" @bind-Value="Report.PageRoute" disabled />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <InputSelect class="form-select" @bind-Value="Report.Status">
+                                    <option value="Functional">Functional</option>
+                                    <option value="Broken">Broken</option>
+                                    <option value="Needs Enhancement">Needs Enhancement</option>
+                                    <option value="Confusing UX">Confusing UX</option>
+                                </InputSelect>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <InputTextArea class="form-control" @bind-Value="Report.Description" rows="3" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Suggestion (optional)</label>
+                                <InputTextArea class="form-control" @bind-Value="Report.Suggestion" rows="2" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Submitted By</label>
+                                <InputText class="form-control" @bind-Value="Report.SubmittedBy" disabled />
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Proposal</button>
+                        </EditForm>
+                       
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    private BugReport Report = new();
+    private int BugCount = 0;
+    private bool SubmitSuccess = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen)
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            Report.PageRoute = uri.AbsolutePath;
+            Report.PageName = uri.Segments.LastOrDefault()?.Trim('/') ?? "Home";
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            Report.SubmittedBy = user.Identity?.Name ?? "Unknown";
+            Report.Status = "Functional";
+            Report.Description = "";
+            Report.Suggestion = "";
+            SubmitSuccess = false;
+            await LoadBugCount();
+        }
+    }
+
+    private async Task LoadBugCount()
+    {
+        try
+        {
+            BugCount = await Http.GetFromJsonAsync<int>($"api/bugreports/count?pageRoute={Report.PageRoute}");
+        }
+        catch { BugCount = 0; }
+    }
+
+    private async Task HandleSubmit()
+    {
+        var response = await Http.PostAsJsonAsync("api/bugreports", Report);
+        if (response.IsSuccessStatusCode)
+        {
+            SubmitSuccess = true;
+            await LoadBugCount();
+        }
+    }
+
+    private async Task Close()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

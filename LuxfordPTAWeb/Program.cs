@@ -119,8 +119,12 @@ public class Program
 			.AddSignInManager()
 			.AddDefaultTokenProviders();
 
-		builder.Services.AddScoped<IEmailSender<ApplicationUser>, LuxfordPTAWeb.Services.IdentityEmailSender>();
-		builder.Services.AddScoped<LuxfordPTAWeb.Services.IEmailSenderService, LuxfordPTAWeb.Services.EmailSenderService>();
+
+        // Register custom claims principal factory to include first and last name claims
+        builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ApplicationUserClaimsPrincipalFactory>();
+
+        builder.Services.AddScoped<IEmailSender<ApplicationUser>, LuxfordPTAWeb.Services.IdentityEmailSender>();
+        builder.Services.AddScoped<LuxfordPTAWeb.Services.IEmailSenderService, LuxfordPTAWeb.Services.EmailSenderService>();
 
 		// Configure OAuth2 settings for Gmail SMTP
 		builder.Services.Configure<OAuth2Settings>(

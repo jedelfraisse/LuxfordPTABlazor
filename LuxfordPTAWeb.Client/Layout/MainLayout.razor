@@ -1,4 +1,4 @@
-﻿@using LuxfordPTAWeb.Client.Code
+@using LuxfordPTAWeb.Client.Code
 @using LuxfordPTAWeb.Client.Components
 @using LuxfordPTAWeb.Shared.Models
 @inject IJSRuntime JS
@@ -11,113 +11,112 @@
 
 <div class="container-fluid p-0">
 	<div class="row g-0">
-		<!-- Small Top Banner - Two Lines for Mobile -->
-		<div class="w-100 text-center pta-top-banner">
-			<div class="pta-banner-line1">Virginia Congress Of Parents And Teachers</div>
-			<div class="pta-banner-line2">Luxford Elementary PTA</div>
-			<!-- Year Selection and Login Row - Side by side on larger screens -->
-			<div class="d-flex justify-content-center align-items-center flex-wrap gap-3">
-				<div class="school-year-banner d-flex align-items-center" style="gap:0.5rem;">
-					@if (ShowPrevArrow)
-					{
-						<button class="btn btn-link p-0 m-0" @onclick="PrevYear" title="Previous Year" style="font-size:1.2rem;min-width:unset;min-height:unset;line-height:1;">←</button>
-					}
-					<span class="fw-bold text-primary mx-1" style="font-size:0.95rem;">@CurrentYearText</span>
+		<!-- Top Banner with Logo, Text, and Mascot -->
+		<div class="w-100 pta-top-banner-new">
+			<div class="pta-banner-container">
+				<!-- PTA Logo (Left) -->
+				<div class="pta-banner-logo">
+					<a href="/" aria-label="Home">
+						<img src="images/pta-logo.png" alt="Luxford Dragons PTA Logo" class="pta-logo-small" />
+					</a>
+				</div>
+				
+				<!-- Center Text -->
+				<div class="pta-banner-text">
+					<div class="pta-banner-line1">Virginia Congress Of Parents And Teachers</div>
+					<div class="pta-banner-line2">Luxford Elementary PTA</div>
+					<!-- School Year and Reflections - Compact Inline Format -->
 					@if (SelectedSchoolYearInfo != null)
 					{
-						<span class="text-muted mx-1 d-none d-sm-inline" style="font-size:0.8rem;">
-							Reflections:
-							<NavLink href="/reflections" class="text-decoration-underline text-reset" style="cursor:pointer;">@SelectedSchoolYearInfo.ReflectionsTheme</NavLink>
-						</span>
+						<div class="school-year-compact">
+							<span class="year-text">School Year:</span>
+							@if (ShowPrevArrow)
+							{
+								<button class="year-nav-btn-compact" @onclick="PrevYear" title="Previous Year" aria-label="Previous Year">
+									<i class="bi bi-chevron-left"></i>
+								</button>
+							}
+							<span class="year-value-compact">@CurrentYearText</span>
+							@if (ShowNextArrow)
+							{
+								<button class="year-nav-btn-compact" @onclick="NextYear" title="Next Year" aria-label="Next Year">
+									<i class="bi bi-chevron-right"></i>
+								</button>
+							}
+						</div>
 					}
-					@if (ShowNextArrow)
-					{
-						<button class="btn btn-link p-0 m-0" @onclick="NextYear" title="Next Year" style="font-size:1.2rem;min-width:unset;min-height:unset;line-height:1;">→</button>
-					}
+				</div>
+				
+				<!-- Mascot (Right) -->
+				<div class="pta-banner-mascot">
+					<a href="/" aria-label="Home">
+						<img src="images/mascot.png" alt="Luxford Dragons Mascot" class="pta-mascot-small" />
+					</a>
 				</div>
 			</div>
 		</div>
 
 		<div class="col-12">
-			<!-- Header Box -->
-			<div class="pta-header-box mb-3">
-				<!-- Top Row: Three aligned images -->
-				<div class="pta-header-top d-flex justify-content-center align-items-center mb-3">
-					<!-- PTA Logo -->
-					<div class="pta-logo-box">
-						<a href="/">
-							<img src="images/pta-logo.png" alt="PTA Logo" class="pta-logo" />
-						</a>
-					</div>
-					<!-- Mascot -->
-					<div class="pta-mascot-box">
-						<a href="/">
-							<img src="images/mascot.png" alt="Mascot" class="pta-mascot" />
-						</a>
-					</div>
-					<!-- Sponsor Badge -->
-					<div class="pta-sponsor-box">
-						<NavLink href="sponsors" aria-label="Sponsors" title="Sponsors">
-							<img src="sponsors/hsc.png" alt="Sponsor: HSC" class="sponsor-logo" />
-						</NavLink>
+			<!-- Menu Tray Container -->
+			<div class="menu-tray-container">
+				<!-- Menu Toggle Button (Mobile Only) - Always visible -->
+				<button class="menu-tray-toggle" @onclick="ToggleMenuTray" aria-label="Toggle menu" aria-expanded="@isMenuTrayOpen">
+					<i class="bi @(isMenuTrayOpen ? "bi-chevron-up" : "bi-chevron-down")"></i>
+				</button>
+				
+				<!-- Menu Tray - Always open on desktop, collapsible on mobile -->
+				<div class="menu-tray @(isMenuTrayOpen ? "open" : "")">
+					<div class="menu-tray-content">
+						<!-- Navigation Links -->
+						<nav class="pta-nav-tray">
+							<NavLink href="/" class="pta-nav-link text-purple" aria-label="Home" title="Home" Match="NavLinkMatch.All">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-house"></i></span>
+								Home
+							</NavLink>
+							<NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
+								Get Involved
+							</NavLink>
+							<NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
+								Events
+							</NavLink>
+							<NavLink href="programs" class="pta-nav-link text-info" aria-label="Programs" title="Programs">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-grid"></i></span>
+								Programs
+							</NavLink>
+							<NavLink href="givebacks" class="pta-nav-link text-warning" aria-label="Givebacks" title="Givebacks">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-gift"></i></span>
+								Givebacks
+							</NavLink>
+							@if (1==2){
+							<NavLink href="documents" class="pta-nav-link text-secondary" aria-label="Documents" title="Documents">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
+								Documents
+							</NavLink>
+
+							}
+							<NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
+								Sponsors
+							</NavLink>
+						</nav>
+						
+						<!-- Login Display -->
+						<div class="login-display-tray">
+							<LoginDisplay />
+						</div>
 					</div>
 				</div>
-				<div class="login-display-container pta-nav-horizontal">
-					<LoginDisplay />
-				</div>
-
-
-				<!-- Navigation Row - Desktop horizontal, Mobile hamburger -->
-				<nav class="pta-header-nav mb-2">
-					<!-- Hamburger Button (Hidden on desktop) -->
-					<button class="hamburger-btn d-lg-none btn btn-outline-primary"
-							@onclick="ToggleMenu"
-							aria-label="Toggle navigation menu"
-							aria-expanded="@isMenuOpen">
-						<span class="hamburger-icon">
-							<span></span>
-							<span></span>
-							<span></span>
-						</span>
-						Menu
-					</button>
-
-					<!-- Desktop Navigation (Hidden on mobile/tablet) -->
-					<div class="pta-nav-horizontal d-none d-lg-flex">
-						<NavLink href="/" class="pta-nav-link text-purple" aria-label="Home" title="Home" Match="NavLinkMatch.All">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-house"></i></span>
-							Home
-						</NavLink>
-						<NavLink href="get-involved" class="pta-nav-link text-success" aria-label="Get Involved" title="Get Involved">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
-							Get Involved
-						</NavLink>
-						<NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
-							Events
-						</NavLink>
-						<NavLink href="givebacks" class="pta-nav-link text-warning" aria-label="Givebacks" title="Givebacks">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-gift"></i></span>
-							Givebacks
-						</NavLink>
-						<NavLink href="documents" class="pta-nav-link text-secondary" aria-label="Documents" title="Documents">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-file-earmark-text"></i></span>
-							Documents
-						</NavLink>
-						<NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
-							<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
-							Sponsors
-						</NavLink>
-					</div>
-				</nav>
-
-				@if (IsViewingPreviousYear)
-				{
-					<div class="alert alert-info text-center mb-2">
-						You are viewing a previous year. <a href="#" @onclick="ShowCurrentYear" class="alert-link">Click here to view the current year.</a>
-					</div>
-				}
 			</div>
+			
+			<!-- Previous Year Banner (only shows when viewing previous year) -->
+			@if (IsViewingPreviousYear)
+			{
+				<div class="alert alert-info text-center mb-2">
+					You are viewing a previous year. <a href="#" @onclick="ShowCurrentYear" class="alert-link">Click here to view the current year.</a>
+				</div>
+			}
 
 			<!-- Content Area with responsive padding -->
 			<div class="content-wrapper">
@@ -129,47 +128,14 @@
 	</div>
 </div>
 
-<!-- Mobile Menu Overlay -->
-<div class="mobile-menu-overlay @(isMenuOpen ? "show" : "")" @onclick="CloseMenu">
-	<div class="mobile-menu-content" @onclick:stopPropagation="true">
-		<div class="mobile-menu-header">
-			<span class="mobile-menu-title">Navigation</span>
-			<button class="mobile-menu-close btn btn-outline-light" @onclick="CloseMenu" aria-label="Close menu">
-				<i class="bi bi-x-lg"></i>
-			</button>
-		</div>
-		<div class="mobile-menu-items">
-			<NavLink href="get-involved" class="mobile-nav-link text-success" @onclick="CloseMenu">
-				<span class="mobile-nav-icon"><i class="bi bi-people-fill"></i></span>
-				Get Involved
-			</NavLink>
-			<NavLink href="events" class="mobile-nav-link text-primary" @onclick="CloseMenu">
-				<span class="mobile-nav-icon"><i class="bi bi-calendar-event"></i></span>
-				Events
-			</NavLink>
-			<NavLink href="givebacks" class="mobile-nav-link text-warning" @onclick="CloseMenu">
-				<span class="mobile-nav-icon"><i class="bi bi-gift"></i></span>
-				Givebacks
-			</NavLink>
-			<NavLink href="documents" class="mobile-nav-link text-secondary" @onclick="CloseMenu">
-				<span class="mobile-nav-icon"><i class="bi bi-file-earmark-text"></i></span>
-				Documents
-			</NavLink>
-			<NavLink href="sponsors" class="mobile-nav-link text-info" @onclick="CloseMenu">
-				<span class="mobile-nav-icon"><i class="bi bi-star"></i></span>
-				Sponsors
-			</NavLink>
-		</div>
-	</div>
-</div>
-
 <footer class="bg-light border-top py-3 mt-auto">
 	<div class="container d-flex justify-content-center gap-3 flex-wrap">
-		<NavLink href="get-involved" class="text-decoration-none text-success">Get Involved</NavLink>
-		<NavLink href="events" class="text-decoration-none text-primary">Events</NavLink>
-		<NavLink href="givebacks" class="text-decoration-none text-warning">Givebacks</NavLink>
-		<NavLink href="documents" class="text-decoration-none text-secondary">Documents</NavLink>
-		<NavLink href="sponsors" class="text-decoration-none text-info">Sponsors</NavLink>
+		<NavLink href="/" class="text-decoration-none text-purple" title="Home">Home</NavLink>
+		<NavLink href="get-involved" class="text-decoration-none text-success" title="Get Involved">Get Involved</NavLink>
+		<NavLink href="events" class="text-decoration-none text-primary" title="Events">Events</NavLink>
+		<NavLink href="programs" class="text-decoration-none text-info" title="Programs">Programs</NavLink>
+		<NavLink href="givebacks" class="text-decoration-none text-warning" title="Givebacks">Givebacks</NavLink>
+		<NavLink href="sponsors" class="text-decoration-none text-info" title="Sponsors">Sponsors</NavLink>
 	</div>
 	<div class="container d-flex justify-content-center gap-3 flex-wrap mt-2">
 		<NavLink href="/privacy-policy" class="text-decoration-none text-muted small">Privacy Policy</NavLink>
@@ -178,7 +144,10 @@
 		</button>
 	</div>
 	<div class="text-center mt-2">
-		<small>&copy; 2025 Luxford Elementary PTA</small>
+		<small>&copy; 2026 Luxford Elementary PTA</small>
+	</div>
+	<div class="text-center mt-2">
+		<img src="images/luxford-L.png" />
 	</div>
 </footer>
 
@@ -188,7 +157,7 @@
 <div id="blazor-error-ui" data-nosnippet>
 	An unhandled error has occurred.
 	<a href="." class="reload">Reload</a>
-	<span class="dismiss">🗙</span>
+	<span class="dismiss">??</span>
 </div>
 
 <style>
@@ -198,11 +167,11 @@
 </style>
 
 @code {
-	private int minYear = 2024;
+	private int minYear = 2025;
 	private int currentYear;
 	private int selectedYear;
 	private bool _loaded = false;
-	private bool isMenuOpen = false;
+	private bool isMenuTrayOpen = true; // Open by default so menu is visible on mobile
 
 	private int startYear => selectedYear;
 	private int endYear => selectedYear + 1;
@@ -252,15 +221,9 @@
 		SchoolYearSupport.ReloadPage();
 	}
 
-	private void ToggleMenu()
+	private void ToggleMenuTray()
 	{
-		isMenuOpen = !isMenuOpen;
-		StateHasChanged();
-	}
-
-	private void CloseMenu()
-	{
-		isMenuOpen = false;
+		isMenuTrayOpen = !isMenuTrayOpen;
 		StateHasChanged();
 	}
 

@@ -16,6 +16,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<EventCat> EventCats { get; set; }
 	public DbSet<SponsorAssignment> SponsorAssignments { get; set; }
 	public DbSet<EventCatSub> EventCatSubs { get; set; }
+	public DbSet<ProgramCard> ProgramCards { get; set; }
+
+	// Summit Proposal: Bug Reports
+	public DbSet<BugReport> BugReports { get; set; }
 
 	public DbSet<BoardPositionTitle> BoardPositionTitles { get; set; }
 	public DbSet<BoardPosition> BoardPositions { get; set; }

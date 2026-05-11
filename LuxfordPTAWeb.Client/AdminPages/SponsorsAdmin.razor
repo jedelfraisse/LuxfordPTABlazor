@@ -1,0 +1,69 @@
+@page "/admin/sponsors"
+@using LuxfordPTAWeb.Shared.Models
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage Sponsors</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1><i class="bi bi-award"></i> Manage Sponsors</h1>
+	<div>
+		<a href="/admin" class="btn btn-outline-secondary me-2">
+			<i class="bi bi-arrow-left"></i> Back to Dashboard
+		</a>
+		<a href="/sponsors" class="btn btn-outline-info me-2">
+			<i class="bi bi-eye"></i> View Public Page
+		</a>
+		<button class="btn btn-primary">
+			<i class="bi bi-plus"></i> Add New Sponsor
+		</button>
+	</div>
+</div>
+
+<div class="alert alert-info">
+	<i class="bi bi-info-circle"></i> 
+	<strong>Coming Soon:</strong> Full sponsor management interface will be added here. 
+	For now, please use the public <a href="/sponsors" class="alert-link">Sponsors page</a> to view current sponsors.
+</div>
+
+<div class="row">
+	<div class="col-md-6">
+		<div class="card shadow-sm mb-4">
+			<div class="card-header bg-light">
+				<h5 class="mb-0">Sponsor Management Features</h5>
+			</div>
+			<div class="card-body">
+				<ul>
+					<li>Add, edit, and remove sponsors</li>
+					<li>Upload sponsor logos</li>
+					<li>Manage sponsor levels (Gold, Silver, Bronze)</li>
+					<li>Assign sponsors to specific school years</li>
+					<li>Track sponsor contributions</li>
+					<li>Set sponsor website links</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+	
+	<div class="col-md-6">
+		<div class="card shadow-sm mb-4">
+			<div class="card-header bg-light">
+				<h5 class="mb-0">Quick Actions</h5>
+			</div>
+			<div class="card-body">
+				<div class="d-grid gap-2">
+					<a href="/sponsors" class="btn btn-outline-primary">
+						<i class="bi bi-eye"></i> View Public Sponsors Page
+					</a>
+					<button class="btn btn-outline-secondary" disabled>
+						<i class="bi bi-file-earmark-excel"></i> Export Sponsors List
+					</button>
+					<button class="btn btn-outline-info" disabled>
+						<i class="bi bi-envelope"></i> Email All Sponsors
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

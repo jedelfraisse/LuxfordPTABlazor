@@ -1,0 +1,151 @@
+﻿@page "/programs"
+
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>PTA Programs</PageTitle>
+
+<div class="card shadow-sm mb-4">
+	<div class="card-body">
+		<h1 class="card-title text-center mb-3">School Programs</h1>
+		<p class="lead text-center mb-0">
+			Explore the various programs offered at Luxford Elementary School, designed to enrich the educational experience of our students.
+		</p>
+	</div>
+</div>
+
+@if (isLoading)
+{
+	<div class="text-center my-5">
+		<div class="spinner-border text-primary" role="status">
+			<span class="visually-hidden">Loading programs...</span>
+		</div>
+		<p class="mt-2 text-muted">Loading programs...</p>
+	</div>
+}
+else if (!ProgramsList.Any())
+{
+	<div class="alert alert-info text-center">
+		<i class="bi bi-info-circle me-2"></i>
+		<em>No programs available at this time.</em>
+	</div>
+}
+else
+{
+	<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+		@foreach (var program in ProgramsList)
+		{
+			<div class="col">
+				<div class="card h-100 shadow-sm">
+					@if (!string.IsNullOrWhiteSpace(program.ImageUrl))
+					{
+						<img src="@program.ImageUrl" class="card-img-top" alt="@program.ProgramTitle" style="object-fit:fill; height:180px;">
+					}
+					<div class="card-body d-flex flex-column">
+						<h5 class="card-title">@program.ProgramTitle</h5>
+						<p class="card-text flex-grow-1">@program.ShortDescription</p>
+						<NavLink class="btn btn-outline-primary mt-2" href="@program.Link">Learn More</NavLink>
+						@if (!string.IsNullOrWhiteSpace(program.FlyerUrl))
+						{
+							<a class="btn btn-outline-secondary mt-2" href="@program.FlyerUrl" target="_blank">View Flyer</a>
+						}
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+@code {
+	private List<ProgramCard> ProgramsList = new();
+	private bool isLoading = true;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadProgramsAsync();
+	}
+
+	private async Task LoadProgramsAsync()
+	{
+		isLoading = true;
+		try
+		{
+			var programs = await Http.GetFromJsonAsync<List<ProgramCard>>("api/programcards");
+			ProgramsList = programs ?? new List<ProgramCard>();
+		}
+		catch (Exception)
+		{
+			// If no programs in database, fallback to hardcoded list
+			ProgramsList = new List<ProgramCard>
+			{
+				new ProgramCard
+				{
+					ProgramTitle = "Rising 6th Grade Avid Program",
+					ShortDescription = "Preparing students for a successful transition to middle school.",
+					Link = "/programs/rising-6th-grade-avid",
+					ImageUrl = "images/programs/avid.png",
+					FlyerUrl = "flyers/avid.pdf",
+					IsHybrid = false,
+					DisplayIndex = 1,
+					IsActive = true
+				},
+				new ProgramCard
+				{
+					ProgramTitle = "Reflections",
+					ShortDescription = "A national arts recognition program for students.",
+					Link = "/programs/reflections",
+					ImageUrl = "images/programs/reflections-25-26.png",
+					FlyerUrl = "flyers/reflections.pdf",
+					IsHybrid = true,
+					DisplayIndex = 2,
+					IsActive = true
+				},
+				new ProgramCard
+				{
+					ProgramTitle = "Digital Citizenship",
+					ShortDescription = "Promoting safe and responsible technology use.",
+					Link = "/programs/digital-citizenship",
+					ImageUrl = "images/programs/digitalcitizenshipcontest.jpeg",
+					IsHybrid = false,
+					DisplayIndex = 3,
+					IsActive = true
+				},
+				new ProgramCard
+				{
+					ProgramTitle = "Dragon of the Month",
+					ShortDescription = "Recognizing outstanding students each month.",
+					Link = "/programs/dragon-of-the-month",
+					ImageUrl = "images/programs/dragonofthemonth.png",
+					IsHybrid = false,
+					DisplayIndex = 4,
+					IsActive = true
+				},
+				new ProgramCard
+				{
+					ProgramTitle = "Garden Club",
+					ShortDescription = "Hands-on learning and fun in our school garden.",
+					Link = "/programs/garden-club",
+					ImageUrl = "images/programs/gardenclub.png",
+					FlyerUrl = "flyers/gardenclub.pdf",
+					IsHybrid = true,
+					DisplayIndex = 5,
+					IsActive = true
+				},
+				new ProgramCard
+				{
+					ProgramTitle = "School Apps",
+					ShortDescription = "Resources and help for school technology and apps.",
+					Link = "/programs/school-apps",
+					ImageUrl = "images/programs/schoolapps.png",
+					IsHybrid = false,
+					DisplayIndex = 6,
+					IsActive = true
+				},
+			};
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+}

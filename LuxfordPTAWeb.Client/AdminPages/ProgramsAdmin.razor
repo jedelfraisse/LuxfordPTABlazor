@@ -1,0 +1,584 @@
+@page "/admin/programs"
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Client.Components
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Manage Programs</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+	<h1><i class="bi bi-mortarboard"></i> Manage Programs</h1>
+	<div>
+		<a href="/admin" class="btn btn-outline-secondary me-2">
+			<i class="bi bi-arrow-left"></i> Back to Dashboard
+		</a>
+		<button class="btn btn-primary" @onclick="ShowCreateForm">
+			<i class="bi bi-plus"></i> Add New Program
+		</button>
+	</div>
+</div>
+
+@if (isLoading)
+{
+	<div class="text-center my-5">
+		<div class="spinner-border text-primary" role="status">
+			<span class="visually-hidden">Loading programs...</span>
+		</div>
+	</div>
+}
+else
+{
+	<!-- Programs Table -->
+	<div class="card shadow-sm">
+		<div class="card-header bg-light">
+			<h5 class="mb-0"><i class="bi bi-list"></i> All Programs</h5>
+		</div>
+		<div class="card-body">
+			@if (!programs.Any())
+			{
+				<div class="alert alert-info">
+					<i class="bi bi-info-circle"></i> No programs found. Click "Add New Program" to create one.
+				</div>
+			}
+			else
+			{
+				<div class="table-responsive">
+					<table class="table table-hover">
+						<thead>
+							<tr>
+								<th>Order</th>
+								<th>Title</th>
+								<th>Type</th>
+								<th>Status</th>
+								<th>Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var program in programs.OrderBy(p => p.DisplayIndex))
+							{
+								<tr class="@(!program.IsActive ? "table-secondary" : "")">
+									<td>@program.DisplayIndex</td>
+									<td>
+										<strong>@program.ProgramTitle</strong>
+										<br>
+										<small class="text-muted">@program.ShortDescription</small>
+									</td>
+									<td>
+										<span class="badge @(program.IsHybrid ? "bg-info" : "bg-secondary")">
+											@(program.IsHybrid ? "Dynamic Page" : "Custom Page")
+										</span>
+									</td>
+									<td>
+										<span class="badge @(program.IsActive ? "bg-success" : "bg-danger")">
+											@(program.IsActive ? "Active" : "Inactive")
+										</span>
+									</td>
+									<td>
+										<div class="btn-group btn-group-sm">
+											<button class="btn btn-outline-primary" @onclick="() => EditProgram(program)">
+												<i class="bi bi-pencil"></i> Edit
+											</button>
+											<button class="btn btn-outline-secondary" @onclick="() => ToggleActive(program)">
+												<i class="bi bi-eye@(program.IsActive ? "-slash" : "")"></i> 
+												@(program.IsActive ? "Hide" : "Show")
+											</button>
+											<button class="btn btn-outline-danger" @onclick="() => DeleteProgram(program)">
+												<i class="bi bi-trash"></i> Delete
+											</button>
+										</div>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+<!-- Create/Edit Modal -->
+@if (showEditForm)
+{
+	<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-lg modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header @(isEditMode ? "bg-primary" : "bg-success") text-white">
+					<h5 class="modal-title">
+						<i class="bi bi-@(isEditMode ? "pencil" : "plus")"></i>
+						@(isEditMode ? "Edit Program" : "Add New Program")
+					</h5>
+					<button type="button" class="btn-close btn-close-white" @onclick="CloseEditForm"></button>
+				</div>
+				<div class="modal-body">
+					<EditForm Model="@editingProgram" OnValidSubmit="SaveProgram">
+						<DataAnnotationsValidator />
+						<ValidationSummary class="alert alert-danger" />
+
+						<div class="mb-3">
+							<label class="form-label">Program Title <span class="text-danger">*</span></label>
+							<InputText @bind-Value="editingProgram!.ProgramTitle" class="form-control" />
+							<ValidationMessage For="@(() => editingProgram!.ProgramTitle)" />
+						</div>
+
+						<div class="mb-3">
+							<label class="form-label">Short Description</label>
+							<InputTextArea @bind-Value="editingProgram!.ShortDescription" class="form-control" rows="2" />
+							<div class="form-text">Brief summary shown on the programs card (max 500 characters)</div>
+						</div>
+
+						<div class="mb-3">
+							<label class="form-label">Long Description (Markdown)</label>
+							<div class="alert alert-info" role="alert">
+								<i class="bi bi-lightbulb"></i>
+								<strong>Tip:</strong> Use the rich text editor below or write Markdown directly. 
+								<a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown Guide</a>
+							</div>
+							<TinyMCEEditor @bind-Value="editingProgram!.LongDescription" Height="400" />
+						</div>
+
+						<div class="row">
+							<div class="col-md-6 mb-3">
+								<label class="form-label">Link/Route</label>
+								<InputText @bind-Value="editingProgram!.Link" class="form-control" placeholder="/programs/my-program" />
+								<div class="form-text">URL path for the program detail page</div>
+							</div>
+
+							<div class="col-md-6 mb-3">
+								<label class="form-label">Display Order</label>
+								<InputNumber @bind-Value="editingProgram!.DisplayIndex" class="form-control" />
+								<div class="form-text">Lower numbers appear first</div>
+							</div>
+						</div>
+
+						<div class="row">
+							<div class="col-md-6 mb-3">
+								<label class="form-label">Image URL</label>
+								<div class="input-group">
+									<InputText @bind-Value="editingProgram!.ImageUrl" class="form-control" placeholder="images/programs/program.png" />
+									<button class="btn btn-outline-secondary" type="button" @onclick="() => TriggerImageUpload()">
+										<i class="bi bi-upload"></i> Upload
+									</button>
+								</div>
+								<div class="form-text">Path to program image</div>
+								@if (!string.IsNullOrEmpty(editingProgram!.ImageUrl))
+								{
+									<div class="mt-2">
+										<small class="text-muted">Current:</small>
+										<img src="@editingProgram.ImageUrl" alt="Preview" style="max-width: 100px; max-height: 100px; border-radius: 4px;" />
+									</div>
+								}
+								<input type="file" @ref="imageUploadInput" hidden accept="image/*" @onchange="HandleImageUpload" />
+								@if (isUploadingImage)
+								{
+									<div class="mt-2">
+										<small>Uploading image...</small>
+										<div class="progress" style="height: 5px;">
+											<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;"></div>
+										</div>
+									</div>
+								}
+							</div>
+
+							<div class="col-md-6 mb-3">
+								<label class="form-label">Flyer URL (Optional)</label>
+								<div class="input-group">
+									<InputText @bind-Value="editingProgram!.FlyerUrl" class="form-control" placeholder="flyers/program.pdf" />
+									<button class="btn btn-outline-secondary" type="button" @onclick="() => TriggerFlyerUpload()">
+										<i class="bi bi-upload"></i> Upload
+									</button>
+								</div>
+								<div class="form-text">Path to PDF flyer</div>
+								@if (!string.IsNullOrEmpty(editingProgram!.FlyerUrl))
+								{
+									<div class="mt-2">
+										<small class="text-muted">Current:</small>
+										<a href="@editingProgram.FlyerUrl" target="_blank" class="d-inline-block">
+											<i class="bi bi-file-earmark-pdf"></i> View Flyer
+										</a>
+									</div>
+								}
+								<input type="file" @ref="flyerUploadInput" hidden accept=".pdf" @onchange="HandleFlyerUpload" />
+								@if (isUploadingFlyer)
+								{
+									<div class="mt-2">
+										<small>Uploading flyer...</small>
+										<div class="progress" style="height: 5px;">
+											<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;"></div>
+										</div>
+									</div>
+								}
+							</div>
+						</div>
+
+						<div class="row">
+							<div class="col-md-6 mb-3">
+								<div class="form-check form-switch">
+									<InputCheckbox @bind-Value="editingProgram!.IsHybrid" class="form-check-input" id="isHybrid" />
+									<label class="form-check-label" for="isHybrid">
+										Use Dynamic Page (Markdown Rendering)
+									</label>
+									<div class="form-text">Enable to use ProgramDetail.razor with Markdown content</div>
+								</div>
+							</div>
+
+							<div class="col-md-6 mb-3">
+								<div class="form-check form-switch">
+									<InputCheckbox @bind-Value="editingProgram!.IsActive" class="form-check-input" id="isActive" />
+									<label class="form-check-label" for="isActive">
+										Active (Visible to Public)
+									</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="modal-footer">
+							<button type="button" class="btn btn-secondary" @onclick="CloseEditForm">
+								<i class="bi bi-x"></i> Cancel
+							</button>
+							<button type="submit" class="btn @(isEditMode ? "btn-primary" : "btn-success")" disabled="@isSaving">
+								@if (isSaving)
+								{
+									<span class="spinner-border spinner-border-sm me-1"></span>
+								}
+								<i class="bi bi-@(isEditMode ? "check" : "plus")"></i>
+								@(isEditMode ? "Update Program" : "Create Program")
+							</button>
+						</div>
+					</EditForm>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+@code {
+	private List<ProgramCard> programs = new();
+	private bool isLoading = true;
+	private bool showEditForm = false;
+	private bool isEditMode = false;
+	private bool isSaving = false;
+	private ProgramCard? editingProgram;
+	
+	// File upload references
+	private ElementReference imageUploadInput;
+	private ElementReference flyerUploadInput;
+	private bool isUploadingImage = false;
+	private bool isUploadingFlyer = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadProgramsAsync();
+	}
+
+	private async Task LoadProgramsAsync()
+	{
+		isLoading = true;
+		try
+		{
+			// Load all programs (including inactive for admin view)
+			var response = await Http.GetAsync("api/programcards");
+			if (response.IsSuccessStatusCode)
+			{
+				programs = await response.Content.ReadFromJsonAsync<List<ProgramCard>>() ?? new();
+			}
+		}
+		catch (Exception ex)
+		{
+			await JS.InvokeVoidAsync("alert", $"Error loading programs: {ex.Message}");
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private void ShowCreateForm()
+	{
+		editingProgram = new ProgramCard
+		{
+			IsActive = true,
+			IsHybrid = true,
+			DisplayIndex = programs.Any() ? programs.Max(p => p.DisplayIndex) + 1 : 1
+		};
+		isEditMode = false;
+		showEditForm = true;
+	}
+
+	private void EditProgram(ProgramCard program)
+	{
+		editingProgram = new ProgramCard
+		{
+			Id = program.Id,
+			ProgramTitle = program.ProgramTitle,
+			ShortDescription = program.ShortDescription,
+			LongDescription = program.LongDescription,
+			Link = program.Link,
+			ImageUrl = program.ImageUrl,
+			FlyerUrl = program.FlyerUrl,
+			IsHybrid = program.IsHybrid,
+			DisplayIndex = program.DisplayIndex,
+			IsActive = program.IsActive
+		};
+		isEditMode = true;
+		showEditForm = true;
+		
+		Console.WriteLine($"Editing program: {editingProgram.ProgramTitle}");
+		Console.WriteLine($"Long Description length: {editingProgram.LongDescription?.Length ?? 0}");
+	}
+
+	private void CloseEditForm()
+	{
+		showEditForm = false;
+		editingProgram = null;
+	}
+
+	// File Upload Methods
+	private async Task TriggerImageUpload()
+	{
+		await imageUploadInput.FocusAsync();
+		await JS.InvokeVoidAsync("click", imageUploadInput);
+	}
+
+	private async Task TriggerFlyerUpload()
+	{
+		await flyerUploadInput.FocusAsync();
+		await JS.InvokeVoidAsync("click", flyerUploadInput);
+	}
+
+	private async Task HandleImageUpload(ChangeEventArgs e)
+	{
+		if (editingProgram == null || e.Value == null) return;
+
+		var files = (IReadOnlyList<IBrowserFile>)e.Value;
+		if (files.Count == 0) return;
+
+		await UploadFile(files[0], "image");
+	}
+
+	private async Task HandleFlyerUpload(ChangeEventArgs e)
+	{
+		if (editingProgram == null || e.Value == null) return;
+
+		var files = (IReadOnlyList<IBrowserFile>)e.Value;
+		if (files.Count == 0) return;
+
+		await UploadFile(files[0], "flyer");
+	}
+
+	private async Task UploadFile(IBrowserFile file, string fileType)
+	{
+		try
+		{
+			if (fileType == "image")
+			{
+				isUploadingImage = true;
+				StateHasChanged();
+
+				using var content = new MultipartFormDataContent();
+				var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB limit
+				content.Add(new StreamContent(stream), "file", file.Name);
+				content.Add(new StringContent("programs"), "folder");
+
+				var response = await Http.PostAsync("api/fileupload/upload-image", content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					var result = await response.Content.ReadFromJsonAsync<FileUploadResponse>();
+					if (result != null)
+					{
+						editingProgram!.ImageUrl = result.Url;
+						await JS.InvokeVoidAsync("alert", "Image uploaded successfully!");
+					}
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					await JS.InvokeVoidAsync("alert", $"Error uploading image: {error}");
+				}
+
+				isUploadingImage = false;
+			}
+			else if (fileType == "flyer")
+			{
+				isUploadingFlyer = true;
+				StateHasChanged();
+
+				using var content = new MultipartFormDataContent();
+				var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024); // 5MB limit
+				content.Add(new StreamContent(stream), "file", file.Name);
+
+				var response = await Http.PostAsync("api/fileupload/upload-pdf", content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					var result = await response.Content.ReadFromJsonAsync<FileUploadResponse>();
+					if (result != null)
+					{
+						editingProgram!.FlyerUrl = result.Url;
+						await JS.InvokeVoidAsync("alert", "Flyer uploaded successfully!");
+					}
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					await JS.InvokeVoidAsync("alert", $"Error uploading flyer: {error}");
+				}
+
+				isUploadingFlyer = false;
+			}
+
+			StateHasChanged();
+		}
+		catch (Exception ex)
+		{
+			await JS.InvokeVoidAsync("alert", $"Error uploading file: {ex.Message}");
+			
+			if (fileType == "image")
+				isUploadingImage = false;
+			else if (fileType == "flyer")
+				isUploadingFlyer = false;
+
+			StateHasChanged();
+		}
+	}
+
+	private async Task SaveProgram()
+	{
+		if (editingProgram == null) return;
+
+		// Validate required fields
+		if (string.IsNullOrWhiteSpace(editingProgram.ProgramTitle))
+		{
+			await JS.InvokeVoidAsync("alert", "Program Title is required");
+			return;
+		}
+
+		isSaving = true;
+		try
+		{
+			HttpResponseMessage response;
+			
+			if (isEditMode)
+			{
+				response = await Http.PutAsJsonAsync($"api/programcards/{editingProgram.Id}", editingProgram);
+			}
+			else
+			{
+				response = await Http.PostAsJsonAsync("api/programcards", editingProgram);
+			}
+
+			if (response.IsSuccessStatusCode)
+			{
+				await JS.InvokeVoidAsync("alert", $"Program {(isEditMode ? "updated" : "created")} successfully!");
+				CloseEditForm();
+				await LoadProgramsAsync();
+			}
+			else
+			{
+				// Try to get detailed error message
+				string errorMessage = "Unknown error";
+				try
+				{
+					var errorContent = await response.Content.ReadAsStringAsync();
+					if (!string.IsNullOrEmpty(errorContent))
+					{
+						// Try to parse as JSON to get error details
+						try
+						{
+							var errorObj = System.Text.Json.JsonDocument.Parse(errorContent);
+							if (errorObj.RootElement.TryGetProperty("error", out var errorProp))
+							{
+								errorMessage = errorProp.GetString() ?? errorContent;
+							}
+							else
+							{
+								errorMessage = errorContent;
+							}
+						}
+						catch
+						{
+							errorMessage = errorContent;
+						}
+					}
+					else
+					{
+						errorMessage = $"HTTP {response.StatusCode}: {response.ReasonPhrase}";
+					}
+				}
+				catch (Exception ex)
+				{
+					errorMessage = $"HTTP {response.StatusCode}: {ex.Message}";
+				}
+
+				await JS.InvokeVoidAsync("alert", $"Error saving program: {errorMessage}");
+				Console.WriteLine($"Save error: {errorMessage}");
+			}
+		}
+		catch (Exception ex)
+		{
+			var errorMsg = $"Error saving program: {ex.Message}";
+			await JS.InvokeVoidAsync("alert", errorMsg);
+			Console.WriteLine($"Exception during save: {ex.StackTrace}");
+		}
+		finally
+		{
+			isSaving = false;
+		}
+	}
+
+	private async Task ToggleActive(ProgramCard program)
+	{
+		try
+		{
+			var response = await Http.PatchAsync($"api/programcards/{program.Id}/toggle-active", null);
+			
+			if (response.IsSuccessStatusCode)
+			{
+				await LoadProgramsAsync();
+			}
+			else
+			{
+				await JS.InvokeVoidAsync("alert", "Error toggling program status");
+			}
+		}
+		catch (Exception ex)
+		{
+			await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+		}
+	}
+
+	private async Task DeleteProgram(ProgramCard program)
+	{
+		if (!await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{program.ProgramTitle}'? This action cannot be undone."))
+			return;
+
+		try
+		{
+			var response = await Http.DeleteAsync($"api/programcards/{program.Id}");
+			
+			if (response.IsSuccessStatusCode)
+			{
+				await JS.InvokeVoidAsync("alert", "Program deleted successfully!");
+				await LoadProgramsAsync();
+			}
+			else
+			{
+				await JS.InvokeVoidAsync("alert", "Error deleting program");
+			}
+		}
+		catch (Exception ex)
+		{
+			await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+		}
+	}
+
+	// Helper class for file upload response
+	private class FileUploadResponse
+	{
+		public string Url { get; set; } = string.Empty;
+		public string FileName { get; set; } = string.Empty;
+	}
+}

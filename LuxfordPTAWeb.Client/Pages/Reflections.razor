@@ -1,10 +1,34 @@
 ﻿@page "/reflections"
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
 
 <h3>Reflections</h3>
 
-Comming Soon!
-
+@if (isLoading)
+{
+    <div class="text-muted">Loading current school year...</div>
+}
+else if (schoolYearInfo != null)
+{
+    <div class="mb-3">
+        <strong>Current School Year:</strong> @schoolYearInfo.Name
+    </div>
+    <div class="mb-3">
+        <strong>Reflections Theme:</strong> <span class="text-primary">@schoolYearInfo.ReflectionsTheme</span>
+    </div>
+}
+else
+{
+    <div class="text-danger">Could not load school year info.</div>
+}
 
 @code {
+    private LuxfordPTAWeb.Shared.Models.SchoolYear? schoolYearInfo;
+    private bool isLoading = true;
 
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        schoolYearInfo = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+        isLoading = false;
+    }
 }
