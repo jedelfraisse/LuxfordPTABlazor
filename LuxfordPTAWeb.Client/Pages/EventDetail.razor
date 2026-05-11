@@ -1,0 +1,182 @@
+@page "/events/{slug}"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@using LuxfordPTAWeb.Shared.Models
+
+<PageTitle>@(eventItem?.Title ?? "Event Details")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info">
+        <em>Loading event details...</em>
+    </div>
+}
+else if (eventItem == null)
+{
+    <div class="alert alert-warning">
+        <em>Event details were not found.</em>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">@eventItem.Title</h1>
+        <a href="/events" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Events
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <p class="text-muted mb-2">
+                <i class="bi bi-calendar"></i> @eventItem.Date.ToString("MMMM d, yyyy")
+                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(eventItem)))
+                {
+                    <span class="ms-1"><i class="bi bi-clock"></i> @GetSingleDayTimeText(eventItem)</span>
+                }
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(eventItem.Location))
+            {
+                <p class="text-muted mb-2">
+                    <i class="bi bi-geo-alt"></i> @eventItem.Location
+                </p>
+            }
+
+            @if (eventItem.RequiresVolunteers)
+            {
+                <p class="text-muted mb-2">
+                    <i class="bi bi-people"></i>
+                    @if (!string.IsNullOrWhiteSpace(eventItem.ExcelImportId))
+                    {
+                        <a href="@eventItem.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                    }
+                    else
+                    {
+                        <span>@GetVolunteerSignupText(eventItem)</span>
+                    }
+                </p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(eventItem.FlyerUrl))
+            {
+                <p class="mb-0">
+                    <a href="@eventItem.FlyerUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                        View Flyer
+                    </a>
+                </p>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(eventItem.DescriptionHtml))
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>Description</strong></div>
+            <div class="card-body">
+                @((MarkupString)eventItem.DescriptionHtml)
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(eventItem.DescriptionMarkdown))
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>Description</strong></div>
+            <div class="card-body">
+                <BlazorMarkdown.Markdown Content="@eventItem.DescriptionMarkdown" />
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(eventItem.MoreDetailsHtml))
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>More Details</strong></div>
+            <div class="card-body">
+                @((MarkupString)eventItem.MoreDetailsHtml)
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(eventItem.MoreDetailsMarkdown))
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>More Details</strong></div>
+            <div class="card-body">
+                <BlazorMarkdown.Markdown Content="@eventItem.MoreDetailsMarkdown" />
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+    private Event? eventItem;
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadEvent();
+    }
+
+    private async Task LoadEvent()
+    {
+        isLoading = true;
+        try
+        {
+            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/by-slug/{Slug}");
+        }
+        catch
+        {
+            eventItem = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetSingleDayTimeText(Event evt)
+    {
+        if (evt.EventDays?.Count > 1)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime == default || evt.EventEndTime == default)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime.TimeOfDay == TimeSpan.Zero && evt.EventEndTime.TimeOfDay == TimeSpan.Zero)
+        {
+            return string.Empty;
+        }
+
+        if (evt.EventStartTime.TimeOfDay == evt.EventEndTime.TimeOfDay)
+        {
+            return evt.EventStartTime.ToString("h:mm tt");
+        }
+
+        return $"{evt.EventStartTime:h:mm tt} - {evt.EventEndTime:h:mm tt}";
+    }
+
+    private static string GetVolunteerSignupText(Event evt)
+    {
+        if (evt.SignupWindowStart.HasValue && evt.SignupWindowEnd.HasValue)
+        {
+            return $"Signups: {evt.SignupWindowStart.Value:MMM d h:mm tt} - {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
+        }
+
+        if (evt.SignupWindowStart.HasValue)
+        {
+            return $"Signups open: {evt.SignupWindowStart.Value:MMM d h:mm tt}";
+        }
+
+        if (evt.SignupWindowEnd.HasValue)
+        {
+            return $"Signups close: {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
+        }
+
+        return "Volunteers needed";
+    }
+}

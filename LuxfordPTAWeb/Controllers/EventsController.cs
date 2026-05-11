@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Markdig;
+using System.IO;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -18,19 +19,22 @@ public class EventsController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditService _auditService;
     private readonly IEventPermissionService _eventPermissionService;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
     public EventsController(
         ApplicationDbContext db, 
         ILogger<EventsController> logger, 
         UserManager<ApplicationUser> userManager,
         IAuditService auditService,
-        IEventPermissionService eventPermissionService)
+        IEventPermissionService eventPermissionService,
+        IWebHostEnvironment webHostEnvironment)
     {
         _db = db;
         _logger = logger;
         _userManager = userManager;
         _auditService = auditService;
         _eventPermissionService = eventPermissionService;
+        _webHostEnvironment = webHostEnvironment;
     }
 
     [HttpGet]
@@ -329,7 +333,8 @@ public class EventsController : ControllerBase
                 ApprovalNotes = createEventDto.ApprovalNotes,
                 SchoolYearId = createEventDto.SchoolYearId,
                 EventCatId = createEventDto.EventCatId,
-                EventSubTypeId = createEventDto.EventSubTypeId
+                EventSubTypeId = createEventDto.EventSubTypeId,
+                FlyerUrl = createEventDto.FlyerUrl
             };
 
             // Generate slug if not provided
@@ -355,6 +360,8 @@ public class EventsController : ControllerBase
             var pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
             eventItem.DescriptionMarkdown = createEventDto.DescriptionMarkdown ?? string.Empty;
             eventItem.DescriptionHtml = Markdig.Markdown.ToHtml(eventItem.DescriptionMarkdown, pipeline);
+            eventItem.MoreDetailsMarkdown = createEventDto.MoreDetailsMarkdown ?? string.Empty;
+            eventItem.MoreDetailsHtml = Markdig.Markdown.ToHtml(eventItem.MoreDetailsMarkdown, pipeline);
 
             // Set audit information for creation
             await _auditService.SetCreationAuditAsync(eventItem, currentUser);
@@ -445,7 +452,10 @@ public class EventsController : ControllerBase
                 EventSubTypeId = sourceEvent.EventSubTypeId,
                 Slug = Event.GenerateSlug(request.NewTitle ?? sourceEvent.Title),
                 SourceEventId = sourceEvent.Id,
-                CopyGeneration = sourceEvent.CopyGeneration + 1
+                CopyGeneration = sourceEvent.CopyGeneration + 1,
+                MoreDetailsMarkdown = sourceEvent.MoreDetailsMarkdown,
+                MoreDetailsHtml = sourceEvent.MoreDetailsHtml,
+                FlyerUrl = sourceEvent.FlyerUrl
             };
 
             // Ensure slug is unique
@@ -628,6 +638,7 @@ public class EventsController : ControllerBase
             eventItem.EventCatId = updatedEventDto.EventCatId;
             eventItem.EventSubTypeId = updatedEventDto.EventSubTypeId;
             eventItem.ExcelImportId = updatedEventDto.ExcelImportId;
+            eventItem.FlyerUrl = updatedEventDto.FlyerUrl;
             
             // Update slug if title changed
             if (eventItem.Title != updatedEventDto.Title && !string.IsNullOrEmpty(updatedEventDto.Title))
@@ -656,6 +667,8 @@ public class EventsController : ControllerBase
             var pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
             eventItem.DescriptionMarkdown = updatedEventDto.DescriptionMarkdown ?? string.Empty;
             eventItem.DescriptionHtml = Markdig.Markdown.ToHtml(eventItem.DescriptionMarkdown, pipeline);
+            eventItem.MoreDetailsMarkdown = updatedEventDto.MoreDetailsMarkdown ?? string.Empty;
+            eventItem.MoreDetailsHtml = Markdig.Markdown.ToHtml(eventItem.MoreDetailsMarkdown, pipeline);
 
             // Create comprehensive change notes
             var changeNotes = !string.IsNullOrWhiteSpace(updatedEventDto.ChangeNotes) 
@@ -677,6 +690,59 @@ public class EventsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating event {EventId}", id);
+            return BadRequest(new { Error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/flyer")]
+    [Authorize(Roles = "Admin,BoardMember")]
+    public async Task<ActionResult<object>> UploadFlyer(int id, [FromForm] IFormFile flyer)
+    {
+        try
+        {
+            if (flyer == null || flyer.Length == 0)
+            {
+                return BadRequest("No flyer file uploaded.");
+            }
+
+            var eventItem = await _db.Events.FindAsync(id);
+            if (eventItem == null)
+            {
+                return NotFound();
+            }
+
+            var extension = Path.GetExtension(flyer.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".pdf", ".png", ".jpg", ".jpeg", ".webp" };
+            if (!allowedExtensions.Contains(extension))
+            {
+                return BadRequest("Flyer must be PDF or image file.");
+            }
+
+            var uploadsRoot = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "event-flyers");
+            Directory.CreateDirectory(uploadsRoot);
+
+            var safeName = Path.GetFileNameWithoutExtension(flyer.FileName);
+            foreach (var invalidChar in Path.GetInvalidFileNameChars())
+            {
+                safeName = safeName.Replace(invalidChar, '-');
+            }
+
+            var fileName = $"{id}-{Guid.NewGuid():N}-{safeName}{extension}";
+            var filePath = Path.Combine(uploadsRoot, fileName);
+
+            await using (var stream = System.IO.File.Create(filePath))
+            {
+                await flyer.CopyToAsync(stream);
+            }
+
+            eventItem.FlyerUrl = $"/uploads/event-flyers/{fileName}";
+            await _db.SaveChangesAsync();
+
+            return Ok(new { flyerUrl = eventItem.FlyerUrl });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading flyer for event {EventId}", id);
             return BadRequest(new { Error = ex.Message });
         }
     }

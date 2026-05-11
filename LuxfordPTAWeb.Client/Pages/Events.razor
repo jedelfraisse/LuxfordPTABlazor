@@ -99,6 +99,14 @@
                             {
                                 <span class="badge bg-light text-dark">@evt.EventCat.Name</span>
                             }
+                            @if (HasDetailsOrFlyer(evt))
+                            {
+                                <div class="mt-2">
+                                    <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">
+                                        More Details
+                                    </a>
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
@@ -200,6 +208,12 @@ else
                                                 <small class="text-muted">+@(subcatEvents.Count() - 1) more events</small>
                                             </div>
                                         }
+                                        @if (HasDetailsOrFlyer(nextEvent))
+                                        {
+                                            <div class="mt-2">
+                                                <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                            </div>
+                                        }
                                     }
                                     else
                                     {
@@ -250,6 +264,12 @@ else
                                                 <small class="text-muted">+@(eventsWithoutSubcat.Count() - 1) more events</small>
                                             </div>
                                         }
+                                        @if (HasDetailsOrFlyer(nextGeneralEvent))
+                                        {
+                                            <div class="mt-2">
+                                                <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                            </div>
+                                        }
                                     </div>
                                 }
                             }
@@ -295,6 +315,12 @@ else
                                 {
                                     <div class="mt-2">
                                         <small class="text-muted">+@(categoryEvents.Count() - 1) more events in this category</small>
+                                    </div>
+                                }
+                                @if (HasDetailsOrFlyer(nextEvent))
+                                {
+                                    <div class="mt-2">
+                                        <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
                                     </div>
                                 }
                             }
@@ -606,5 +632,15 @@ else
         }
 
         return "Volunteers needed";
+    }
+
+    private static bool HasDetailsOrFlyer(Event evt)
+    {
+        return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) || !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+    }
+
+    private static string GetEventDetailsUrl(Event evt)
+    {
+        return $"/events/{evt.Slug}";
     }
 }

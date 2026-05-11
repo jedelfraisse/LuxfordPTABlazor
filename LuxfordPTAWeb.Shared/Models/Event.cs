@@ -130,4 +130,7 @@ public class Event : IAuditableEntity
 
 	public string DescriptionMarkdown { get; set; } = string.Empty;
 	public string DescriptionHtml { get; set; } = string.Empty;
+	public string MoreDetailsMarkdown { get; set; } = string.Empty;
+	public string MoreDetailsHtml { get; set; } = string.Empty;
+	public string? FlyerUrl { get; set; }
 }

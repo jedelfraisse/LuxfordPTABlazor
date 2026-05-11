@@ -232,10 +232,10 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Include stations and other copyable event components from prior events
   - [ ] Template management interface for admins
 
-- [ ] **Event Details & Flyer Enhancements** *(MEDIUM PRIORITY)*
-  - [ ] Add "More Details" controller/page flow for extended event information
-  - [ ] Add optional event flyer upload/attachment support
-  - [ ] Show flyer/details link on event pages when either details or flyer exists
+- [x] **Event Details & Flyer Enhancements** *(MEDIUM PRIORITY)*
+  - [x] Add "More Details" controller/page flow for extended event information
+  - [x] Add optional event flyer upload/attachment support
+  - [x] Show flyer/details link on event pages when either details or flyer exists
 
 #### 2.2 Station Management System (ENHANCED)
 - [ ] **EventStation Model**
@@ -705,7 +705,7 @@ LuxfordPTAWeb.Client/Components/
 5. **Template Scope**: Templates should include stations and other copyable components from prior events.
 6. **Calendar Integration**: Should we build a full calendar view or integrate with existing calendar systems?
 7. **Details Page Control**: Add a configurable control for whether an event/category should use a dedicated details page.
-8. **Flyer Storage/Hosting**: Should flyers be stored in-app (blob/file store) or linked from an external source?
+8. **Flyer Storage/Hosting**: ✅ Use local storage now; add Google Drive later behind admin configuration.
 
 ## 📝 Updated Implementation Notes
 

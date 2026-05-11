@@ -56,4 +56,7 @@ public class UpdateEventDTO
     // NEW: Markdown and HTML description rendering
     public string DescriptionMarkdown { get; set; } = string.Empty;
     public string DescriptionHtml { get; set; } = string.Empty;
+    public string MoreDetailsMarkdown { get; set; } = string.Empty;
+    public string MoreDetailsHtml { get; set; } = string.Empty;
+    public string? FlyerUrl { get; set; }
 }

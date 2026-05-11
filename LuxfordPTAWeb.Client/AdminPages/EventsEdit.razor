@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@using Microsoft.AspNetCore.Components.Forms
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
@@ -23,8 +24,10 @@
     private bool isSaving = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
+    private string flyerUploadMessage = string.Empty;
     private int eventSubCategoryId = 0;
     private string changeNotes = string.Empty;
+    private IBrowserFile? selectedFlyerFile;
     
     // Primary day time tracking
     private bool primaryDayIsAllDay = true;
@@ -400,6 +403,9 @@
                 EventCatId = eventModel.EventCatId,
                 EventSubTypeId = eventSubCategoryId > 0 ? eventSubCategoryId : null,
                 ExcelImportId = eventModel.ExcelImportId,
+                MoreDetailsMarkdown = eventModel.MoreDetailsMarkdown,
+                MoreDetailsHtml = eventModel.MoreDetailsHtml,
+                FlyerUrl = eventModel.FlyerUrl,
                 ChangeNotes = changeNotes
             };
             
@@ -619,6 +625,42 @@
             .Description?
             .Trim() ?? string.Empty;
     }
+
+    private void OnFlyerSelected(InputFileChangeEventArgs e)
+    {
+        selectedFlyerFile = e.File;
+        flyerUploadMessage = string.Empty;
+    }
+
+    private async Task UploadFlyerAsync()
+    {
+        if (selectedFlyerFile == null || eventModel == null)
+        {
+            return;
+        }
+
+        using var content = new MultipartFormDataContent();
+        await using var stream = selectedFlyerFile.OpenReadStream(10 * 1024 * 1024); // 10 MB
+        using var streamContent = new StreamContent(stream);
+        content.Add(streamContent, "flyer", selectedFlyerFile.Name);
+
+        var response = await Http.PostAsync($"api/events/{eventModel.Id}/flyer", content);
+        if (!response.IsSuccessStatusCode)
+        {
+            flyerUploadMessage = $"Flyer upload failed: {await response.Content.ReadAsStringAsync()}";
+            return;
+        }
+
+        var uploadResult = await response.Content.ReadFromJsonAsync<FlyerUploadResult>();
+        eventModel.FlyerUrl = uploadResult?.FlyerUrl ?? eventModel.FlyerUrl;
+        flyerUploadMessage = "Flyer uploaded.";
+        selectedFlyerFile = null;
+    }
+
+    private class FlyerUploadResult
+    {
+        public string? FlyerUrl { get; set; }
+    }
 }
 
 <PageTitle>Edit Event</PageTitle>
@@ -692,6 +734,31 @@ else if (eventModel != null)
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" rows="4" @bind="eventModel.Description"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="moreDetails" class="form-label">More Details (Markdown)</label>
+                        <textarea class="form-control" id="moreDetails" rows="4" @bind="eventModel.MoreDetailsMarkdown" placeholder="Additional event details, agenda, reminders, etc."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Event Flyer</label>
+                        <div class="input-group">
+                            <InputFile OnChange="OnFlyerSelected" class="form-control" />
+                            <button type="button" class="btn btn-outline-primary" @onclick="UploadFlyerAsync" disabled="@(selectedFlyerFile == null)">
+                                Upload Flyer
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(eventModel.FlyerUrl))
+                        {
+                            <div class="form-text">
+                                Current flyer: <a href="@eventModel.FlyerUrl" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(flyerUploadMessage))
+                        {
+                            <div class="form-text">@flyerUploadMessage</div>
+                        }
                     </div>
 
                     <div class="row mb-3">

@@ -112,6 +112,12 @@ else
                                     Learn More <i class="bi bi-arrow-up-right"></i>
                                 </a>
                             }
+                            @if (HasDetailsOrFlyer(evt))
+                            {
+                                <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary ms-2">
+                                    More Details
+                                </a>
+                            }
                         </div>
                         <div class="card-footer bg-transparent">
                             <small class="text-muted">
@@ -162,6 +168,10 @@ else
                                                 <p class="small mb-2">
                                                     <i class="bi bi-geo-alt"></i> @evt.Location
                                                 </p>
+                                            }
+                                            @if (HasDetailsOrFlyer(evt))
+                                            {
+                                                <a href="@GetEventDetailsUrl(evt)" class="btn btn-sm btn-outline-secondary">More Details</a>
                                             }
                                         </div>
                                     </div>
@@ -276,17 +286,31 @@ else
         return "Volunteers needed";
     }
 
+    private static bool HasDetailsOrFlyer(EventDto evt)
+    {
+        return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) || !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+    }
+
+    private static string GetEventDetailsUrl(EventDto evt)
+    {
+        return $"/events/{evt.Slug}";
+    }
+
     public class EventDto
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public DateTime EventStartTime { get; set; }
         public DateTime EventEndTime { get; set; }
         public string Description { get; set; } = string.Empty;
+        public string MoreDetailsMarkdown { get; set; } = string.Empty;
+        public string MoreDetailsHtml { get; set; } = string.Empty;
         public string Location { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public string Link { get; set; } = string.Empty;
+        public string? FlyerUrl { get; set; }
         public bool RequiresVolunteers { get; set; }
         public string? ExcelImportId { get; set; }
         public DateTime? SignupWindowStart { get; set; }

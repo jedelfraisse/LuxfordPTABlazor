@@ -17,6 +17,9 @@ public class CreateEventDTO
 
     public string DescriptionMarkdown { get; set; } = string.Empty;
     public string DescriptionHtml { get; set; } = string.Empty;
+    public string MoreDetailsMarkdown { get; set; } = string.Empty;
+    public string MoreDetailsHtml { get; set; } = string.Empty;
+    public string? FlyerUrl { get; set; }
 
     public string Location { get; set; } = string.Empty;
 
