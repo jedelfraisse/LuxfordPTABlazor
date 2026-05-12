@@ -227,8 +227,8 @@ Building a comprehensive event management system for the Luxford PTA that handle
 
 - [ ] **Event Templates System** *(MEDIUM PRIORITY)*
   - [x] EventTemplate model for recurring annual events
-  - [ ] Template categories (Fire Prevention Week, Book Fair, Spirit Week, etc.)
-  - [ ] Pre-filled templates with default settings
+  - [x] Template categories (Fire Prevention Week, Book Fair, Spirit Week, etc.)
+  - [x] Pre-filled templates with default settings
   - [ ] Include stations and other copyable event components from prior events
   - [x] Template management interface for admins
 

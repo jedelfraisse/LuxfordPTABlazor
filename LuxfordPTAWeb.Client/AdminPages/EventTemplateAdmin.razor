@@ -14,10 +14,17 @@
         <a href="/admin/events" class="btn btn-outline-secondary me-2">
             <i class="bi bi-arrow-left"></i> Back to Events
         </a>
+        <button class="btn btn-outline-info me-2" @onclick="SeedStarterTemplates" disabled="@isSeedingStarters">
+            <i class="bi bi-magic"></i> Add Starter Templates
+        </button>
         <button class="btn btn-primary" @onclick="StartCreateTemplate">
             <i class="bi bi-plus"></i> Add Template
         </button>
     </div>
+</div>
+
+<div class="alert alert-info">
+    Starter templates can preload common recurring events like <strong>Fire Prevention Week</strong>, <strong>Book Fair</strong>, and <strong>Spirit Week</strong> with markdown defaults.
 </div>
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -255,6 +262,7 @@
     private bool isLoading = true;
     private bool isSaving = false;
     private bool isCreatingEvent = false;
+    private bool isSeedingStarters = false;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
 
@@ -497,5 +505,179 @@
         {
             isCreatingEvent = false;
         }
+    }
+
+    private async Task SeedStarterTemplates()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        isSeedingStarters = true;
+
+        try
+        {
+            var existingNames = templates
+                .Select(t => t.Name.Trim())
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var createdCount = 0;
+            var skipped = new List<string>();
+
+            foreach (var preset in GetStarterPresets())
+            {
+                if (existingNames.Contains(preset.Name))
+                {
+                    skipped.Add($"{preset.Name} (already exists)");
+                    continue;
+                }
+
+                var category = FindCategoryByKeywords(preset.CategoryKeywords);
+                if (category == null)
+                {
+                    skipped.Add($"{preset.Name} (matching category not found)");
+                    continue;
+                }
+
+                var subCategory = FindSubCategoryByKeywords(category.Id, preset.SubCategoryKeywords);
+
+                var template = new EventTemplate
+                {
+                    Name = preset.Name,
+                    Description = preset.Description,
+                    IsActive = true,
+                    EventCatId = category.Id,
+                    EventSubTypeId = subCategory?.Id,
+                    DefaultTitle = preset.DefaultTitle,
+                    DefaultLocation = preset.DefaultLocation,
+                    DefaultDescriptionMarkdown = preset.DefaultDescriptionMarkdown,
+                    DefaultMoreDetailsMarkdown = preset.DefaultMoreDetailsMarkdown,
+                    RequiresVolunteers = preset.RequiresVolunteers,
+                    RequiresSetup = preset.RequiresSetup,
+                    RequiresCleanup = preset.RequiresCleanup
+                };
+
+                var response = await Http.PostAsJsonAsync("api/eventtemplate", template);
+                if (response.IsSuccessStatusCode)
+                {
+                    createdCount++;
+                    existingNames.Add(preset.Name);
+                    continue;
+                }
+
+                skipped.Add($"{preset.Name} (save failed)");
+            }
+
+            await LoadData();
+            successMessage = createdCount > 0
+                ? $"Created {createdCount} starter template(s)."
+                : "No starter templates were created.";
+
+            if (skipped.Any())
+            {
+                errorMessage = $"Skipped: {string.Join(", ", skipped)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating starter templates: {ex.Message}";
+        }
+        finally
+        {
+            isSeedingStarters = false;
+        }
+    }
+
+    private EventCat? FindCategoryByKeywords(IEnumerable<string> keywords)
+    {
+        var keywordSet = keywords.Where(k => !string.IsNullOrWhiteSpace(k)).ToList();
+        if (!keywordSet.Any())
+        {
+            return null;
+        }
+
+        return eventCategories
+            .Where(c => c.IsActive)
+            .FirstOrDefault(c => keywordSet.Any(k =>
+                c.Name.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+                c.Description.Contains(k, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private EventCatSub? FindSubCategoryByKeywords(int eventCatId, IEnumerable<string> keywords)
+    {
+        var keywordSet = keywords.Where(k => !string.IsNullOrWhiteSpace(k)).ToList();
+        if (!keywordSet.Any())
+        {
+            return null;
+        }
+
+        return eventSubCategories
+            .Where(sc => sc.IsActive && sc.EventCatId == eventCatId)
+            .FirstOrDefault(sc => keywordSet.Any(k =>
+                sc.Name.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+                sc.Description.Contains(k, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static IEnumerable<StarterTemplatePreset> GetStarterPresets()
+    {
+        return
+        [
+            new StarterTemplatePreset
+            {
+                Name = "Fire Prevention Week",
+                Description = "Recurring fall safety-awareness week with volunteer stations.",
+                CategoryKeywords = ["school", "special", "community", "event"],
+                SubCategoryKeywords = ["safety", "awareness", "week"],
+                DefaultTitle = "Fire Prevention Week",
+                DefaultLocation = "School Campus",
+                DefaultDescriptionMarkdown = "Join us for **Fire Prevention Week** activities featuring safety demonstrations and family-friendly learning stations.",
+                DefaultMoreDetailsMarkdown = "- Coordinate with local fire department\n- Prepare classroom station schedule\n- Share reminders with families",
+                RequiresVolunteers = true,
+                RequiresSetup = true,
+                RequiresCleanup = true
+            },
+            new StarterTemplatePreset
+            {
+                Name = "Book Fair",
+                Description = "Recurring fundraiser with volunteer shifts and daily setup/closeout.",
+                CategoryKeywords = ["fundraiser", "pta", "event", "program"],
+                SubCategoryKeywords = ["book", "fair", "fundraiser"],
+                DefaultTitle = "PTA Book Fair",
+                DefaultLocation = "Library / Multi-Purpose Room",
+                DefaultDescriptionMarkdown = "Our annual **Book Fair** is a week-long fundraiser that helps support school programs.",
+                DefaultMoreDetailsMarkdown = "- Add volunteer shifts for register and floor help\n- Coordinate class preview times\n- Include family shopping night details",
+                RequiresVolunteers = true,
+                RequiresSetup = true,
+                RequiresCleanup = true
+            },
+            new StarterTemplatePreset
+            {
+                Name = "Spirit Week",
+                Description = "Recurring themed week with daily activities and family communication.",
+                CategoryKeywords = ["school", "special", "community", "event"],
+                SubCategoryKeywords = ["spirit", "theme", "week"],
+                DefaultTitle = "Spirit Week",
+                DefaultLocation = "School Campus",
+                DefaultDescriptionMarkdown = "Celebrate **Spirit Week** with themed days and school-community participation.",
+                DefaultMoreDetailsMarkdown = "- Publish daily themes\n- Share participation reminders\n- Coordinate photo opportunities and wrap-up",
+                RequiresVolunteers = false,
+                RequiresSetup = false,
+                RequiresCleanup = false
+            }
+        ];
+    }
+
+    private sealed class StarterTemplatePreset
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Description { get; init; } = string.Empty;
+        public IEnumerable<string> CategoryKeywords { get; init; } = [];
+        public IEnumerable<string> SubCategoryKeywords { get; init; } = [];
+        public string DefaultTitle { get; init; } = string.Empty;
+        public string DefaultLocation { get; init; } = string.Empty;
+        public string DefaultDescriptionMarkdown { get; init; } = string.Empty;
+        public string DefaultMoreDetailsMarkdown { get; init; } = string.Empty;
+        public bool RequiresVolunteers { get; init; }
+        public bool RequiresSetup { get; init; }
+        public bool RequiresCleanup { get; init; }
     }
 }
