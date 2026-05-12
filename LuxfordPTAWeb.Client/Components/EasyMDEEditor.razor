@@ -1,0 +1,89 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<textarea id="@EditorId" @ref="editorElement"></textarea>
+
+@code {
+    private ElementReference editorElement;
+    private DotNetObjectReference<EasyMDEEditor>? dotNetRef;
+    private bool isInitialized;
+    private string lastKnownValue = string.Empty;
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string EditorId { get; set; } = $"easymde-{Guid.NewGuid():N}";
+
+    [Parameter]
+    public string Placeholder { get; set; } = string.Empty;
+
+    [Parameter]
+    public int MinHeight { get; set; } = 180;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        dotNetRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync(
+            "initEasyMDE",
+            editorElement,
+            EditorId,
+            Value ?? string.Empty,
+            Placeholder ?? string.Empty,
+            MinHeight,
+            dotNetRef);
+
+        lastKnownValue = Value ?? string.Empty;
+        isInitialized = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!isInitialized)
+        {
+            return;
+        }
+
+        var safeValue = Value ?? string.Empty;
+        if (safeValue == lastKnownValue)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("setEasyMDEContent", EditorId, safeValue);
+        lastKnownValue = safeValue;
+    }
+
+    [JSInvokable]
+    public async Task OnEasyMdeChanged(string value)
+    {
+        var safeValue = value ?? string.Empty;
+        if (safeValue == Value)
+        {
+            return;
+        }
+
+        Value = safeValue;
+        lastKnownValue = safeValue;
+        await ValueChanged.InvokeAsync(safeValue);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (isInitialized)
+        {
+            await JS.InvokeVoidAsync("disposeEasyMDE", EditorId);
+        }
+
+        dotNetRef?.Dispose();
+    }
+}

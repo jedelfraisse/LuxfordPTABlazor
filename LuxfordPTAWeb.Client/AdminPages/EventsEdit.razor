@@ -739,7 +739,10 @@ else if (eventModel != null)
 
                     <div class="mb-3">
                         <label for="descriptionMarkdown" class="form-label">Description (Markdown Supported)</label>
-                        <textarea class="form-control" id="descriptionMarkdown" rows="6" @bind="eventModel.DescriptionMarkdown" placeholder="Enter event details using markdown formatting..."></textarea>
+                        <EasyMDEEditor @bind-Value="eventModel.DescriptionMarkdown"
+                                       EditorId="event-edit-description"
+                                       MinHeight="220"
+                                       Placeholder="Enter event details using markdown formatting..." />
                         <div class="form-text">You can use <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a> for formatting. HTML is not allowed and will be ignored.</div>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(eventModel.DescriptionMarkdown))
@@ -752,7 +755,10 @@ else if (eventModel != null)
 
                     <div class="mb-3">
                         <label for="moreDetails" class="form-label">More Details (Markdown)</label>
-                        <textarea class="form-control" id="moreDetails" rows="4" @bind="eventModel.MoreDetailsMarkdown" placeholder="Additional event details, agenda, reminders, etc."></textarea>
+                        <EasyMDEEditor @bind-Value="eventModel.MoreDetailsMarkdown"
+                                       EditorId="event-edit-more-details"
+                                       MinHeight="170"
+                                       Placeholder="Additional event details, agenda, reminders, etc." />
                         <div class="form-text">This is optional. Use Markdown for formatting extended event details.</div>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(eventModel.MoreDetailsMarkdown))
