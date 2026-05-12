@@ -64,14 +64,47 @@
                 <button class="btn btn-outline-primary" @onclick="MoveNext" disabled="@(state.CurrentIndex >= state.Items.Count - 1 || isBusy)">Next Act</button>
                 <button class="btn btn-success" @onclick="PublishStateAsync" disabled="@(!isConnected || isBusy)">Push Update</button>
                 <button class="btn btn-outline-danger" @onclick="ClearSessionAsync" disabled="@(!isConnected || isBusy)">Clear Session</button>
-                <div class="form-check ms-2">
-                    <InputCheckbox class="form-check-input" @bind-Value="state.IsLiveMode" />
-                    <label class="form-check-label">Live Mode</label>
+            </div>
+            <div class="row g-2 mt-3">
+                <div class="col-md-3">
+                    <label class="form-label mb-1">Overall State</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.OverallState">
+                        @foreach (var overall in TalentShowOverallState.All)
+                        {
+                            <option value="@overall">@overall</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1">Live Sub-State</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.LiveSubState" disabled="@(state.OverallState != TalentShowOverallState.Live)">
+                        @foreach (var sub in TalentShowLiveSubState.All)
+                        {
+                            <option value="@sub">@sub</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1">Next Sub-State</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.NextLiveSubState" disabled="@(state.OverallState != TalentShowOverallState.Live)">
+                        @foreach (var sub in TalentShowLiveSubState.All)
+                        {
+                            <option value="@sub">@sub</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1">Est. Minutes</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="state.EstimatedSegmentMinutes" />
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button class="btn btn-outline-secondary btn-sm w-100" @onclick="MarkSegmentStartedNow">Now</button>
                 </div>
             </div>
-            <div class="mt-3">
+            <div class="mt-2">
                 <strong>Connection:</strong> @(isConnected ? "Connected" : "Disconnected")
                 <span class="ms-3"><strong>Updated:</strong> @state.UpdatedAtUtc.ToLocalTime().ToString("g")</span>
+                <span class="ms-3"><strong>Segment Start:</strong> @state.SegmentStartedAtUtc.ToLocalTime().ToString("t")</span>
             </div>
         </div>
     </div>
@@ -92,6 +125,29 @@
                 <p class="mb-1"><strong>Performer:</strong> @current.PerformerName</p>
                 <p class="mb-1"><strong>Category:</strong> @current.Category</p>
                 <p class="mb-0"><strong>Intro:</strong> @current.IntroLine</p>
+                <p class="mb-0 mt-1"><strong>State:</strong> @state.OverallState @(state.OverallState == TalentShowOverallState.Live ? $" / {state.LiveSubState}" : string.Empty)</p>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Voting Summary (Current Act)</h5>
+        </div>
+        <div class="card-body">
+            @if (current == null)
+            {
+                <em>Select an act to view votes.</em>
+            }
+            else
+            {
+                var summary = GetVoteSummary(current.Order);
+                <div class="row">
+                    <div class="col-md-3"><strong>Judge Votes:</strong> @summary.JudgeCount</div>
+                    <div class="col-md-3"><strong>Audience Votes:</strong> @summary.AudienceCount</div>
+                    <div class="col-md-3"><strong>Judge Avg Total:</strong> @summary.JudgeAverageTotal.ToString("0.0")</div>
+                    <div class="col-md-3"><strong>Audience Avg Total:</strong> @summary.AudienceAverageTotal.ToString("0.0")</div>
+                </div>
             }
         </div>
     </div>
@@ -248,6 +304,11 @@
                 ShowName = rehearsalPackage.ShowName,
                 SessionCode = rehearsalPackage.SessionCode,
                 IsLiveMode = false,
+                OverallState = TalentShowOverallState.PreShow,
+                LiveSubState = TalentShowLiveSubState.HostTalk,
+                NextLiveSubState = TalentShowLiveSubState.ActShow,
+                SegmentStartedAtUtc = DateTime.UtcNow,
+                EstimatedSegmentMinutes = 5,
                 CurrentIndex = rehearsalPackage.Items.Any() ? 0 : -1,
                 Items = rehearsalPackage.Items.OrderBy(i => i.Order).ToList(),
                 Presentation = rehearsalPackage.Presentation,
@@ -336,6 +397,12 @@
             return;
         }
 
+        state.IsLiveMode = state.OverallState == TalentShowOverallState.Live;
+        if (state.OverallState != TalentShowOverallState.Live)
+        {
+            state.LiveSubState = TalentShowLiveSubState.HostTalk;
+        }
+
         state.UpdatedAtUtc = DateTime.UtcNow;
         await hubConnection.InvokeAsync("PublishState", state);
         statusMessage = "Update pushed to displays.";
@@ -356,6 +423,7 @@
         if (state.CurrentIndex > 0)
         {
             state.CurrentIndex--;
+            UpdateEstimatedMinutesForCurrentState();
         }
     }
 
@@ -364,6 +432,7 @@
         if (state.CurrentIndex < state.Items.Count - 1)
         {
             state.CurrentIndex++;
+            UpdateEstimatedMinutesForCurrentState();
         }
     }
 
@@ -372,7 +441,46 @@
         if (index >= 0 && index < state.Items.Count)
         {
             state.CurrentIndex = index;
+            UpdateEstimatedMinutesForCurrentState();
         }
+    }
+
+    private void MarkSegmentStartedNow()
+    {
+        state.SegmentStartedAtUtc = DateTime.UtcNow;
+    }
+
+    private void UpdateEstimatedMinutesForCurrentState()
+    {
+        if (state.OverallState == TalentShowOverallState.Live &&
+            state.LiveSubState == TalentShowLiveSubState.ActShow &&
+            GetCurrentItem() is { } current)
+        {
+            state.EstimatedSegmentMinutes = current.DurationMinutes;
+        }
+    }
+
+    private VoteSummary GetVoteSummary(int actOrder)
+    {
+        var actVotes = state.Votes.Where(v => v.ActOrder == actOrder).ToList();
+        var judgeVotes = actVotes.Where(v => v.IsJudge).ToList();
+        var audienceVotes = actVotes.Where(v => !v.IsJudge).ToList();
+
+        return new VoteSummary
+        {
+            JudgeCount = judgeVotes.Count,
+            AudienceCount = audienceVotes.Count,
+            JudgeAverageTotal = judgeVotes.Any() ? judgeVotes.Average(v => v.TotalScore) : 0,
+            AudienceAverageTotal = audienceVotes.Any() ? audienceVotes.Average(v => v.TotalScore) : 0
+        };
+    }
+
+    private sealed class VoteSummary
+    {
+        public int JudgeCount { get; init; }
+        public int AudienceCount { get; init; }
+        public double JudgeAverageTotal { get; init; }
+        public double AudienceAverageTotal { get; init; }
     }
 
     private string GetSelectedRole(string pairingCode)

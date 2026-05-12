@@ -1,5 +1,6 @@
 @page "/eventconnect"
 @page "/display/talent-show"
+@page "/talent-show/vote/{SessionCodeParam}"
 @layout LuxfordPTAWeb.Client.Layout.DeviceDisplayLayout
 @using LuxfordPTAWeb.Shared.DTOs
 @using Microsoft.AspNetCore.SignalR.Client
@@ -11,30 +12,42 @@
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
-            <div class="card bg-dark text-light border-secondary mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h2 class="mb-0"><i class="bi bi-cast"></i> Event Connect</h2>
-                        <span class="badge @(isConnected ? "bg-success" : "bg-secondary")">
-                            @(isConnected ? "Connected" : "Disconnected")
-                        </span>
+            @if (isDirectAudienceVoteMode)
+            {
+                <div class="card bg-dark text-light border-info mb-3">
+                    <div class="card-body">
+                        <h2 class="mb-0"><i class="bi bi-people"></i> Audience Voting</h2>
+                        <p class="mb-0 mt-2">Connected to session <strong>@sessionCodeInput</strong>. Submit your vote for the current act.</p>
                     </div>
-                    <div class="mt-3 row g-2">
-                        <div class="col-md-5">
-                            <label class="form-label">Device Name</label>
-                            <InputText class="form-control" @bind-Value="deviceNameInput" />
-                        </div>
-                        <div class="col-md-3 d-flex align-items-end">
-                            <button class="btn btn-outline-light w-100" @onclick="RegisterDeviceAsync">Regenerate Code</button>
-                        </div>
-                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                            <div class="small text-uppercase text-secondary">Pairing Code</div>
-                            <div class="display-4 fw-bold">@pairingCode</div>
-                        </div>
-                    </div>
-                    <div class="mt-2 text-info">@statusMessage</div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="card bg-dark text-light border-secondary mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="mb-0"><i class="bi bi-cast"></i> Event Connect</h2>
+                            <span class="badge @(isConnected ? "bg-success" : "bg-secondary")">
+                                @(isConnected ? "Connected" : "Disconnected")
+                            </span>
+                        </div>
+                        <div class="mt-3 row g-2">
+                            <div class="col-md-5">
+                                <label class="form-label">Device Name</label>
+                                <InputText class="form-control" @bind-Value="deviceNameInput" />
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button class="btn btn-outline-light w-100" @onclick="RegisterDeviceAsync">Regenerate Code</button>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <div class="small text-uppercase text-secondary">Pairing Code</div>
+                                <div class="display-4 fw-bold">@pairingCode</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-info">@statusMessage</div>
+                    </div>
+                </div>
+            }
 
             @if (!isAssigned)
             {
@@ -47,68 +60,118 @@
             }
             else
             {
-                @if (state?.Items?.Any() == true)
+                @switch (assignedRole)
                 {
-                    @switch (assignedRole)
-                    {
-                        case TalentShowDisplayRole.BackstageDirector:
-                            <div class="card bg-dark text-light border-warning mb-3">
-                                <div class="card-body">
-                                    <h3 class="text-warning">Backstage Director View</h3>
-                                    @if (GetCurrentItem() is { } currentBackstage)
-                                    {
-                                        <h1 class="display-5">@currentBackstage.PerformerName</h1>
-                                        <p class="mb-1"><strong>Current Act:</strong> @currentBackstage.ActTitle</p>
-                                        <p class="mb-1"><strong>Duration:</strong> @currentBackstage.DurationMinutes min</p>
-                                        <p class="mb-0"><strong>Outro Cue:</strong> @currentBackstage.OutroLine</p>
-                                    }
+                    case TalentShowDisplayRole.BackstageDirector:
+                        <div class="card bg-dark text-light border-warning mb-3">
+                            <div class="card-body">
+                                <h3 class="text-warning">Backstage Director View</h3>
+                                <p class="mb-1"><strong>Overall:</strong> @state.OverallState</p>
+                                <p class="mb-1"><strong>Live Sub-State:</strong> @state.LiveSubState</p>
+                                <p class="mb-1"><strong>Next Sub-State:</strong> @state.NextLiveSubState</p>
+                                <p class="mb-1"><strong>Estimated Timer:</strong> @GetRemainingTimerText()</p>
+                                @if (GetCurrentItem() is { } currentBackstage)
+                                {
+                                    <hr />
+                                    <h4>@currentBackstage.PerformerName</h4>
+                                    <p class="mb-1"><strong>Current Act:</strong> @currentBackstage.ActTitle</p>
                                     @if (GetNextItem() is { } nextBackstage)
                                     {
-                                        <hr />
                                         <p class="mb-0"><strong>On Deck:</strong> @nextBackstage.PerformerName — @nextBackstage.ActTitle</p>
                                     }
-                                </div>
+                                }
                             </div>
-                            break;
-                        case TalentShowDisplayRole.JudgesVote:
-                            <div class="card bg-dark text-light border-info mb-3">
-                                <div class="card-body">
-                                    <h3 class="text-info">Judges Vote View</h3>
-                                    @if (GetCurrentItem() is { } currentJudge)
-                                    {
-                                        <h1 class="display-5">@currentJudge.ActTitle</h1>
-                                        <p class="mb-1"><strong>Performer:</strong> @currentJudge.PerformerName</p>
-                                        <p class="mb-1"><strong>Category:</strong> @currentJudge.Category</p>
-                                        <p class="mb-0">Prepare scoring for this performance.</p>
-                                    }
-                                </div>
+                        </div>
+                        break;
+                    case TalentShowDisplayRole.JudgesVote:
+                        <div class="card bg-dark text-light border-info mb-3">
+                            <div class="card-body">
+                                <h3 class="text-info">Main Judge Voting</h3>
+                                @if (GetCurrentItem() is { } currentJudge)
+                                {
+                                    <p class="mb-1"><strong>Act:</strong> @currentJudge.ActTitle</p>
+                                    <p class="mb-1"><strong>Performer:</strong> @currentJudge.PerformerName</p>
+                                    @RenderVoteForm(true, "Judge Name")
+                                }
+                                else
+                                {
+                                    <em>Waiting for current act.</em>
+                                }
                             </div>
-                            break;
-                        default:
-                            <div class="card bg-dark text-light border-success mb-3 @state.Presentation.ThemeClass">
-                                <div class="card-body">
-                                    <h3 class="mb-2">@state.ShowName</h3>
-                                    <p class="mb-1">@state.Presentation.WelcomeMessage</p>
-                                    @if (GetCurrentItem() is { } currentMain)
-                                    {
-                                        <h1 class="display-4 mt-3">Now Performing: @currentMain.ActTitle</h1>
-                                        <h3>@currentMain.PerformerName</h3>
-                                        <p>@currentMain.IntroLine</p>
-                                        @if (GetNextItem() is { } nextMain)
-                                        {
-                                            <hr />
-                                            <p class="mb-0"><strong>Up Next:</strong> @nextMain.ActTitle (@nextMain.PerformerName)</p>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <div class="alert alert-secondary mt-3 mb-0">Waiting for the controller to start the show.</div>
-                                    }
-                                </div>
+                        </div>
+                        break;
+                    case TalentShowDisplayRole.AudienceVote:
+                        <div class="card bg-dark text-light border-primary mb-3">
+                            <div class="card-body">
+                                <h3 class="text-primary">Audience Voting</h3>
+                                <p class="mb-2">Share this link with audience:</p>
+                                <p class="mb-3"><code>@GetAudienceVoteUrl()</code></p>
+                                @if (GetCurrentItem() is { } currentAudience)
+                                {
+                                    <p class="mb-1"><strong>Act:</strong> @currentAudience.ActTitle</p>
+                                    <p class="mb-1"><strong>Performer:</strong> @currentAudience.PerformerName</p>
+                                    @RenderVoteForm(false, "Your Name (optional)")
+                                }
+                                else
+                                {
+                                    <em>Waiting for current act.</em>
+                                }
                             </div>
-                            break;
-                    }
+                        </div>
+                        break;
+                    default:
+                        <div class="card bg-dark text-light border-success mb-3 @state.Presentation.ThemeClass">
+                            <div class="card-body">
+                                <h3 class="mb-2">@state.ShowName</h3>
+                                @if (state.OverallState == TalentShowOverallState.PreShow)
+                                {
+                                    <h1 class="display-5">Pre-Show</h1>
+                                    <p>@state.Presentation.WelcomeMessage</p>
+                                    <p><strong>Sponsor Loop / Upcoming Events</strong></p>
+                                }
+                                else if (state.OverallState == TalentShowOverallState.PostShow)
+                                {
+                                    <h1 class="display-5">Post-Show</h1>
+                                    <p>Thank you for attending Luxford Got Talent!</p>
+                                    <p><strong>Sponsors and upcoming PTA events</strong></p>
+                                }
+                                else if (state.LiveSubState == TalentShowLiveSubState.PauseIntermission)
+                                {
+                                    <h1 class="display-5">Intermission</h1>
+                                    <p>@state.Presentation.IntermissionMessage</p>
+                                    <p><strong>Sponsors and upcoming PTA events</strong></p>
+                                }
+                                else if (state.LiveSubState == TalentShowLiveSubState.HostTalk)
+                                {
+                                    <h1 class="display-5">Host Segment</h1>
+                                    <p>The hosts are addressing the audience.</p>
+                                    @if (GetCurrentItem() is { } hostNext)
+                                    {
+                                        <p class="mb-0"><strong>Next Act:</strong> @hostNext.ActTitle (@hostNext.PerformerName)</p>
+                                    }
+                                }
+                                else if (GetCurrentItem() is { } currentMain)
+                                {
+                                    <h1 class="display-4 mt-3">Now Performing: @currentMain.ActTitle</h1>
+                                    <h3>@currentMain.PerformerName</h3>
+                                    <p>@currentMain.IntroLine</p>
+                                    @if (GetNextItem() is { } nextMain)
+                                    {
+                                        <hr />
+                                        <p class="mb-0"><strong>Up Next:</strong> @nextMain.ActTitle (@nextMain.PerformerName)</p>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="alert alert-secondary mt-3 mb-0">Waiting for the controller to start the show.</div>
+                                }
+                            </div>
+                        </div>
+                        break;
+                }
 
+                @if (state.Items.Any())
+                {
                     <div class="card bg-dark text-light border-secondary">
                         <div class="card-body">
                             <h5 class="mb-3">Running Order</h5>
@@ -139,34 +202,49 @@
                         </div>
                     </div>
                 }
-                else
-                {
-                    <div class="card bg-black text-light border-secondary">
-                        <div class="card-body text-center py-5">
-                            <h4>Assigned, waiting for show state…</h4>
-                        </div>
-                    </div>
-                }
             }
         </div>
     </div>
 </div>
 
 @code {
+    [Parameter] public string? SessionCodeParam { get; set; }
+
     private HubConnection? hubConnection;
     private TalentShowRealtimeState state = new();
-    private TalentShowDeviceRegistrationResult? registration;
     private string pairingCode = "-----";
     private string deviceNameInput = $"Display-{DateTime.Now:HHmm}";
     private string statusMessage = "Connecting to event hub...";
     private string assignedRole = TalentShowDisplayRole.MainBoard;
     private string assignedSessionCode = string.Empty;
+    private string sessionCodeInput = string.Empty;
     private bool isConnected;
     private bool isAssigned;
+    private bool isDirectAudienceVoteMode;
+
+    private string voterName = string.Empty;
+    private int talentScore = 3;
+    private int stagePresenceScore = 3;
+    private int creativityScore = 3;
+    private int crowdEngagementScore = 3;
+    private string voteMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        isDirectAudienceVoteMode = !string.IsNullOrWhiteSpace(SessionCodeParam);
         await EnsureHubConnectionAsync();
+
+        if (isDirectAudienceVoteMode)
+        {
+            assignedRole = TalentShowDisplayRole.AudienceVote;
+            assignedSessionCode = NormalizeSessionCode(SessionCodeParam!);
+            sessionCodeInput = assignedSessionCode;
+            isAssigned = true;
+            await JoinSessionAsync(assignedSessionCode);
+            statusMessage = $"Joined audience voting for {assignedSessionCode}.";
+            return;
+        }
+
         await RegisterDeviceAsync();
     }
 
@@ -189,13 +267,14 @@
             InvokeAsync(StateHasChanged);
         });
 
-        hubConnection.On<TalentShowDeviceAssignment>("DeviceAssigned", assignment =>
+        hubConnection.On<TalentShowDeviceAssignment>("DeviceAssigned", async assignment =>
         {
             assignedSessionCode = assignment.SessionCode;
             assignedRole = assignment.DisplayRole;
             isAssigned = true;
             statusMessage = $"Assigned to session {assignment.SessionCode} as {assignment.DisplayRole}.";
-            InvokeAsync(StateHasChanged);
+            await JoinSessionAsync(assignedSessionCode);
+            await InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On("DeviceAssignmentCleared", () =>
@@ -218,6 +297,16 @@
         isConnected = true;
     }
 
+    private async Task JoinSessionAsync(string sessionCode)
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("JoinSession", sessionCode);
+    }
+
     private async Task RegisterDeviceAsync()
     {
         if (hubConnection == null)
@@ -225,11 +314,63 @@
             return;
         }
 
-        registration = await hubConnection.InvokeAsync<TalentShowDeviceRegistrationResult>("RegisterDevice", deviceNameInput);
+        var registration = await hubConnection.InvokeAsync<TalentShowDeviceRegistrationResult>("RegisterDevice", deviceNameInput);
         pairingCode = registration.PairingCode;
         assignedSessionCode = string.Empty;
         isAssigned = false;
         statusMessage = $"Device registered. Pairing code: {pairingCode}";
+    }
+
+    private RenderFragment RenderVoteForm(bool isJudge, string nameLabel) => @<div class="mt-3">
+        <label class="form-label">@nameLabel</label>
+        <InputText class="form-control mb-2" @bind-Value="voterName" />
+
+        <label class="form-label mb-1 mt-2">Talent (1-5)</label>
+        <InputNumber class="form-control" @bind-Value="talentScore" />
+
+        <label class="form-label mb-1 mt-2">Stage Presence (1-5)</label>
+        <InputNumber class="form-control" @bind-Value="stagePresenceScore" />
+
+        <label class="form-label mb-1 mt-2">Creativity (1-5)</label>
+        <InputNumber class="form-control" @bind-Value="creativityScore" />
+
+        <label class="form-label mb-1 mt-2">Crowd Engagement (1-5)</label>
+        <InputNumber class="form-control" @bind-Value="crowdEngagementScore" />
+
+        <button class="btn btn-primary mt-2" @onclick="() => SubmitVoteAsync(isJudge)">Submit Vote</button>
+        @if (!string.IsNullOrWhiteSpace(voteMessage))
+        {
+            <div class="mt-2 text-success">@voteMessage</div>
+        }
+    </div>;
+
+    private async Task SubmitVoteAsync(bool isJudge)
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        var current = GetCurrentItem();
+        if (current == null)
+        {
+            voteMessage = "No current act to vote on yet.";
+            return;
+        }
+
+        var payload = new TalentShowVoteSubmission
+        {
+            VoterName = string.IsNullOrWhiteSpace(voterName) ? (isJudge ? "Judge" : "Audience") : voterName.Trim(),
+            IsJudge = isJudge,
+            ActOrder = current.Order,
+            TalentScore = Math.Clamp(talentScore, 1, 5),
+            StagePresenceScore = Math.Clamp(stagePresenceScore, 1, 5),
+            CreativityScore = Math.Clamp(creativityScore, 1, 5),
+            CrowdEngagementScore = Math.Clamp(crowdEngagementScore, 1, 5)
+        };
+
+        await hubConnection.InvokeAsync("SubmitVote", state.SessionCode, payload);
+        voteMessage = $"Vote submitted (Total: {payload.TotalScore}).";
     }
 
     private TalentShowScheduleItem? GetCurrentItem()
@@ -251,6 +392,29 @@
         }
 
         return state.Items[nextIndex];
+    }
+
+    private string GetAudienceVoteUrl()
+    {
+        var uri = Navigation.ToAbsoluteUri($"/talent-show/vote/{state.SessionCode}");
+        return uri.ToString();
+    }
+
+    private string GetRemainingTimerText()
+    {
+        var end = state.SegmentStartedAtUtc.AddMinutes(state.EstimatedSegmentMinutes);
+        var remaining = end - DateTime.UtcNow;
+        if (remaining < TimeSpan.Zero)
+        {
+            return "00:00";
+        }
+
+        return $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
+    }
+
+    private static string NormalizeSessionCode(string code)
+    {
+        return new string(code.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
     }
 
     public async ValueTask DisposeAsync()

@@ -34,10 +34,44 @@ public class TalentShowRealtimeState
     public string ShowName { get; set; } = string.Empty;
     public string SessionCode { get; set; } = string.Empty;
     public bool IsLiveMode { get; set; }
+    public string OverallState { get; set; } = TalentShowOverallState.PreShow;
+    public string LiveSubState { get; set; } = TalentShowLiveSubState.HostTalk;
+    public string NextLiveSubState { get; set; } = TalentShowLiveSubState.ActShow;
+    public DateTime SegmentStartedAtUtc { get; set; } = DateTime.UtcNow;
+    public int EstimatedSegmentMinutes { get; set; } = 5;
     public int CurrentIndex { get; set; } = -1;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     public List<TalentShowScheduleItem> Items { get; set; } = new();
     public TalentShowPresentationSettings Presentation { get; set; } = new();
+    public List<TalentShowVoteSubmission> Votes { get; set; } = new();
+}
+
+public static class TalentShowOverallState
+{
+    public const string PreShow = "PreShow";
+    public const string Live = "Live";
+    public const string PostShow = "PostShow";
+
+    public static readonly string[] All =
+    [
+        PreShow,
+        Live,
+        PostShow
+    ];
+}
+
+public static class TalentShowLiveSubState
+{
+    public const string HostTalk = "HostTalk";
+    public const string ActShow = "ActShow";
+    public const string PauseIntermission = "PauseIntermission";
+
+    public static readonly string[] All =
+    [
+        HostTalk,
+        ActShow,
+        PauseIntermission
+    ];
 }
 
 public static class TalentShowDisplayRole
@@ -45,12 +79,14 @@ public static class TalentShowDisplayRole
     public const string MainBoard = "MainBoard";
     public const string BackstageDirector = "BackstageDirector";
     public const string JudgesVote = "JudgesVote";
+    public const string AudienceVote = "AudienceVote";
 
     public static readonly string[] All =
     [
         MainBoard,
         BackstageDirector,
-        JudgesVote
+        JudgesVote,
+        AudienceVote
     ];
 }
 
@@ -78,4 +114,17 @@ public class TalentShowDeviceAssignment
     public string PairingCode { get; set; } = string.Empty;
     public string SessionCode { get; set; } = string.Empty;
     public string DisplayRole { get; set; } = string.Empty;
+}
+
+public class TalentShowVoteSubmission
+{
+    public string VoterName { get; set; } = string.Empty;
+    public bool IsJudge { get; set; }
+    public int ActOrder { get; set; }
+    public int TalentScore { get; set; } = 3;
+    public int StagePresenceScore { get; set; } = 3;
+    public int CreativityScore { get; set; } = 3;
+    public int CrowdEngagementScore { get; set; } = 3;
+    public int TotalScore => TalentScore + StagePresenceScore + CreativityScore + CrowdEngagementScore;
+    public DateTime SubmittedAtUtc { get; set; } = DateTime.UtcNow;
 }

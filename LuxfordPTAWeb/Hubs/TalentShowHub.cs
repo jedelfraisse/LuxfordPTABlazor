@@ -27,6 +27,36 @@ public class TalentShowHub : Hub
     {
         var normalizedCode = NormalizeSessionCode(state.SessionCode);
         state.SessionCode = normalizedCode;
+        state.OverallState = NormalizeOverallState(state.OverallState);
+        state.LiveSubState = NormalizeLiveSubState(state.LiveSubState);
+        state.NextLiveSubState = NormalizeLiveSubState(state.NextLiveSubState);
+        state.UpdatedAtUtc = DateTime.UtcNow;
+        SessionStates[normalizedCode] = state;
+
+        await Clients.Group(normalizedCode).SendAsync("ShowStateUpdated", state);
+    }
+
+    public async Task SubmitVote(string sessionCode, TalentShowVoteSubmission vote)
+    {
+        var normalizedCode = NormalizeSessionCode(sessionCode);
+        if (!SessionStates.TryGetValue(normalizedCode, out var state))
+        {
+            throw new HubException("Session not found.");
+        }
+
+        var safeVote = new TalentShowVoteSubmission
+        {
+            VoterName = string.IsNullOrWhiteSpace(vote.VoterName) ? "Anonymous" : vote.VoterName.Trim(),
+            IsJudge = vote.IsJudge,
+            ActOrder = vote.ActOrder,
+            TalentScore = NormalizeScore(vote.TalentScore),
+            StagePresenceScore = NormalizeScore(vote.StagePresenceScore),
+            CreativityScore = NormalizeScore(vote.CreativityScore),
+            CrowdEngagementScore = NormalizeScore(vote.CrowdEngagementScore),
+            SubmittedAtUtc = DateTime.UtcNow
+        };
+
+        state.Votes.Add(safeVote);
         state.UpdatedAtUtc = DateTime.UtcNow;
         SessionStates[normalizedCode] = state;
 
@@ -176,6 +206,27 @@ public class TalentShowHub : Hub
         var match = TalentShowDisplayRole.All
             .FirstOrDefault(r => r.Equals(role?.Trim(), StringComparison.OrdinalIgnoreCase));
         return match ?? TalentShowDisplayRole.MainBoard;
+    }
+
+    private static string NormalizeOverallState(string state)
+    {
+        var match = TalentShowOverallState.All
+            .FirstOrDefault(s => s.Equals(state?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return match ?? TalentShowOverallState.PreShow;
+    }
+
+    private static string NormalizeLiveSubState(string state)
+    {
+        var match = TalentShowLiveSubState.All
+            .FirstOrDefault(s => s.Equals(state?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return match ?? TalentShowLiveSubState.HostTalk;
+    }
+
+    private static int NormalizeScore(int score)
+    {
+        if (score < 1) return 1;
+        if (score > 5) return 5;
+        return score;
     }
 
     private static string GenerateUniquePairingCode()

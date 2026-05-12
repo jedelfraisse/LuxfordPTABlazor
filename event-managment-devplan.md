@@ -349,6 +349,7 @@ This system adds:
 - [ ] Real-time updates via SignalR  
 - [ ] Control-specific actions (e.g., “Next Performer”, “Call Bingo Number”)  
 - [x] **TEMP PILOT** `/admin/talent-show/rehearsal` controller page with schedule navigation (`Previous` / `Next`) and live push actions for Luxford Got Talent rehearsal
+- [x] **TEMP PILOT** Overall show state (`PreShow`, `Live`, `PostShow`) and live sub-state controls (`HostTalk`, `ActShow`, `PauseIntermission`)
 
 ---
 
@@ -364,6 +365,7 @@ This system adds:
 - [ ] Renders that control’s UI  
 - [ ] Supports multiple display roles (host, backstage, performer, audience)  
 - [x] **TEMP PILOT** `/eventconnect` device page with no site chrome that auto-registers and receives a generated pairing code + assignment
+- [x] **TEMP PILOT** Role-specific display behavior for `MainBoard`, `BackstageDirector`, `JudgesVote`, and `AudienceVote`
 
 ---
 
@@ -376,6 +378,7 @@ This system adds:
 - [ ] Maintain Live/Test isolation  
 - [ ] Handle reconnects and state restoration  
 - [x] **TEMP PILOT** `TalentShowHub` mapped at `/hubs/talent-show` for device registration, pairing-code assignment, and state messaging during rehearsal
+- [x] **TEMP PILOT** Real-time vote submission and rollup transport for judge/audience scoring (1-5 categories)
 
 ---
 
