@@ -10,6 +10,8 @@ public class TalentShowHub : Hub
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, TalentShowConnectedDevice> DevicesByConnection =
         new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, PersistedDeviceProfile> DeviceProfilesById =
+        new(StringComparer.OrdinalIgnoreCase);
     private const string ControllerGroupName = "talent-show-controllers";
 
     public async Task JoinSession(string sessionCode)
@@ -83,6 +85,7 @@ public class TalentShowHub : Hub
         var requestedDeviceId = request.ExistingDeviceId?.Trim() ?? string.Empty;
         var existingPairingCode = NormalizePairingCodeSafe(request.ExistingPairingCode);
         var forceNewCode = request.ForceNewCode;
+        DeviceProfilesById.TryGetValue(requestedDeviceId, out var persistedProfile);
 
         var existingDevice = string.IsNullOrWhiteSpace(requestedDeviceId)
             ? null
@@ -95,20 +98,27 @@ public class TalentShowHub : Hub
             DevicesByConnection.TryRemove(existingDevice.ConnectionId, out _);
         }
 
-        var pairingCode = ResolvePairingCode(existingDevice, existingPairingCode, forceNewCode);
+        var pairingCode = ResolvePairingCode(existingDevice, persistedProfile, existingPairingCode, forceNewCode);
 
         var device = new TalentShowConnectedDevice
         {
-            DeviceId = existingDevice?.DeviceId ?? Guid.NewGuid().ToString("N"),
+            DeviceId = existingDevice?.DeviceId
+                ?? persistedProfile?.DeviceId
+                ?? Guid.NewGuid().ToString("N"),
             ConnectionId = Context.ConnectionId,
             PairingCode = pairingCode,
-            DisplayName = normalizedName,
-            AssignedSessionCode = existingDevice?.AssignedSessionCode ?? string.Empty,
-            AssignedDisplayRole = existingDevice?.AssignedDisplayRole ?? string.Empty,
+            DisplayName = persistedProfile?.DisplayName ?? normalizedName,
+            AssignedSessionCode = persistedProfile?.AssignedSessionCode
+                ?? existingDevice?.AssignedSessionCode
+                ?? string.Empty,
+            AssignedDisplayRole = persistedProfile?.AssignedDisplayRole
+                ?? existingDevice?.AssignedDisplayRole
+                ?? string.Empty,
             LastSeenUtc = DateTime.UtcNow
         };
 
         DevicesByConnection[Context.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
         if (!string.IsNullOrWhiteSpace(device.AssignedSessionCode))
         {
@@ -121,7 +131,9 @@ public class TalentShowHub : Hub
         {
             DeviceId = device.DeviceId,
             PairingCode = device.PairingCode,
-            DisplayName = device.DisplayName
+            DisplayName = device.DisplayName,
+            AssignedSessionCode = device.AssignedSessionCode,
+            AssignedDisplayRole = device.AssignedDisplayRole
         };
     }
 
@@ -141,6 +153,7 @@ public class TalentShowHub : Hub
         device.DisplayName = normalizedDisplayName;
         device.LastSeenUtc = DateTime.UtcNow;
         DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
         await BroadcastDeviceRegistryAsync();
     }
@@ -176,6 +189,7 @@ public class TalentShowHub : Hub
         device.AssignedDisplayRole = normalizedRole;
         device.LastSeenUtc = DateTime.UtcNow;
         DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
         var assignment = new TalentShowDeviceAssignment
         {
@@ -214,6 +228,7 @@ public class TalentShowHub : Hub
         device.AssignedDisplayRole = string.Empty;
         device.LastSeenUtc = DateTime.UtcNow;
         DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
         await Clients.Client(device.ConnectionId).SendAsync("DeviceAssignmentCleared");
         await BroadcastDeviceRegistryAsync();
@@ -311,11 +326,17 @@ public class TalentShowHub : Hub
 
     private static string ResolvePairingCode(
         TalentShowConnectedDevice? existingDevice,
+        PersistedDeviceProfile? persistedProfile,
         string requestedPairingCode,
         bool forceNewCode)
     {
         if (!forceNewCode)
         {
+            if (!string.IsNullOrWhiteSpace(persistedProfile?.PairingCode))
+            {
+                return persistedProfile.PairingCode;
+            }
+
             if (!string.IsNullOrWhiteSpace(requestedPairingCode))
             {
                 var codeInUse = DevicesByConnection.Values.Any(d =>
@@ -357,5 +378,26 @@ public class TalentShowHub : Hub
     private Task BroadcastDeviceRegistryAsync()
     {
         return Clients.Group(ControllerGroupName).SendAsync("DeviceRegistryUpdated", GetDeviceRegistrySnapshot());
+    }
+
+    private sealed class PersistedDeviceProfile
+    {
+        public string DeviceId { get; set; } = string.Empty;
+        public string PairingCode { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string AssignedSessionCode { get; set; } = string.Empty;
+        public string AssignedDisplayRole { get; set; } = string.Empty;
+
+        public static PersistedDeviceProfile FromConnectedDevice(TalentShowConnectedDevice device)
+        {
+            return new PersistedDeviceProfile
+            {
+                DeviceId = device.DeviceId,
+                PairingCode = device.PairingCode,
+                DisplayName = device.DisplayName,
+                AssignedSessionCode = device.AssignedSessionCode,
+                AssignedDisplayRole = device.AssignedDisplayRole
+            };
+        }
     }
 }

@@ -95,6 +95,9 @@ public class TalentShowDeviceRegistrationResult
     public string DeviceId { get; set; } = string.Empty;
     public string PairingCode { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public string AssignedSessionCode { get; set; } = string.Empty;
+    public string AssignedDisplayRole { get; set; } = string.Empty;
+    public bool IsAssigned => !string.IsNullOrWhiteSpace(AssignedSessionCode);
 }
 
 public class TalentShowDeviceRegistrationRequest

@@ -302,34 +302,37 @@ Building a comprehensive event management system for the Luxford PTA that handle
   - [ ] Rule templates
   - [ ] Copy rules from source events
 
-## 🛰️ Phase 2.5: Real-Time Event Controls & Displays ⏱️ *NEW – After Phase 2, Before Phase 3*
+# 🛰️ **Phase 2.5: Real-Time Event Controls & Displays**  
+⏱️ *NEW – After Phase 2, Before Phase 3*
 
-### 📡 Overview
-To support interactive events such as Talent Show, Bingo Night, Elections, PTA Meetings, and Breakfast Events (Muffins With Moms / Donuts With Dad), the system will introduce a modular real-time control framework. This framework integrates with the existing Event model and multi-day architecture without replacing or conflicting with any existing features.
+## 📡 Overview
+To support interactive events such as Talent Show, Bingo Night, Elections, PTA Meetings, and Breakfast Events (Muffins With Moms / Donuts With Dad), the system introduces a modular real-time control framework. This framework integrates with the existing Event model and multi-day architecture without replacing or conflicting with any existing features.
 
 This system adds:
 
-- Attachable Event Controls (modular functional units)
-- Controller Mode for event operators (admin-only)
-- Display Mode for public screens (no login required)
-- SignalR-based real-time communication/control between controller and display/tools pages
-- Role-based displays (host, backstage, performer, audience)
-- Live/Test modes for rehearsals vs. live events
+- Attachable Event Controls (modular functional units)  
+- **Director Controls** (one per event)  
+- Controller Mode for event operators (admin-only)  
+- Display Mode for public screens (no login required)  
+- SignalR-based real-time communication between controller and displays  
+- Role-based displays (host, backstage, performer, audience)  
+- Live/Test modes for rehearsals vs. live events  
 
 ---
 
-### 🧩 2.5.1 Event Controls System (NEW)
+## 🧩 **2.5.1 Event Controls System (NEW)**
 
-#### EventControl Model (NEW)
+### **EventControl Model (NEW)**
 
 - [ ] Add `EventControl` model  
   - [ ] `EventId` (FK to Event)  
   - [ ] `ControlType` (string)  
+  - [ ] `IsDirector` (bool)  
   - [ ] `SettingsJson` (control-specific configuration)  
   - [ ] `DisplayName`  
   - [ ] `SequenceOrder`  
 
-#### Event Model Integration (NEW)
+### **Event Model Integration (NEW)**
 
 - [ ] Add `List<EventControl>` to `Event`  
 - [ ] UI for adding/removing controls in `EventsEdit.razor`  
@@ -337,10 +340,31 @@ This system adds:
 
 ---
 
-### 🖥️ 2.5.2 Controller Page (NEW)
+## 🎛️ **2.5.1.1 Director Controls (NEW)**
 
+Some events require a single “Director” control that manages the overall flow of the event (e.g., Talent Show Director, Bingo Director, Election Director). Director controls act as the primary operational control for the event.
+
+### **Director Control Rules**
+- Only **one** director control may be added to an event.  
+- Director controls appear in a **dedicated dropdown** at the bottom of the event page.  
+- The dropdown is initially blank until a director is selected.  
+- Once a director is chosen, the system unlocks the ability to add **additional non-director controls** (e.g., SponsorDisplayControl, AgendaControl, NoteTakerControl).  
+- Director controls have their own workflow/status (e.g., SignUps → Auditions → Rehearsal → Live for Talent Show).  
+- Director controls link to their own controller sub-page.  
+
+### **Director Control Types (NEW)**
+- `TalentShowDirectorControl`  
+- `BingoDirectorControl`  
+- `ElectionDirectorControl`  
+
+These are separate from functional controls such as `TalentShowControl`, `BingoControl`, etc.
+
+---
+
+## 🖥️ **2.5.2 Controller Page (NEW)**  
 **Route:** `/events/{slug}/control`
 
+### **Core Features**
 - [ ] Password-protected (Admin/Board/Coordinator)  
 - [ ] Live/Test mode toggle  
 - [ ] List of displays waiting to be paired  
@@ -348,13 +372,24 @@ This system adds:
 - [ ] Tabs/subpages for each attached control  
 - [ ] Real-time updates via SignalR  
 - [ ] Control-specific actions (e.g., “Next Performer”, “Call Bingo Number”)  
-- [x] **TEMP PILOT** `/admin/talent-show/rehearsal` controller page with schedule navigation (`Previous` / `Next`) and live push actions for Luxford Got Talent rehearsal
-- [x] **TEMP PILOT** Overall show state (`PreShow`, `Live`, `PostShow`) and live sub-state controls (`HostTalk`, `ActShow`, `PauseIntermission`)
+
+### **Director Selection UI (NEW)**
+- A dedicated dropdown labeled **“Event Director”**  
+- Shows only director-type controls  
+- Once selected, the director control becomes the primary tab in the controller  
+- Additional controls can then be added from the standard controls list  
+- Director control determines the main event workflow and status  
+
+### **TEMP PILOT**
+- [x] `/admin/talent-show/rehearsal` controller page with schedule navigation  
+- [x] Overall show state (`PreShow`, `Live`, `PostShow`)  
+- [x] Live sub-state controls (`HostTalk`, `ActShow`, `PauseIntermission`)  
+- [x] Connected device registry + role assignment workflow  
+- [x] Display rename support from controller page  
 
 ---
 
-### 📺 2.5.3 Display Page (NEW)
-
+## 📺 **2.5.3 Display Page (NEW)**  
 **Route:** `/display`
 
 - [ ] No login required  
@@ -364,12 +399,15 @@ This system adds:
 - [ ] Assigned to a control by the controller  
 - [ ] Renders that control’s UI  
 - [ ] Supports multiple display roles (host, backstage, performer, audience)  
-- [x] **TEMP PILOT** `/eventconnect` device page with no site chrome that auto-registers and receives a generated pairing code + assignment
-- [x] **TEMP PILOT** Role-specific display behavior for `MainBoard`, `BackstageDirector`, `JudgesVote`, and `AudienceVote`
+
+### **TEMP PILOT**
+- [x] `/display` generic device page with pairing code  
+- [x] Role-specific display behavior for `MainBoard`, `BackstageDirector`, `JudgesVote`, `AudienceVote`  
+- [x] Assignment survives reconnect/refresh by persisted device identity  
 
 ---
 
-### 🔌 2.5.4 SignalR Hub (NEW)
+## 🔌 **2.5.4 SignalR Hub (NEW)**
 
 - [ ] Display registration  
 - [ ] Pairing code generation  
@@ -377,98 +415,100 @@ This system adds:
 - [ ] Route updates to displays assigned to specific controls  
 - [ ] Maintain Live/Test isolation  
 - [ ] Handle reconnects and state restoration  
-- [x] **TEMP PILOT** `TalentShowHub` mapped at `/hubs/talent-show` for device registration, pairing-code assignment, and state messaging during rehearsal
-- [x] **TEMP PILOT** Real-time vote submission and rollup transport for judge/audience scoring (1-5 categories)
+
+### **TEMP PILOT**
+- [x] `TalentShowHub` at `/hubs/talent-show`  
+- [x] Real-time vote submission and rollup transport  
 
 ---
 
-### 🎛️ 2.5.5 Control Types (NEW)
+## 🎛️ **2.5.5 Control Types (UPDATED)**
 
-#### Reusable Controls
+### **Director Controls (NEW)**
+- `TalentShowDirectorControl`  
+- `BingoDirectorControl`  
+- `ElectionDirectorControl`  
 
-- [ ] `SponsorDisplayControl`  
-- [ ] `AgendaControl`  
-- [ ] `NoteTakerControl`  
-- [ ] `SlideshowControl`  
-- [ ] `QRCodeControl`  
-- [ ] `CountdownTimerControl`  
+### **Reusable Controls**
+- `SponsorDisplayControl`  
+- `AgendaControl`  
+- `NoteTakerControl`  
+- `ScheduleControl`  
+- `SlideshowControl`  
+- `QRCodeControl`  
+- `CountdownTimerControl`  
 
-#### Event-Specific Controls
-
-- [ ] `TalentAuditionControl`  
-- [ ] `TalentShowControl`  
-- [ ] `PerformerBackstageControl`  
-- [ ] `HostTeleprompterControl`  
-- [ ] `ActTimerControl`  
-- [ ] `KaraokeVideoControl`  
-- [ ] `BingoControl`  
-- [ ] `ElectionControl`  
+### **Event-Specific Controls**
+- `TalentAuditionControl`  
+- `TalentShowControl`  
+- `PerformerBackstageControl`  
+- `HostTeleprompterControl`  
+- `ActTimerControl`  
+- `KaraokeVideoControl`  
+- `BingoControl`  
+- `ElectionControl`  
 
 ---
 
-### 🎤 2.5.6 Example Event Configurations (NEW)
+## 🎤 **2.5.6 Example Event Configurations (UPDATED)**
 
-#### Muffins With Moms / Donuts With Dad
-
-- Controls: `SponsorDisplayControl`, `AgendaControl`  
-- Displays: Optional sponsor loop  
-
-#### PTA Meeting
-
-- Controls: `AgendaControl`, `NoteTakerControl`, `SlideshowControl`  
-
-#### Talent Show (Main Event)
-
-- Controls:  
+### **Talent Show (Main Event)**
+- **Director:** `TalentShowDirectorControl`  
+- Additional Controls:  
   - `TalentShowControl`  
   - `SponsorDisplayControl`  
   - `HostTeleprompterControl`  
   - `PerformerBackstageControl`  
   - `ActTimerControl`  
   - `KaraokeVideoControl` (optional)  
-- Displays: Main projector, host iPad, backstage iPad, performer iPad, hallway sponsor TV  
 
-#### Talent Show Auditions
+### **Talent Show Auditions**
+- **Director:** `TalentShowDirectorControl` (same director)  
+- Additional Controls:  
+  - `TalentAuditionControl`  
+  - `NoteTakerControl`  
+  - `ScheduleControl`  
 
-- Controls: `TalentAuditionControl`, `NoteTakerControl`, `ScheduleControl`  
+### **Bingo Night**
+- **Director:** `BingoDirectorControl`  
+- Additional Controls:  
+  - `SponsorDisplayControl`  
 
-#### Bingo Night
-
-- Controls: `BingoControl`, `SponsorDisplayControl`  
-
-#### Election Event
-
-- Controls: `ElectionControl`, `AgendaControl`, `NoteTakerControl`  
+### **Election Event**
+- **Director:** `ElectionDirectorControl`  
+- Additional Controls:  
+  - `AgendaControl`  
+  - `NoteTakerControl`  
 
 ---
 
-### 🗓️ 2.5.7 School Year Transition Control (PLANNED)
+## 🗓️ **2.5.7 School Year Transition Control (PLANNED)**
 
 A future `SchoolYearTransitionControl` will support:
 
-- [ ] Election checklist  
-- [ ] Officer transitions  
-- [ ] Budget rollover  
-- [ ] Committee resets  
-- [ ] Event archive  
-- [ ] Volunteer reset  
-- [ ] Sponsor reset  
-- [ ] Calendar reset  
+- Election checklist  
+- Officer transitions  
+- Budget rollover  
+- Committee resets  
+- Event archive  
+- Volunteer reset  
+- Sponsor reset  
+- Calendar reset  
 
 ---
 
-### 🚀 2.5.8 Implementation Order (Recommended)
+## 🚀 **2.5.8 Implementation Order (UPDATED)**
 
-#### Phase A — Core Framework
-
+### **Phase A — Core Framework**
 - [ ] `EventControl` model  
+- [ ] Director control support  
 - [ ] SignalR hub  
 - [ ] Display page  
 - [ ] Controller page  
 - [ ] `SponsorDisplayControl`  
 
-#### Phase B — Talent Show
-
+### **Phase B — Talent Show**
+- [ ] `TalentShowDirectorControl`  
 - [ ] `TalentAuditionControl`  
 - [ ] `TalentShowControl`  
 - [ ] `PerformerBackstageControl`  
@@ -476,14 +516,13 @@ A future `SchoolYearTransitionControl` will support:
 - [ ] `ActTimerControl`  
 - [ ] `KaraokeVideoControl`  
 
-#### Phase C — Elections
-
+### **Phase C — Elections**
+- [ ] `ElectionDirectorControl`  
 - [ ] `ElectionControl`  
 - [ ] `AgendaControl` integration  
 - [ ] `NoteTakerControl` integration  
 
-#### Phase D — School Year Transition
-
+### **Phase D — School Year Transition**
 - [ ] `SchoolYearTransitionControl`  
 - [ ] Data archive/reset tools  
 

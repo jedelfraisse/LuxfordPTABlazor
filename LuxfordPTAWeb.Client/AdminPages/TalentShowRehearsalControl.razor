@@ -219,7 +219,7 @@
                                         <div class="input-group input-group-sm">
                                             <input class="form-control"
                                                    value="@GetEditableDisplayName(device.PairingCode, device.DisplayName)"
-                                                   @onchange="(e) => SetEditableDisplayName(device.PairingCode, e.Value?.ToString())" />
+                                                   @oninput="(e) => SetEditableDisplayName(device.PairingCode, e.Value?.ToString())" />
                                             <button class="btn btn-outline-secondary"
                                                     @onclick="() => UpdateDeviceNameAsync(device.PairingCode)"
                                                     disabled="@(!isConnected)">
