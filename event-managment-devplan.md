@@ -348,6 +348,7 @@ This system adds:
 - [ ] Tabs/subpages for each attached control  
 - [ ] Real-time updates via SignalR  
 - [ ] Control-specific actions (e.g., “Next Performer”, “Call Bingo Number”)  
+- [x] **TEMP PILOT** `/admin/talent-show/rehearsal` controller page with schedule navigation (`Previous` / `Next`) and live push actions for Luxford Got Talent rehearsal
 
 ---
 
@@ -362,6 +363,7 @@ This system adds:
 - [ ] Assigned to a control by the controller  
 - [ ] Renders that control’s UI  
 - [ ] Supports multiple display roles (host, backstage, performer, audience)  
+- [x] **TEMP PILOT** `/display/talent-show/{sessionCode}` presentation page that listens for real-time rehearsal state updates
 
 ---
 
@@ -373,6 +375,7 @@ This system adds:
 - [ ] Route updates to displays assigned to specific controls  
 - [ ] Maintain Live/Test isolation  
 - [ ] Handle reconnects and state restoration  
+- [x] **TEMP PILOT** `TalentShowHub` mapped at `/hubs/talent-show` for join/publish/clear state messaging during rehearsal
 
 ---
 

@@ -1,0 +1,318 @@
+@page "/admin/talent-show/rehearsal"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@using LuxfordPTAWeb.Shared.DTOs
+@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Talent Show Rehearsal Control</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-broadcast"></i> Talent Show Rehearsal Control</h1>
+    <a href="/admin/events" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Events
+    </a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-info">@statusMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Test Show</label>
+                <InputSelect class="form-select" @bind-Value="selectedShowKey">
+                    @foreach (var key in availableShowKeys)
+                    {
+                        <option value="@key">@key</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="LoadShowAsync" disabled="@isBusy">
+                    Load
+                </button>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Session Code</label>
+                <InputText class="form-control" @bind-Value="state.SessionCode" />
+            </div>
+            <div class="col-md-3">
+                <a class="btn btn-outline-success w-100" href="@($"/display/talent-show/{state.SessionCode}")" target="_blank" rel="noopener noreferrer">
+                    Open Display
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (rehearsalPackage != null)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <button class="btn btn-outline-secondary" @onclick="MovePrevious" disabled="@(state.CurrentIndex <= 0 || isBusy)">Previous Act</button>
+                <button class="btn btn-outline-primary" @onclick="MoveNext" disabled="@(state.CurrentIndex >= state.Items.Count - 1 || isBusy)">Next Act</button>
+                <button class="btn btn-success" @onclick="PublishStateAsync" disabled="@(!isConnected || isBusy)">Push Update</button>
+                <button class="btn btn-outline-danger" @onclick="ClearSessionAsync" disabled="@(!isConnected || isBusy)">Clear Session</button>
+                <div class="form-check ms-2">
+                    <InputCheckbox class="form-check-input" @bind-Value="state.IsLiveMode" />
+                    <label class="form-check-label">Live Mode</label>
+                </div>
+            </div>
+            <div class="mt-3">
+                <strong>Connection:</strong> @(isConnected ? "Connected" : "Disconnected")
+                <span class="ms-3"><strong>Updated:</strong> @state.UpdatedAtUtc.ToLocalTime().ToString("g")</span>
+            </div>
+        </div>
+    </div>
+
+    var current = GetCurrentItem();
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Current Presentation</h5>
+        </div>
+        <div class="card-body">
+            @if (current == null)
+            {
+                <em>Select an act to begin.</em>
+            }
+            else
+            {
+                <h4>@current.Order. @current.ActTitle</h4>
+                <p class="mb-1"><strong>Performer:</strong> @current.PerformerName</p>
+                <p class="mb-1"><strong>Category:</strong> @current.Category</p>
+                <p class="mb-0"><strong>Intro:</strong> @current.IntroLine</p>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Schedule</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Act</th>
+                            <th>Performer</th>
+                            <th>Duration</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in state.Items.OrderBy(i => i.Order))
+                        {
+                            var idx = state.Items.FindIndex(i => i.Order == item.Order && i.ActTitle == item.ActTitle && i.PerformerName == item.PerformerName);
+                            <tr class="@(idx == state.CurrentIndex ? "table-primary" : string.Empty)">
+                                <td>@item.Order</td>
+                                <td>@item.ActTitle</td>
+                                <td>@item.PerformerName</td>
+                                <td>@item.DurationMinutes min</td>
+                                <td>
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => SetCurrentIndex(idx)">Go Live</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private HubConnection? hubConnection;
+    private List<string> availableShowKeys = new();
+    private string selectedShowKey = "luxford-got-talent";
+    private TalentShowRehearsalPackage? rehearsalPackage;
+    private TalentShowRealtimeState state = new();
+    private bool isConnected;
+    private bool isBusy;
+    private string errorMessage = string.Empty;
+    private string statusMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadShowKeysAsync();
+        await EnsureHubConnectionAsync();
+        await LoadShowAsync();
+    }
+
+    private async Task LoadShowKeysAsync()
+    {
+        try
+        {
+            availableShowKeys = await Http.GetFromJsonAsync<List<string>>("api/talentshow-test/shows") ?? new();
+            if (!availableShowKeys.Any())
+            {
+                availableShowKeys.Add(selectedShowKey);
+            }
+            else if (!availableShowKeys.Contains(selectedShowKey, StringComparer.OrdinalIgnoreCase))
+            {
+                selectedShowKey = availableShowKeys.First();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Could not load rehearsal files: {ex.Message}";
+        }
+    }
+
+    private async Task LoadShowAsync()
+    {
+        errorMessage = string.Empty;
+        statusMessage = string.Empty;
+        isBusy = true;
+
+        try
+        {
+            rehearsalPackage = await Http.GetFromJsonAsync<TalentShowRehearsalPackage>($"api/talentshow-test/shows/{selectedShowKey}");
+            if (rehearsalPackage == null)
+            {
+                errorMessage = "Selected rehearsal package was empty.";
+                return;
+            }
+
+            state = new TalentShowRealtimeState
+            {
+                ShowName = rehearsalPackage.ShowName,
+                SessionCode = rehearsalPackage.SessionCode,
+                IsLiveMode = false,
+                CurrentIndex = rehearsalPackage.Items.Any() ? 0 : -1,
+                Items = rehearsalPackage.Items.OrderBy(i => i.Order).ToList(),
+                Presentation = rehearsalPackage.Presentation,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+
+            statusMessage = $"Loaded {rehearsalPackage.ShowName}.";
+            await JoinSessionAsync();
+            await PublishStateAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Could not load selected rehearsal package: {ex.Message}";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", incomingState =>
+        {
+            state = incomingState;
+            statusMessage = $"State synced at {incomingState.UpdatedAtUtc.ToLocalTime():T}.";
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On("SessionCleared", () =>
+        {
+            statusMessage = "Session was cleared.";
+            state.CurrentIndex = -1;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isConnected = true;
+    }
+
+    private async Task JoinSessionAsync()
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("JoinSession", state.SessionCode);
+        isConnected = hubConnection.State == HubConnectionState.Connected;
+    }
+
+    private TalentShowScheduleItem? GetCurrentItem()
+    {
+        if (state.CurrentIndex < 0 || state.CurrentIndex >= state.Items.Count)
+        {
+            return null;
+        }
+
+        return state.Items[state.CurrentIndex];
+    }
+
+    private async Task PublishStateAsync()
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        state.UpdatedAtUtc = DateTime.UtcNow;
+        await hubConnection.InvokeAsync("PublishState", state);
+        statusMessage = "Update pushed to displays.";
+    }
+
+    private async Task ClearSessionAsync()
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("ClearSession", state.SessionCode);
+    }
+
+    private void MovePrevious()
+    {
+        if (state.CurrentIndex > 0)
+        {
+            state.CurrentIndex--;
+        }
+    }
+
+    private void MoveNext()
+    {
+        if (state.CurrentIndex < state.Items.Count - 1)
+        {
+            state.CurrentIndex++;
+        }
+    }
+
+    private void SetCurrentIndex(int index)
+    {
+        if (index >= 0 && index < state.Items.Count)
+        {
+            state.CurrentIndex = index;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

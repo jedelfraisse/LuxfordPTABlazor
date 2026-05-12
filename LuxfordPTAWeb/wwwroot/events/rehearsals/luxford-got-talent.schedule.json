@@ -1,0 +1,53 @@
+{
+  "showName": "Luxford Got Talent",
+  "sessionCode": "LGT26",
+  "venue": "Luxford Cafeteria",
+  "showDate": "2026-05-19T18:00:00",
+  "items": [
+    {
+      "order": 1,
+      "performerName": "Maya R.",
+      "actTitle": "Piano Medley",
+      "category": "Instrumental",
+      "durationMinutes": 4,
+      "introLine": "Please welcome Maya with a piano medley.",
+      "outroLine": "Great job, Maya!"
+    },
+    {
+      "order": 2,
+      "performerName": "Team Sparks",
+      "actTitle": "Hip-Hop Crew Routine",
+      "category": "Dance",
+      "durationMinutes": 5,
+      "introLine": "Next up is Team Sparks with a dance routine.",
+      "outroLine": "Let's hear it for Team Sparks!"
+    },
+    {
+      "order": 3,
+      "performerName": "Jonah P.",
+      "actTitle": "Comedy Set",
+      "category": "Comedy",
+      "durationMinutes": 3,
+      "introLine": "Please welcome Jonah to the stage for comedy.",
+      "outroLine": "Thanks, Jonah!"
+    },
+    {
+      "order": 4,
+      "performerName": "Ava L. & Noah K.",
+      "actTitle": "Duet: A Million Dreams",
+      "category": "Vocal",
+      "durationMinutes": 4,
+      "introLine": "Now performing, Ava and Noah with a duet.",
+      "outroLine": "Beautiful performance!"
+    },
+    {
+      "order": 5,
+      "performerName": "Dragon Crew",
+      "actTitle": "Finale Mashup",
+      "category": "Group",
+      "durationMinutes": 6,
+      "introLine": "Closing tonight's show: Dragon Crew!",
+      "outroLine": "That wraps Luxford Got Talent. Thank you!"
+    }
+  ]
+}

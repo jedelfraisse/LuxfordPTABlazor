@@ -3,6 +3,7 @@ using LuxfordPTAWeb.Client.Services;
 using LuxfordPTAWeb.Components;
 using LuxfordPTAWeb.Components.Account;
 using LuxfordPTAWeb.Data;
+using LuxfordPTAWeb.Hubs;
 using LuxfordPTAWeb.Shared.Configuration;
 using LuxfordPTAWeb.Shared.Models;
 using LuxfordPTAWeb.Shared.Services;
@@ -162,6 +163,7 @@ public class Program
 		// Register backup services
 		builder.Services.AddScoped<LuxfordPTAWeb.Services.IDatabaseBackupService, LuxfordPTAWeb.Services.DatabaseBackupService>();
 		builder.Services.AddHostedService<LuxfordPTAWeb.Services.ScheduledBackupService>();
+		builder.Services.AddSignalR();
 
 		builder.Services.AddCors(options =>
 		{
@@ -373,6 +375,7 @@ public class Program
 
 	// Map controller endpoints
 	app.MapControllers();
+	app.MapHub<TalentShowHub>("/hubs/talent-show");
 		app.MapAdditionalIdentityEndpoints();
 
 		await app.RunAsync();

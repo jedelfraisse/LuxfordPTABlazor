@@ -1,0 +1,202 @@
+@page "/display/talent-show"
+@page "/display/talent-show/{SessionCode}"
+@using LuxfordPTAWeb.Shared.DTOs
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Talent Show Display</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0"><i class="bi bi-easel"></i> Talent Show Display</h2>
+        <span class="badge @(isConnected ? "bg-success" : "bg-secondary")">
+            @(isConnected ? "Connected" : "Disconnected")
+        </span>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label">Session Code</label>
+                    <InputText class="form-control" @bind-Value="sessionCodeInput" placeholder="Enter code (e.g., LGT26)" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" @onclick="JoinSessionAsync">Join Session</button>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-secondary w-100" @onclick="RefreshFromHubAsync">Refresh State</button>
+                </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(statusMessage))
+            {
+                <div class="text-muted mt-2">@statusMessage</div>
+            }
+        </div>
+    </div>
+
+    @if (state?.Items?.Any() == true)
+    {
+        var current = GetCurrentItem();
+        var next = GetNextItem();
+        <div class="card mb-3 @state.Presentation.ThemeClass">
+            <div class="card-body">
+                <h3 class="mb-2">@state.ShowName</h3>
+                <p class="mb-1">@state.Presentation.WelcomeMessage</p>
+                @if (current == null)
+                {
+                    <div class="alert alert-warning mb-0">Waiting for the controller to start the show.</div>
+                }
+                else
+                {
+                    <div class="mt-3">
+                        <h1 class="display-5 mb-1">Now Performing: @current.ActTitle</h1>
+                        <h4 class="mb-1">@current.PerformerName</h4>
+                        <p class="mb-0">@current.IntroLine</p>
+                    </div>
+                    @if (next != null)
+                    {
+                        <div class="mt-3">
+                            <strong>Up Next:</strong> @next.ActTitle (@next.PerformerName)
+                        </div>
+                    }
+                }
+                <hr />
+                <small>@state.Presentation.FooterMessage</small>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Running Order</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Act</th>
+                                <th>Performer</th>
+                                <th>Minutes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < state.Items.Count; i++)
+                            {
+                                var item = state.Items[i];
+                                <tr class="@(i == state.CurrentIndex ? "table-primary" : string.Empty)">
+                                    <td>@item.Order</td>
+                                    <td>@item.ActTitle</td>
+                                    <td>@item.PerformerName</td>
+                                    <td>@item.DurationMinutes</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">Waiting for controller updates...</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? SessionCode { get; set; }
+
+    private HubConnection? hubConnection;
+    private TalentShowRealtimeState state = new();
+    private string sessionCodeInput = string.Empty;
+    private bool isConnected;
+    private string statusMessage = "Enter a session code and join.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        sessionCodeInput = SessionCode ?? string.Empty;
+        await EnsureHubConnectionAsync();
+
+        if (!string.IsNullOrWhiteSpace(sessionCodeInput))
+        {
+            await JoinSessionAsync();
+        }
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", incomingState =>
+        {
+            state = incomingState;
+            statusMessage = $"Connected to {incomingState.SessionCode} • Updated {incomingState.UpdatedAtUtc.ToLocalTime():T}";
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On("SessionCleared", () =>
+        {
+            state = new TalentShowRealtimeState();
+            statusMessage = "Session was cleared by controller.";
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isConnected = true;
+    }
+
+    private async Task JoinSessionAsync()
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(sessionCodeInput))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("JoinSession", sessionCodeInput);
+        statusMessage = $"Joined session {sessionCodeInput.ToUpperInvariant()}. Waiting for state...";
+    }
+
+    private async Task RefreshFromHubAsync()
+    {
+        await JoinSessionAsync();
+    }
+
+    private TalentShowScheduleItem? GetCurrentItem()
+    {
+        if (state.CurrentIndex < 0 || state.CurrentIndex >= state.Items.Count)
+        {
+            return null;
+        }
+
+        return state.Items[state.CurrentIndex];
+    }
+
+    private TalentShowScheduleItem? GetNextItem()
+    {
+        var nextIndex = state.CurrentIndex + 1;
+        if (nextIndex < 0 || nextIndex >= state.Items.Count)
+        {
+            return null;
+        }
+
+        return state.Items[nextIndex];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
