@@ -361,8 +361,8 @@ These are separate from functional controls such as `TalentShowControl`, `BingoC
 
 ---
 
-## 🖥️ **2.5.2 Controller Page (NEW)**  
-**Route:** `/events/{slug}/control`
+## 🖥️ **2.5.2 Admin Event Controls Tab (NEW)**  
+**Route:** `/admin/events/edit/{eventId}?tab=controls`
 
 ### **Core Features**
 - [ ] Password-protected (Admin/Board/Coordinator)  

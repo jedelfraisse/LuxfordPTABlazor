@@ -4,6 +4,7 @@ using LuxfordPTAWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxfordPTAWeb.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260512165007_AddEventControls")]
+    partial class AddEventControls
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -359,9 +362,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Property<string>("FlyerUrl")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FlyerUrlsJson")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -587,17 +587,6 @@ namespace LuxfordPTAWeb.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDirector")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("NotesHtml")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("NotesMarkdown")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("PublicInformation")
                         .HasColumnType("bit");
 
                     b.Property<int>("SequenceOrder")

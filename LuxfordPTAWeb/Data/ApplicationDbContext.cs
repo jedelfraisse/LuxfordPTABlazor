@@ -17,6 +17,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<SponsorAssignment> SponsorAssignments { get; set; }
 	public DbSet<EventCatSub> EventCatSubs { get; set; }
 	public DbSet<EventTemplate> EventTemplates { get; set; }
+	public DbSet<EventControl> EventControls { get; set; }
 	public DbSet<ProgramCard> ProgramCards { get; set; }
 
 	// Summit Proposal: Bug Reports
@@ -86,6 +87,29 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.WithMany(e => e.EventDays)
 			.HasForeignKey(ed => ed.EventId)
 			.OnDelete(DeleteBehavior.Cascade);
+
+		// Event controls relationship configuration
+		builder.Entity<EventControl>()
+			.HasOne(ec => ec.Event)
+			.WithMany(e => e.EventControls)
+			.HasForeignKey(ec => ec.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<EventControl>()
+			.Property(ec => ec.ControlType)
+			.HasMaxLength(100);
+
+		builder.Entity<EventControl>()
+			.Property(ec => ec.DisplayName)
+			.HasMaxLength(120);
+
+		builder.Entity<EventControl>()
+			.HasIndex(ec => new { ec.EventId, ec.IsDirector })
+			.HasFilter("[IsDirector] = 1")
+			.IsUnique();
+
+		builder.Entity<EventControl>()
+			.HasIndex(ec => new { ec.EventId, ec.SequenceOrder });
 
 		// Event Status enum configuration
 		builder.Entity<Event>()

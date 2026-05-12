@@ -37,6 +37,9 @@ public class EventsController : ControllerBase
         _webHostEnvironment = webHostEnvironment;
     }
 
+    private static string? NormalizeCoordinatorId(string? coordinatorId)
+        => string.IsNullOrWhiteSpace(coordinatorId) ? null : coordinatorId.Trim();
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Event>>> Get()
     {
@@ -48,6 +51,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
                 .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .Where(e => e.Status == EventStatus.Active)
                 .ToListAsync();
 
@@ -71,6 +75,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
                 .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .Include(e => e.SourceEvent)
                 .Include(e => e.CopiedEvents)
                 .FirstOrDefaultAsync(e => e.Id == id);
@@ -110,6 +115,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
                 .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .Include(e => e.SourceEvent)
                 .Include(e => e.CopiedEvents)
                 .Where(e => e.Slug == slug);
@@ -278,6 +284,8 @@ public class EventsController : ControllerBase
                 }
             }
 
+            createEventDto.EventCoordinatorId = NormalizeCoordinatorId(createEventDto.EventCoordinatorId);
+
             // NEW: Validate coordinator assignment based on category requirements
             var (coordinatorValid, coordinatorError) = await _eventPermissionService
                 .ValidateCoordinatorAssignmentAsync(createEventDto.EventCatId, createEventDto.EventCoordinatorId);
@@ -301,6 +309,8 @@ public class EventsController : ControllerBase
             {
                 return BadRequest("Volunteer signup start must be before the signup end.");
             }
+
+            createEventDto.EventCoordinatorId = NormalizeCoordinatorId(createEventDto.EventCoordinatorId);
 
             // Create Event from DTO
             var eventItem = new Event
@@ -334,7 +344,8 @@ public class EventsController : ControllerBase
                 SchoolYearId = createEventDto.SchoolYearId,
                 EventCatId = createEventDto.EventCatId,
                 EventSubTypeId = createEventDto.EventSubTypeId,
-                FlyerUrl = createEventDto.FlyerUrl
+                FlyerUrl = createEventDto.FlyerUrl,
+                FlyerUrlsJson = createEventDto.FlyerUrlsJson
             };
 
             // Generate slug if not provided
@@ -369,12 +380,36 @@ public class EventsController : ControllerBase
             _db.Events.Add(eventItem);
             await _db.SaveChangesAsync();
 
+            var normalizedControls = NormalizeControls(createEventDto.Controls);
+            if (normalizedControls.Any())
+            {
+                foreach (var controlDto in normalizedControls)
+                {
+                    _db.EventControls.Add(new EventControl
+                    {
+                        EventId = eventItem.Id,
+                        ControlType = controlDto.ControlType,
+                        IsDirector = controlDto.IsDirector,
+                        PublicInformation = controlDto.PublicInformation,
+                        SettingsJson = controlDto.SettingsJson,
+                        DisplayName = controlDto.DisplayName,
+                        NotesMarkdown = controlDto.NotesMarkdown,
+                        NotesHtml = controlDto.NotesHtml,
+                        SequenceOrder = controlDto.SequenceOrder,
+                        IsActive = controlDto.IsActive
+                    });
+                }
+
+                await _db.SaveChangesAsync();
+            }
+
             // Load navigation properties for return
             await _db.Entry(eventItem).Reference(e => e.EventCat).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.EventCatSub).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.SchoolYear).LoadAsync();
             await _db.Entry(eventItem).Reference(e => e.EventCoordinator).LoadAsync();
             await _db.Entry(eventItem).Collection(e => e.EventDays).LoadAsync();
+            await _db.Entry(eventItem).Collection(e => e.EventControls).LoadAsync();
 
             _logger.LogInformation("Event created: {EventId} - {EventTitle} by user {UserId}", 
                 eventItem.Id, eventItem.Title, currentUser?.Id ?? "System");
@@ -398,6 +433,7 @@ public class EventsController : ControllerBase
             
             var sourceEvent = await _db.Events
                 .Include(e => e.EventDays)
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .Include(e => e.EventCat)
                 .Include(e => e.EventCatSub)
                 .Include(e => e.SchoolYear)
@@ -414,6 +450,8 @@ public class EventsController : ControllerBase
                 return BadRequest("Target school year not found");
             }
 
+            var normalizedCoordinatorId = NormalizeCoordinatorId(request.NewCoordinatorId);
+
             // Create new event based on source
             var newEvent = new Event
             {
@@ -423,7 +461,7 @@ public class EventsController : ControllerBase
                 Location = sourceEvent.Location,
                 ImageUrl = sourceEvent.ImageUrl,
                 Link = sourceEvent.Link,
-                EventCoordinatorId = request.NewCoordinatorId ?? sourceEvent.EventCoordinatorId,
+                EventCoordinatorId = normalizedCoordinatorId ?? sourceEvent.EventCoordinatorId,
                 Status = EventStatus.Planning, // New events start in planning
                 EventStartTime = UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.EventStartTime),
                 EventEndTime = UpdateDateKeepTime(request.NewStartDate ?? sourceEvent.Date.AddYears(1), sourceEvent.EventEndTime),
@@ -455,7 +493,8 @@ public class EventsController : ControllerBase
                 CopyGeneration = sourceEvent.CopyGeneration + 1,
                 MoreDetailsMarkdown = sourceEvent.MoreDetailsMarkdown,
                 MoreDetailsHtml = sourceEvent.MoreDetailsHtml,
-                FlyerUrl = sourceEvent.FlyerUrl
+                FlyerUrl = sourceEvent.FlyerUrl,
+                FlyerUrlsJson = sourceEvent.FlyerUrlsJson
             };
 
             // Ensure slug is unique
@@ -475,6 +514,28 @@ public class EventsController : ControllerBase
 
             _db.Events.Add(newEvent);
             await _db.SaveChangesAsync();
+
+            if (sourceEvent.EventControls.Any())
+            {
+                foreach (var sourceControl in sourceEvent.EventControls.OrderBy(c => c.SequenceOrder))
+                {
+                    _db.EventControls.Add(new EventControl
+                    {
+                        EventId = newEvent.Id,
+                        ControlType = sourceControl.ControlType,
+                        IsDirector = sourceControl.IsDirector,
+                        PublicInformation = sourceControl.PublicInformation,
+                        SettingsJson = sourceControl.SettingsJson,
+                        DisplayName = sourceControl.DisplayName,
+                        NotesMarkdown = sourceControl.NotesMarkdown,
+                        NotesHtml = sourceControl.NotesHtml,
+                        SequenceOrder = sourceControl.SequenceOrder,
+                        IsActive = sourceControl.IsActive
+                    });
+                }
+
+                await _db.SaveChangesAsync();
+            }
 
             // Copy event days if requested and source event has days
             if (sourceEvent.EventDays.Any() && request.CopyEventDays)
@@ -512,6 +573,7 @@ public class EventsController : ControllerBase
             await _db.Entry(newEvent).Reference(e => e.SchoolYear).LoadAsync();
             await _db.Entry(newEvent).Reference(e => e.EventCoordinator).LoadAsync();
             await _db.Entry(newEvent).Collection(e => e.EventDays).LoadAsync();
+            await _db.Entry(newEvent).Collection(e => e.EventControls).LoadAsync();
 
             _logger.LogInformation("Event copied: Source {SourceEventId} → New {NewEventId} by user {UserId}", 
                 sourceEvent.Id, newEvent.Id, currentUser?.Id ?? "System");
@@ -565,6 +627,7 @@ public class EventsController : ControllerBase
         {
             var eventItem = await _db.Events
                 .Include(e => e.EventCoordinator)
+                .Include(e => e.EventControls)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (eventItem == null)
@@ -587,6 +650,8 @@ public class EventsController : ControllerBase
             {
                 return BadRequest("Volunteer signup start must be before the signup end.");
             }
+
+            updatedEventDto.EventCoordinatorId = NormalizeCoordinatorId(updatedEventDto.EventCoordinatorId);
 
             // Validate coordinator assignment (only admins/board members can change coordinator)
             if (!string.IsNullOrEmpty(updatedEventDto.EventCoordinatorId) && updatedEventDto.EventCoordinatorId != eventItem.EventCoordinatorId)
@@ -639,6 +704,31 @@ public class EventsController : ControllerBase
             eventItem.EventSubTypeId = updatedEventDto.EventSubTypeId;
             eventItem.ExcelImportId = updatedEventDto.ExcelImportId;
             eventItem.FlyerUrl = updatedEventDto.FlyerUrl;
+            eventItem.FlyerUrlsJson = updatedEventDto.FlyerUrlsJson;
+
+            var normalizedControls = NormalizeControls(updatedEventDto.Controls);
+            var existingControls = eventItem.EventControls.ToList();
+            if (existingControls.Any())
+            {
+                _db.EventControls.RemoveRange(existingControls);
+            }
+
+            foreach (var controlDto in normalizedControls)
+            {
+                _db.EventControls.Add(new EventControl
+                {
+                    EventId = eventItem.Id,
+                    ControlType = controlDto.ControlType,
+                    IsDirector = controlDto.IsDirector,
+                    PublicInformation = controlDto.PublicInformation,
+                    SettingsJson = controlDto.SettingsJson,
+                    DisplayName = controlDto.DisplayName,
+                    NotesMarkdown = controlDto.NotesMarkdown,
+                    NotesHtml = controlDto.NotesHtml,
+                    SequenceOrder = controlDto.SequenceOrder,
+                    IsActive = controlDto.IsActive
+                });
+            }
             
             // Update slug if title changed
             if (eventItem.Title != updatedEventDto.Title && !string.IsNullOrEmpty(updatedEventDto.Title))
@@ -895,6 +985,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
                 .Include(e => e.EventDays)
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .AsQueryable();
 
             // Filter by school year if provided
@@ -958,6 +1049,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.SchoolYear)
                 .Include(e => e.EventCoordinator)
                 .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
+                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
                 .Where(e => e.SchoolYearId == schoolYearId && e.Status == EventStatus.Active)
                 .OrderBy(e => e.Date)
                 .ToListAsync();
@@ -969,6 +1061,54 @@ public class EventsController : ControllerBase
             _logger.LogError(ex, "Error getting events for school year {SchoolYearId}", schoolYearId);
             return BadRequest(new { Error = ex.Message });
         }
+    }
+
+    private static List<EventControlDTO> NormalizeControls(IEnumerable<EventControlDTO>? controls)
+    {
+        if (controls == null)
+        {
+            return [];
+        }
+
+        var normalized = controls
+            .Where(c => !string.IsNullOrWhiteSpace(c.ControlType))
+                .Select(c => new EventControlDTO
+                {
+                    Id = c.Id,
+                    ControlType = c.ControlType.Trim(),
+                    IsDirector = c.IsDirector,
+                    PublicInformation = c.PublicInformation,
+                    SettingsJson = string.IsNullOrWhiteSpace(c.SettingsJson) ? "{}" : c.SettingsJson.Trim(),
+                    DisplayName = string.IsNullOrWhiteSpace(c.DisplayName) ? c.ControlType.Trim() : c.DisplayName.Trim(),
+                    NotesMarkdown = string.IsNullOrWhiteSpace(c.NotesMarkdown) ? string.Empty : c.NotesMarkdown.Trim(),
+                    NotesHtml = string.IsNullOrWhiteSpace(c.NotesHtml)
+                        ? string.IsNullOrWhiteSpace(c.NotesMarkdown)
+                            ? string.Empty
+                            : Markdig.Markdown.ToHtml(c.NotesMarkdown.Trim(), new MarkdownPipelineBuilder().DisableHtml().Build())
+                        : c.NotesHtml.Trim(),
+                    SequenceOrder = c.SequenceOrder,
+                    IsActive = c.IsActive
+                })
+            .OrderBy(c => c.SequenceOrder)
+            .ToList();
+
+        var hasDirector = false;
+        for (var i = 0; i < normalized.Count; i++)
+        {
+            if (normalized[i].IsDirector)
+            {
+                if (hasDirector)
+                {
+                    normalized[i].IsDirector = false;
+                }
+
+                hasDirector = true;
+            }
+
+            normalized[i].SequenceOrder = i + 1;
+        }
+
+        return normalized;
     }
 
     private DateTime UpdateDateKeepTime(DateTime newDate, DateTime originalDateTime)

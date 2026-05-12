@@ -1,0 +1,117 @@
+@page "/admin/eventcontrols/{controlName}/{eventId:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>@(eventItem?.Title ?? "Event Control")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info"><em>Loading control...</em></div>
+}
+else if (eventItem == null)
+{
+    <div class="alert alert-warning"><em>Event not found.</em></div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-0">@GetTitle()</h1>
+            <div class="text-muted">@GetSubtitle()</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/events/edit/{eventItem.Id}?tab=controls")">Back to Event Controls</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            @if (normalizedControlName == "talent-show")
+            {
+                <TalentShowRehearsalControl Embedded="true"
+                                           PreferredShowKey="@eventItem.Slug"
+                                           SessionCodeOverride="@BuildTalentShowSessionCode(eventItem)" />
+            }
+            else if (normalizedControlName == "bingo")
+            {
+                <p>Bingo control workspace is coming next.</p>
+            }
+            else if (normalizedControlName == "election")
+            {
+                <p>Election control workspace is coming next.</p>
+            }
+            else
+            {
+                <p>No generic workspace is defined for this control yet.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string ControlName { get; set; } = string.Empty;
+    [Parameter] public int EventId { get; set; }
+
+    private Event? eventItem;
+    private bool isLoading = true;
+    private string normalizedControlName = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        normalizedControlName = (ControlName ?? string.Empty).Trim().ToLowerInvariant();
+        try
+        {
+            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/{EventId}");
+        }
+        catch
+        {
+            eventItem = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetTitle()
+    {
+        return normalizedControlName switch
+        {
+            "talent-show" => $"{eventItem?.Title} Talent Show Director",
+            "bingo" => $"{eventItem?.Title} Bingo Control",
+            "election" => $"{eventItem?.Title} Election Control",
+            _ => $"{eventItem?.Title} Control"
+        };
+    }
+
+    private string GetSubtitle()
+    {
+        return normalizedControlName switch
+        {
+            "talent-show" => "Event-scoped director workspace",
+            "bingo" => "Generic event control workspace",
+            "election" => "Generic event control workspace",
+            _ => "Generic event control workspace"
+        };
+    }
+
+    private static string BuildTalentShowSessionCode(Event eventItem)
+    {
+        if (string.IsNullOrWhiteSpace(eventItem.Slug))
+        {
+            return $"TALENT{eventItem.Id}";
+        }
+
+        var compact = new string(eventItem.Slug.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        if (compact.Length > 12)
+        {
+            compact = compact[..12];
+        }
+
+        return string.IsNullOrWhiteSpace(compact)
+            ? $"TALENT{eventItem.Id}"
+            : $"{compact}{eventItem.Id}";
+    }
+}

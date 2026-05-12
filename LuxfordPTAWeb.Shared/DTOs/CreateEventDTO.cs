@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using LuxfordPTAWeb.Shared.Enums;
 
@@ -20,6 +21,7 @@ public class CreateEventDTO
     public string MoreDetailsMarkdown { get; set; } = string.Empty;
     public string MoreDetailsHtml { get; set; } = string.Empty;
     public string? FlyerUrl { get; set; }
+    public string? FlyerUrlsJson { get; set; }
 
     public string Location { get; set; } = string.Empty;
 
@@ -82,4 +84,7 @@ public class CreateEventDTO
 
     // Event Sub-type (Optional)
     public int? EventSubTypeId { get; set; }
+
+    // Event controls
+    public List<EventControlDTO> Controls { get; set; } = [];
 }

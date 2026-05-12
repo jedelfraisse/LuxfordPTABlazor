@@ -1,7 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using LuxfordPTAWeb.Shared.Enums;
 using LuxfordPTAWeb.Shared.Interfaces;
+using System.Text.Json;
 
 namespace LuxfordPTAWeb.Shared.Models;
 
@@ -88,6 +90,7 @@ public class Event : IAuditableEntity
 	
 	// NEW: Events copied from this event
 	public ICollection<Event> CopiedEvents { get; set; } = new List<Event>();
+	public ICollection<EventControl> EventControls { get; set; } = new List<EventControl>();
 
 	// Duration helpers (these ARE useful and used)
 	public TimeSpan? EventDuration => EventEndTime != default && EventStartTime != default
@@ -133,4 +136,38 @@ public class Event : IAuditableEntity
 	public string MoreDetailsMarkdown { get; set; } = string.Empty;
 	public string MoreDetailsHtml { get; set; } = string.Empty;
 	public string? FlyerUrl { get; set; }
+	public string? FlyerUrlsJson { get; set; }
+
+	[NotMapped]
+	public IReadOnlyList<string> FlyerUrls => ParseFlyerUrls();
+
+	private IReadOnlyList<string> ParseFlyerUrls()
+	{
+		var flyers = new List<string>();
+
+		if (!string.IsNullOrWhiteSpace(FlyerUrl))
+		{
+			flyers.Add(FlyerUrl.Trim());
+		}
+
+		if (!string.IsNullOrWhiteSpace(FlyerUrlsJson))
+		{
+			try
+			{
+				var extraFlyers = JsonSerializer.Deserialize<List<string>>(FlyerUrlsJson);
+				if (extraFlyers != null)
+				{
+					flyers.AddRange(extraFlyers.Where(url => !string.IsNullOrWhiteSpace(url)).Select(url => url.Trim()));
+				}
+			}
+			catch (JsonException)
+			{
+			}
+		}
+
+		return flyers
+			.Where(url => !string.IsNullOrWhiteSpace(url))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
 }

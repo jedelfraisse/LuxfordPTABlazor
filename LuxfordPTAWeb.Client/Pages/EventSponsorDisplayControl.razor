@@ -1,0 +1,286 @@
+@page "/events/{slug}/control/sponsors"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@using System.Text.Json
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>@(eventItem?.Title ?? "Sponsor Display Control")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info"><em>Loading sponsor display control...</em></div>
+}
+else if (eventItem == null || sponsorControl == null)
+{
+    <div class="alert alert-warning"><em>Sponsor display control not found.</em></div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-0"><i class="bi bi-award"></i> @eventItem.Title Sponsors</h1>
+            <div class="text-muted">Configure which sponsors appear for this event control.</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/events/edit/{eventItem.Id}?tab=controls")">Back to Event Controls</a>
+            <a class="btn btn-outline-primary btn-sm" href="/admin/sponsors">Manage Sponsors</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="alert alert-info">@message</div>
+    }
+
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Available Sponsors</strong>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="SaveControlAsync">Save Selection</button>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="publicInfo" @bind="sponsorControl.PublicInformation" />
+                        <label class="form-check-label" for="publicInfo">Public information</label>
+                    </div>
+
+                    @if (sponsors == null)
+                    {
+                        <div class="text-muted">Loading sponsors...</div>
+                    }
+                    else if (!sponsors.Any())
+                    {
+                        <div class="text-muted">No sponsors available yet.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group mb-3">
+                            @foreach (var sponsor in sponsors)
+                            {
+                                <label class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>
+                                        <input class="form-check-input me-2" type="checkbox" checked="@selectedSponsorIds.Contains(sponsor.Id)" @onchange="e => ToggleSponsorSelection(sponsor.Id, e)" />
+                                        @sponsor.Name
+                                    </span>
+                                    <small class="text-muted">@sponsor.WebsiteUrl</small>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5 mb-4">
+            <div class="card mb-3">
+                <div class="card-header"><strong>Selected Sponsors</strong></div>
+                <div class="card-body">
+                    @if (!selectedSponsorModels.Any())
+                    {
+                        <div class="text-muted">No sponsors selected.</div>
+                    }
+                    else
+                    {
+                        @foreach (var sponsor in selectedSponsorModels)
+                        {
+                            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                                <div>
+                                    <div><strong>@sponsor.Name</strong></div>
+                                    <div class="text-muted small">@sponsor.WebsiteUrl</div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><strong>Add Sponsor</strong></div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <input class="form-control" placeholder="Sponsor name" @bind="newSponsor.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <input class="form-control" placeholder="Logo URL" @bind="newSponsor.LogoUrl" />
+                    </div>
+                    <div class="mb-2">
+                        <input class="form-control" placeholder="Website URL" @bind="newSponsor.WebsiteUrl" />
+                    </div>
+                    <button class="btn btn-outline-primary" @onclick="AddSponsorAsync">Add and Select</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Event? eventItem;
+    private EventControl? sponsorControl;
+    private List<Sponsor>? sponsors;
+    private HashSet<int> selectedSponsorIds = new();
+    private List<Sponsor> selectedSponsorModels = new();
+    private Sponsor newSponsor = new();
+    private bool isLoading = true;
+    private string message = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/by-slug/{Slug}");
+            sponsorControl = eventItem?.EventControls?
+                .Where(c => c.IsActive && c.ControlType == "SponsorDisplayControl")
+                .OrderBy(c => c.SequenceOrder)
+                .FirstOrDefault();
+
+            sponsors = await Http.GetFromJsonAsync<List<Sponsor>>("api/sponsors") ?? new List<Sponsor>();
+            LoadSelectionFromControl();
+        }
+        catch
+        {
+            eventItem = null;
+            sponsorControl = null;
+            sponsors = new List<Sponsor>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadSelectionFromControl()
+    {
+        selectedSponsorIds.Clear();
+
+        if (sponsorControl == null || string.IsNullOrWhiteSpace(sponsorControl.SettingsJson))
+        {
+            UpdateSelectedSponsorModels();
+            return;
+        }
+
+        try
+        {
+            var settings = JsonSerializer.Deserialize<SponsorDisplaySettings>(sponsorControl.SettingsJson);
+            if (settings?.SponsorIds != null)
+            {
+                selectedSponsorIds = settings.SponsorIds.Where(id => id > 0).ToHashSet();
+            }
+        }
+        catch
+        {
+            selectedSponsorIds = new HashSet<int>();
+        }
+
+        UpdateSelectedSponsorModels();
+    }
+
+    private void ToggleSponsorSelection(int sponsorId, ChangeEventArgs e)
+    {
+        if ((bool?)e.Value == true)
+        {
+            selectedSponsorIds.Add(sponsorId);
+        }
+        else
+        {
+            selectedSponsorIds.Remove(sponsorId);
+        }
+
+        UpdateSelectedSponsorModels();
+    }
+
+    private void UpdateSelectedSponsorModels()
+    {
+        if (sponsors == null)
+        {
+            selectedSponsorModels = new List<Sponsor>();
+            return;
+        }
+
+        selectedSponsorModels = sponsors
+            .Where(s => selectedSponsorIds.Contains(s.Id))
+            .OrderBy(s => s.Name)
+            .ToList();
+    }
+
+    private async Task AddSponsorAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newSponsor.Name))
+        {
+            message = "Sponsor name is required.";
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/sponsors", newSponsor);
+        if (!response.IsSuccessStatusCode)
+        {
+            message = await response.Content.ReadAsStringAsync();
+            return;
+        }
+
+        var createdSponsor = await response.Content.ReadFromJsonAsync<Sponsor>();
+        if (createdSponsor != null)
+        {
+            selectedSponsorIds.Add(createdSponsor.Id);
+        }
+
+        newSponsor = new Sponsor();
+        await ReloadSponsorsAsync();
+        message = "Sponsor added and selected.";
+    }
+
+    private async Task SaveControlAsync()
+    {
+        if (sponsorControl == null)
+        {
+            return;
+        }
+
+        sponsorControl.SettingsJson = JsonSerializer.Serialize(new SponsorDisplaySettings
+        {
+            SponsorIds = selectedSponsorIds.OrderBy(id => id).ToList()
+        });
+
+        var response = await Http.PutAsJsonAsync($"api/eventcontrols/{sponsorControl.Id}", BuildControlDto());
+        if (!response.IsSuccessStatusCode)
+        {
+            message = await response.Content.ReadAsStringAsync();
+            return;
+        }
+
+        message = "Sponsor selection saved.";
+        await ReloadSponsorsAsync();
+    }
+
+    private async Task ReloadSponsorsAsync()
+    {
+        sponsors = await Http.GetFromJsonAsync<List<Sponsor>>("api/sponsors") ?? new List<Sponsor>();
+        UpdateSelectedSponsorModels();
+    }
+
+    private EventControlDTO BuildControlDto()
+    {
+        return new EventControlDTO
+        {
+            Id = sponsorControl?.Id ?? 0,
+            ControlType = sponsorControl?.ControlType ?? string.Empty,
+            IsDirector = sponsorControl?.IsDirector ?? false,
+            PublicInformation = sponsorControl?.PublicInformation ?? false,
+            SettingsJson = sponsorControl?.SettingsJson ?? "{}",
+            DisplayName = sponsorControl?.DisplayName ?? string.Empty,
+            NotesMarkdown = sponsorControl?.NotesMarkdown ?? string.Empty,
+            NotesHtml = sponsorControl?.NotesHtml ?? string.Empty,
+            SequenceOrder = sponsorControl?.SequenceOrder ?? 0,
+            IsActive = sponsorControl?.IsActive ?? true
+        };
+    }
+
+    private class SponsorDisplaySettings
+    {
+        public List<int> SponsorIds { get; set; } = new();
+    }
+}

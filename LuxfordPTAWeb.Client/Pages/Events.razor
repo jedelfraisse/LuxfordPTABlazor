@@ -57,9 +57,9 @@
                             <h6 class="card-title">@evt.Title</h6>
                             <p class="text-muted mb-2">
                                 <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
-                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(evt)))
+                                @if (!string.IsNullOrWhiteSpace(GetEventTimeText(evt)))
                                 {
-                                    <span class="ms-1"><i class="bi bi-clock"></i> @GetSingleDayTimeText(evt)</span>
+                                    <span class="ms-1"><i class="bi bi-clock"></i> @GetEventTimeText(evt)</span>
                                 }
                                 @if(evt.Date.Date == DateTime.Now.Date){<span class="badge bg-warning ms-2">Tonight!</span>}
                             </p>
@@ -101,14 +101,14 @@
                             }
                             @if (HasDetailsOrFlyer(evt))
                             {
-                                <div class="mt-2">
-                                    @if (IsFlyerOnly(evt))
+                                <div class="mt-2 d-flex gap-2 flex-wrap">
+                                    @if (GetFlyerUrls(evt).Any())
                                     {
-                                        <a class="btn btn-sm btn-outline-primary" href="@evt.FlyerUrl" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                        <a class="btn btn-sm btn-outline-primary" href="@GetPrimaryFlyerUrl(evt)" target="_blank" rel="noopener noreferrer">View Flyer</a>
                                     }
-                                    else
+                                    @if (HasEventDetails(evt))
                                     {
-                                        <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">More Details</a>
+                                        <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">View Details</a>
                                     }
                                 </div>
                             }
@@ -184,10 +184,10 @@ else
                                             <br>
                                             <span class="text-muted">
                                                 <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
-                                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextEvent)))
-                                                {
-                                                    <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextEvent)
-                                                }
+                                        @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextEvent)))
+                                        {
+                                                    <br><i class="bi bi-clock"></i> @GetEventTimeText(nextEvent)
+                                        }
                                                 @if (nextEvent.RequiresVolunteers)
                                                 {
                                                     <br><i class="bi bi-people"></i>
@@ -215,14 +215,14 @@ else
                                         }
                                         @if (HasDetailsOrFlyer(nextEvent))
                                         {
-                                            <div class="mt-2">
-                                                @if (IsFlyerOnly(nextEvent))
+                                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                @if (GetFlyerUrls(nextEvent).Any())
                                                 {
-                                                    <a href="@nextEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                    <a href="@GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
                                                 }
-                                                else
+                                                @if (HasEventDetails(nextEvent))
                                                 {
-                                                    <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                    <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
                                                 }
                                             </div>
                                         }
@@ -252,9 +252,9 @@ else
                                             <br>
                                             <span class="text-muted">
                                                 <i class="bi bi-calendar"></i> @nextGeneralEvent.Date.ToString("MMM d, yyyy")
-                                                @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextGeneralEvent)))
+                                                @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextGeneralEvent)))
                                                 {
-                                                    <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextGeneralEvent)
+                                                    <br><i class="bi bi-clock"></i> @GetEventTimeText(nextGeneralEvent)
                                                 }
                                                 @if (nextGeneralEvent.RequiresVolunteers)
                                                 {
@@ -278,14 +278,14 @@ else
                                         }
                                         @if (HasDetailsOrFlyer(nextGeneralEvent))
                                         {
-                                            <div class="mt-2">
-                                                @if (IsFlyerOnly(nextGeneralEvent))
+                                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                @if (GetFlyerUrls(nextGeneralEvent).Any())
                                                 {
-                                                    <a href="@nextGeneralEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                    <a href="@GetPrimaryFlyerUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
                                                 }
-                                                else
+                                                @if (HasEventDetails(nextGeneralEvent))
                                                 {
-                                                    <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                                    <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
                                                 }
                                             </div>
                                         }
@@ -303,9 +303,9 @@ else
                                     <h6 class="text-primary mb-1">@(isCurrentSchoolYear ? "Next Event" : "Event"): @nextEvent.Title</h6>
                                     <div class="small text-muted">
                                         <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
-                                        @if (!string.IsNullOrWhiteSpace(GetSingleDayTimeText(nextEvent)))
+                                        @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextEvent)))
                                         {
-                                            <br><i class="bi bi-clock"></i> @GetSingleDayTimeText(nextEvent)
+                                            <br><i class="bi bi-clock"></i> @GetEventTimeText(nextEvent)
                                         }
                                         @if (nextEvent.RequiresVolunteers)
                                         {
@@ -338,14 +338,14 @@ else
                                 }
                                 @if (HasDetailsOrFlyer(nextEvent))
                                 {
-                                    <div class="mt-2">
-                                        @if (IsFlyerOnly(nextEvent))
+                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                        @if (GetFlyerUrls(nextEvent).Any())
                                         {
-                                            <a href="@nextEvent.FlyerUrl" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                            <a href="@GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
                                         }
-                                        else
+                                        @if (HasEventDetails(nextEvent))
                                         {
-                                            <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">More Details</a>
+                                            <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
                                         }
                                     </div>
                                 }
@@ -615,8 +615,22 @@ else
         return description.Substring(0, maxLength - 3) + "...";
     }
 
-    private static string GetSingleDayTimeText(Event evt)
+    private static string GetEventTimeText(Event evt)
     {
+        var firstDay = evt.EventDays?
+            .OrderBy(d => d.DayNumber)
+            .FirstOrDefault();
+
+        if (firstDay?.StartTime.HasValue == true && firstDay.EndTime.HasValue)
+        {
+            if (firstDay.StartTime.Value.TimeOfDay == firstDay.EndTime.Value.TimeOfDay)
+            {
+                return firstDay.StartTime.Value.ToString("h:mm tt");
+            }
+
+            return $"{firstDay.StartTime.Value:h:mm tt} - {firstDay.EndTime.Value:h:mm tt}";
+        }
+
         if (evt.EventDays?.Count > 1)
         {
             return string.Empty;
@@ -662,16 +676,32 @@ else
 
     private static bool HasDetailsOrFlyer(Event evt)
     {
-        return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) || !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+        return HasEventDetails(evt) || GetFlyerUrls(evt).Any();
     }
 
-    private static bool IsFlyerOnly(Event evt)
+    private static bool HasEventDetails(Event evt)
     {
-        return string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown) && !string.IsNullOrWhiteSpace(evt.FlyerUrl);
+        return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown)
+            || HasPublicControlInfo(evt);
     }
 
     private static string GetEventDetailsUrl(Event evt)
     {
         return $"/events/{evt.Slug}";
+    }
+
+    private static string GetPrimaryFlyerUrl(Event evt)
+    {
+        return GetFlyerUrls(evt).FirstOrDefault() ?? string.Empty;
+    }
+
+    private static bool HasPublicControlInfo(Event evt)
+    {
+        return evt.EventControls?.Any(c => c.IsActive && c.PublicInformation) == true;
+    }
+
+    private static IReadOnlyList<string> GetFlyerUrls(Event evt)
+    {
+        return evt.FlyerUrls;
     }
 }

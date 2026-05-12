@@ -1,0 +1,124 @@
+@page "/events/{slug}/control/notes"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>@(eventItem?.Title ?? "Note Taker Control")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info"><em>Loading note taker control...</em></div>
+}
+else if (eventItem == null || noteControl == null)
+{
+    <div class="alert alert-warning"><em>Note taker control not found.</em></div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-0"><i class="bi bi-journal-text"></i> @eventItem.Title Notes</h1>
+            <div class="text-muted">Capture notes for the event and choose whether they are public.</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/events/edit/{eventItem.Id}?tab=controls")">Back to Event Controls</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="alert alert-info">@message</div>
+    }
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Notes</strong>
+            <button class="btn btn-sm btn-outline-primary" @onclick="SaveNotesAsync">Save Notes</button>
+        </div>
+        <div class="card-body">
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="publicNotes" @bind="noteControl.PublicInformation" />
+                <label class="form-check-label" for="publicNotes">Public information</label>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Notes (Markdown)</label>
+                <textarea class="form-control" rows="10" @bind="noteControl.NotesMarkdown"></textarea>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(noteControl.NotesMarkdown))
+            {
+                <div class="mb-3">
+                    <label class="form-label">Preview</label>
+                    <BlazorMarkdown.Markdown Content="@noteControl.NotesMarkdown" />
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Event? eventItem;
+    private EventControl? noteControl;
+    private bool isLoading = true;
+    private string message = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/by-slug/{Slug}");
+            noteControl = eventItem?.EventControls?
+                .Where(c => c.IsActive && c.ControlType == "NoteTakerControl")
+                .OrderBy(c => c.SequenceOrder)
+                .FirstOrDefault();
+        }
+        catch
+        {
+            eventItem = null;
+            noteControl = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveNotesAsync()
+    {
+        if (noteControl == null)
+        {
+            return;
+        }
+
+        var response = await Http.PutAsJsonAsync($"api/eventcontrols/{noteControl.Id}", BuildControlDto());
+        if (!response.IsSuccessStatusCode)
+        {
+            message = await response.Content.ReadAsStringAsync();
+            return;
+        }
+
+        message = "Notes saved.";
+    }
+
+    private EventControlDTO BuildControlDto()
+    {
+        return new EventControlDTO
+        {
+            Id = noteControl?.Id ?? 0,
+            ControlType = noteControl?.ControlType ?? string.Empty,
+            IsDirector = noteControl?.IsDirector ?? false,
+            PublicInformation = noteControl?.PublicInformation ?? false,
+            SettingsJson = noteControl?.SettingsJson ?? "{}",
+            DisplayName = noteControl?.DisplayName ?? string.Empty,
+            NotesMarkdown = noteControl?.NotesMarkdown ?? string.Empty,
+            NotesHtml = noteControl?.NotesHtml ?? string.Empty,
+            SequenceOrder = noteControl?.SequenceOrder ?? 0,
+            IsActive = noteControl?.IsActive ?? true
+        };
+    }
+}

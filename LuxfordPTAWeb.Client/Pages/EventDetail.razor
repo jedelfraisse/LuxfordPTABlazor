@@ -58,16 +58,48 @@ else
                 </p>
             }
 
-            @if (!string.IsNullOrWhiteSpace(eventItem.FlyerUrl))
-            {
-                <p class="mb-0">
-                    <a href="@eventItem.FlyerUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
-                        View Flyer
-                    </a>
-                </p>
-            }
         </div>
     </div>
+
+    @if (GetFlyerUrls(eventItem).Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>Flyers</strong></div>
+            <div class="card-body">
+                @{
+                    var flyerIndex = 1;
+                }
+                @foreach (var flyerUrl in GetFlyerUrls(eventItem))
+                {
+                    var flyerLabel = GetFlyerLabel(flyerUrl, flyerIndex);
+                    <div class="mb-4">
+                        <h6 class="mb-2">@flyerLabel</h6>
+                        @if (IsPdfFlyer(flyerUrl))
+                        {
+                            <div class="ratio ratio-16x9 border rounded">
+                                <object data="@flyerUrl" type="application/pdf">
+                                    <div class="p-3">
+                                        <a href="@flyerUrl" target="_blank" rel="noopener noreferrer">Open PDF flyer</a>
+                                    </div>
+                                </object>
+                            </div>
+                        }
+                        else if (IsImageFlyer(flyerUrl))
+                        {
+                            <img src="@flyerUrl" class="img-fluid rounded border" alt="@flyerLabel" />
+                        }
+                        else
+                        {
+                            <a href="@flyerUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                Open Flyer
+                            </a>
+                        }
+                    </div>
+                    flyerIndex++;
+                }
+            </div>
+        </div>
+    }
 
     @if (!string.IsNullOrWhiteSpace(eventItem.DescriptionHtml))
     {
@@ -103,6 +135,28 @@ else
             <div class="card-header"><strong>More Details</strong></div>
             <div class="card-body">
                 <BlazorMarkdown.Markdown Content="@eventItem.MoreDetailsMarkdown" />
+            </div>
+        </div>
+    }
+
+    @if (GetPublicNotes(eventItem).Any())
+    {
+        <div class="card mb-4 border-success">
+            <div class="card-header"><strong>Public Notes</strong></div>
+            <div class="card-body">
+                @foreach (var note in GetPublicNotes(eventItem))
+                {
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>@note.DisplayName</strong>
+                            <span class="badge bg-success">Public</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(note.NotesHtml))
+                        {
+                            <div class="mt-2">@((MarkupString)note.NotesHtml)</div>
+                        }
+                    </div>
+                }
             </div>
         </div>
     }
@@ -178,5 +232,44 @@ else
         }
 
         return "Volunteers needed";
+    }
+
+    private static IEnumerable<EventControl> GetPublicNotes(Event evt)
+    {
+        return evt.EventControls?
+            .Where(c => c.IsActive && c.PublicInformation && !string.IsNullOrWhiteSpace(c.NotesHtml))
+            .OrderBy(c => c.SequenceOrder)
+            ?? Enumerable.Empty<EventControl>();
+    }
+
+    private static IReadOnlyList<string> GetFlyerUrls(Event evt)
+    {
+        return evt.FlyerUrls;
+    }
+
+    private static string GetFlyerLabel(string flyerUrl, int index)
+    {
+        var fileName = flyerUrl.Split('?', '#')[0].Split('/').LastOrDefault();
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return $"Flyer {index}";
+        }
+
+        return fileName;
+    }
+
+    private static bool IsPdfFlyer(string flyerUrl)
+    {
+        return flyerUrl.Split('?', '#')[0].EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsImageFlyer(string flyerUrl)
+    {
+        var url = flyerUrl.Split('?', '#')[0];
+        return url.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)
+            || url.EndsWith(".webp", StringComparison.OrdinalIgnoreCase);
     }
 }

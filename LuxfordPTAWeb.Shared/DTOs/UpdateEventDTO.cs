@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using LuxfordPTAWeb.Shared.Enums;
 
 namespace LuxfordPTAWeb.Shared.DTOs;
@@ -59,4 +60,6 @@ public class UpdateEventDTO
     public string MoreDetailsMarkdown { get; set; } = string.Empty;
     public string MoreDetailsHtml { get; set; } = string.Empty;
     public string? FlyerUrl { get; set; }
+    public string? FlyerUrlsJson { get; set; }
+    public List<EventControlDTO> Controls { get; set; } = [];
 }

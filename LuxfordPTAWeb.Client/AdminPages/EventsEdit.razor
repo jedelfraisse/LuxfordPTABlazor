@@ -3,6 +3,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.WebUtilities
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
@@ -38,12 +39,36 @@
     private Dictionary<int, string> dayStartTimes = new();
     private Dictionary<int, string> dayEndTimes = new();
     private Dictionary<int, bool> dayIsAllDay = new();
+    private readonly string[] directorControlTypes =
+    [
+        "TalentShowDirectorControl",
+        "BingoDirectorControl",
+        "ElectionDirectorControl"
+    ];
+    private readonly string[] nonDirectorControlTypes =
+    [
+        "SponsorDisplayControl",
+        "MeetingAgendaControl",
+        "NoteTakerControl",
+        "SlideshowControl",
+        "FeedBackFormControl"
+    ];
+    private string selectedOpsTab = "information";
+    private string selectedDirectorControlType = string.Empty;
+    private string selectedNonDirectorControlType = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDropdownData();
         await LoadEvent();
+        ApplyTabFromQueryString();
         isLoading = false;
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        ApplyTabFromQueryString();
+        return Task.CompletedTask;
     }
     
     private async Task LoadDropdownData()
@@ -76,6 +101,8 @@
                 ? eventModel.Description ?? string.Empty
                 : eventModel.DescriptionMarkdown;
             eventModel.MoreDetailsMarkdown ??= string.Empty;
+            eventModel.EventControls ??= new List<EventControl>();
+            SyncControlSelectionsFromModel();
             
             // Set the subcategory ID for the dropdown
             eventSubCategoryId = eventModel.EventSubTypeId ?? 0;
@@ -412,7 +439,8 @@
                 MoreDetailsMarkdown = eventModel.MoreDetailsMarkdown,
                 MoreDetailsHtml = eventModel.MoreDetailsHtml,
                 FlyerUrl = eventModel.FlyerUrl,
-                ChangeNotes = changeNotes
+                ChangeNotes = changeNotes,
+                Controls = BuildEventControlDtos()
             };
             
             // Update main event
@@ -569,6 +597,266 @@
         NavigationManager.NavigateTo("/admin/events");
     }
 
+    private void ApplyTabFromQueryString()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("tab", out var tabValues))
+        {
+            var tab = tabValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(tab))
+            {
+                selectedOpsTab = tab.ToLowerInvariant();
+            }
+        }
+    }
+
+    private void SyncControlSelectionsFromModel()
+    {
+        if (eventModel == null)
+        {
+            selectedDirectorControlType = string.Empty;
+            selectedNonDirectorControlType = string.Empty;
+            return;
+        }
+
+        selectedDirectorControlType = eventModel.EventControls
+            .Where(c => c.IsDirector)
+            .OrderBy(c => c.SequenceOrder)
+            .Select(c => c.ControlType)
+            .FirstOrDefault() ?? string.Empty;
+
+        var availableControls = GetAvailableNonDirectorControlTypes().ToList();
+        if (string.IsNullOrWhiteSpace(selectedNonDirectorControlType) || !availableControls.Contains(selectedNonDirectorControlType, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedNonDirectorControlType = availableControls.FirstOrDefault() ?? string.Empty;
+        }
+    }
+
+    private List<EventControlDTO> BuildEventControlDtos()
+    {
+        if (eventModel?.EventControls == null)
+        {
+            return [];
+        }
+
+        return eventModel.EventControls
+            .OrderBy(c => c.SequenceOrder)
+            .Select((control, index) => new EventControlDTO
+            {
+                Id = control.Id,
+                ControlType = control.ControlType,
+                IsDirector = control.IsDirector,
+                PublicInformation = control.PublicInformation,
+                SettingsJson = string.IsNullOrWhiteSpace(control.SettingsJson) ? "{}" : control.SettingsJson,
+                DisplayName = control.DisplayName,
+                NotesMarkdown = string.IsNullOrWhiteSpace(control.NotesMarkdown) ? string.Empty : control.NotesMarkdown,
+                NotesHtml = string.IsNullOrWhiteSpace(control.NotesHtml) ? string.Empty : control.NotesHtml,
+                SequenceOrder = index + 1,
+                IsActive = control.IsActive
+            })
+            .ToList();
+    }
+
+    private EventControl? GetDirectorControl()
+    {
+        return eventModel?.EventControls
+            .Where(c => c.IsDirector)
+            .OrderBy(c => c.SequenceOrder)
+            .FirstOrDefault();
+    }
+
+    private IEnumerable<EventControl> GetNonDirectorControls()
+    {
+        return eventModel?.EventControls
+                   .Where(c => !c.IsDirector)
+                   .OrderBy(c => c.SequenceOrder)
+                ?? Enumerable.Empty<EventControl>();
+    }
+
+    private IEnumerable<EventControl> GetNoteControls()
+    {
+        return eventModel?.EventControls
+                   .Where(c => c.IsActive && c.ControlType == "NoteTakerControl")
+                   .OrderBy(c => c.SequenceOrder)
+               ?? Enumerable.Empty<EventControl>();
+    }
+
+    private void ApplyDirectorSelection()
+    {
+        if (eventModel == null)
+        {
+            return;
+        }
+
+        var controls = eventModel.EventControls.ToList();
+        var existingDirector = controls.FirstOrDefault(c => c.IsDirector);
+
+        if (string.IsNullOrWhiteSpace(selectedDirectorControlType))
+        {
+            if (existingDirector != null)
+            {
+                eventModel.EventControls.Remove(existingDirector);
+                ReorderControls();
+                SyncControlSelectionsFromModel();
+            }
+
+            return;
+        }
+
+        if (existingDirector == null)
+        {
+            eventModel.EventControls.Add(new EventControl
+            {
+                ControlType = selectedDirectorControlType,
+                DisplayName = selectedDirectorControlType,
+                IsDirector = true,
+                PublicInformation = false,
+                SettingsJson = "{}",
+                NotesMarkdown = string.Empty,
+                NotesHtml = string.Empty,
+                IsActive = true,
+                SequenceOrder = 1
+            });
+        }
+        else
+        {
+            existingDirector.ControlType = selectedDirectorControlType;
+            existingDirector.DisplayName = selectedDirectorControlType;
+            existingDirector.IsDirector = true;
+            existingDirector.IsActive = true;
+            existingDirector.SettingsJson = string.IsNullOrWhiteSpace(existingDirector.SettingsJson)
+                ? "{}"
+                : existingDirector.SettingsJson;
+        }
+
+        ReorderControls();
+        SyncControlSelectionsFromModel();
+    }
+
+    private void AddNonDirectorControl()
+    {
+        if (eventModel == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(selectedNonDirectorControlType))
+        {
+            return;
+        }
+
+        if (!GetAvailableNonDirectorControlTypes().Contains(selectedNonDirectorControlType, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var alreadyExists = eventModel.EventControls.Any(c =>
+            !c.IsDirector &&
+            c.ControlType.Equals(selectedNonDirectorControlType, StringComparison.OrdinalIgnoreCase));
+        if (alreadyExists)
+        {
+            return;
+        }
+
+        eventModel.EventControls.Add(new EventControl
+        {
+            ControlType = selectedNonDirectorControlType,
+            DisplayName = selectedNonDirectorControlType,
+            IsDirector = false,
+            PublicInformation = false,
+            SettingsJson = "{}",
+            NotesMarkdown = string.Empty,
+            NotesHtml = string.Empty,
+            IsActive = true
+        });
+
+        ReorderControls();
+        SyncControlSelectionsFromModel();
+    }
+
+    private void RemoveControl(EventControl control)
+    {
+        if (eventModel == null)
+        {
+            return;
+        }
+
+        eventModel.EventControls.Remove(control);
+        if (control.IsDirector)
+        {
+            selectedDirectorControlType = string.Empty;
+        }
+
+        ReorderControls();
+        SyncControlSelectionsFromModel();
+    }
+
+    private void ReorderControls()
+    {
+        if (eventModel?.EventControls == null)
+        {
+            return;
+        }
+
+        var ordered = eventModel.EventControls
+            .OrderByDescending(c => c.IsDirector)
+            .ThenBy(c => c.SequenceOrder)
+            .ThenBy(c => c.ControlType)
+            .ToList();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            ordered[i].SequenceOrder = i + 1;
+        }
+
+        eventModel.EventControls = ordered;
+    }
+
+    private bool CanAddControls()
+    {
+        return eventModel != null && GetAvailableNonDirectorControlTypes().Any();
+    }
+
+    private IEnumerable<string> GetAvailableNonDirectorControlTypes()
+    {
+        if (eventModel == null)
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        var addedControlTypes = eventModel.EventControls
+            .Where(c => !string.IsNullOrWhiteSpace(c.ControlType))
+            .Select(c => c.ControlType)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return nonDirectorControlTypes
+            .Where(controlType => !addedControlTypes.Contains(controlType));
+    }
+
+    private string GetControlPageUrl(EventControl control)
+    {
+        if (eventModel == null)
+        {
+            return string.Empty;
+        }
+
+        return control.ControlType switch
+        {
+            "TalentShowDirectorControl" => $"/admin/eventcontrols/talent-show/{eventModel.Id}",
+            "BingoDirectorControl" => $"/admin/eventcontrols/bingo/{eventModel.Id}",
+            "ElectionDirectorControl" => $"/admin/eventcontrols/election/{eventModel.Id}",
+            "BingoControl" => $"/admin/eventcontrols/bingo/{eventModel.Id}",
+            "ElectionControl" => $"/admin/eventcontrols/election/{eventModel.Id}",
+            "SponsorDisplayControl" => $"/events/{eventModel.Slug}/control/sponsors",
+            "NoteTakerControl" => $"/events/{eventModel.Slug}/control/notes",
+            _ => $"/admin/events/edit/{eventModel.Id}?tab=controls"
+        };
+    }
+
+    private void SelectOpsTab(string tab)
+    {
+        selectedOpsTab = tab;
+    }
+
     private bool ShouldShowCoordinatorField()
     {
         if (eventModel?.EventCatId == 0 || eventCategories == null)
@@ -667,6 +955,17 @@
     {
         public string? FlyerUrl { get; set; }
     }
+
+    private static bool IsImageFlyer(string? flyerUrl)
+    {
+        if (string.IsNullOrWhiteSpace(flyerUrl))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(flyerUrl).ToLowerInvariant();
+        return extension is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".svg";
+    }
 }
 
 <PageTitle>Edit Event</PageTitle>
@@ -710,14 +1009,46 @@
 }
 else if (eventModel != null)
 {
+    <div class="mb-3">
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <button type="button" class="nav-link @(selectedOpsTab == "information" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("information")'>
+                    Information
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link @(selectedOpsTab == "flyer" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("flyer")'>
+                    Flyer
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link @(selectedOpsTab == "schedule" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("schedule")'>
+                    Schedule
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link @(selectedOpsTab == "controls" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("controls")'>
+                    Event Controls
+                </button>
+            </li>
+            <li class="nav-item">
+                <button type="button" class="nav-link @(selectedOpsTab == "volunteers" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("volunteers")'>
+                    Volunteers
+                </button>
+            </li>
+        </ul>
+    </div>
+
     <div class="row">
         <div class="col-lg-8">
-            <!-- Basic Event Information -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Event Information</h5>
-                </div>
-                <div class="card-body">
+            @if (selectedOpsTab == "information")
+            {
+                <!-- Basic Event Information -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Event Information</h5>
+                    </div>
+                    <div class="card-body">
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <label for="title" class="form-label">Event Title *</label>
@@ -735,58 +1066,6 @@ else if (eventModel != null)
                                 <option value="@EventStatus.Cancelled">Cancelled</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="descriptionMarkdown" class="form-label">Description (Markdown Supported)</label>
-                        <EasyMDEEditor @bind-Value="eventModel.DescriptionMarkdown"
-                                       EditorId="event-edit-description"
-                                       MinHeight="220"
-                                       Placeholder="Enter event details using markdown formatting..." />
-                        <div class="form-text">You can use <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a> for formatting. HTML is not allowed and will be ignored.</div>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(eventModel.DescriptionMarkdown))
-                    {
-                        <div class="mb-3">
-                            <label class="form-label">Live Preview:</label>
-                            <BlazorMarkdown.Markdown Content="@eventModel.DescriptionMarkdown" />
-                        </div>
-                    }
-
-                    <div class="mb-3">
-                        <label for="moreDetails" class="form-label">More Details (Markdown)</label>
-                        <EasyMDEEditor @bind-Value="eventModel.MoreDetailsMarkdown"
-                                       EditorId="event-edit-more-details"
-                                       MinHeight="170"
-                                       Placeholder="Additional event details, agenda, reminders, etc." />
-                        <div class="form-text">This is optional. Use Markdown for formatting extended event details.</div>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(eventModel.MoreDetailsMarkdown))
-                    {
-                        <div class="mb-3">
-                            <label class="form-label">More Details Preview:</label>
-                            <BlazorMarkdown.Markdown Content="@eventModel.MoreDetailsMarkdown" />
-                        </div>
-                    }
-
-                    <div class="mb-3">
-                        <label class="form-label">Event Flyer</label>
-                        <div class="input-group">
-                            <InputFile OnChange="OnFlyerSelected" class="form-control" />
-                            <button type="button" class="btn btn-outline-primary" @onclick="UploadFlyerAsync" disabled="@(selectedFlyerFile == null)">
-                                Upload Flyer
-                            </button>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(eventModel.FlyerUrl))
-                        {
-                            <div class="form-text">
-                                Current flyer: <a href="@eventModel.FlyerUrl" target="_blank" rel="noopener noreferrer">View Flyer</a>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(flyerUploadMessage))
-                        {
-                            <div class="form-text">@flyerUploadMessage</div>
-                        }
                     </div>
 
                     <div class="row mb-3">
@@ -845,7 +1124,7 @@ else if (eventModel != null)
                         </div>
                     </div>
 
-                    <!-- Event Coordinator Section - conditional based on category settings -->
+                       <!-- Event Coordinator Section - conditional based on category settings -->
                     @if (ShouldShowCoordinatorField())
                     {
                         <div class="row mb-3">
@@ -894,13 +1173,87 @@ else if (eventModel != null)
                             Events in this category do not require a coordinator assignment.
                         </div>
                     }
-                    
-                    <!-- Primary Event Day -->
-                    <div class="card border-primary mb-3">
-                        <div class="card-header bg-primary text-white py-2">
-                            <h6 class="mb-0"><i class="bi bi-calendar-date"></i> Primary Event Day</h6>
+
+                    <div class="mb-3">
+                        <label for="descriptionMarkdown" class="form-label">Description (Markdown Supported)</label>
+                        <EasyMDEEditor @bind-Value="eventModel.DescriptionMarkdown"
+                                       EditorId="event-edit-description"
+                                       MinHeight="220"
+                                       Placeholder="Enter event details using markdown formatting..." />
+                        <div class="form-text">You can use <a href="https://www.markdownguide.org/basic-syntax/" target="_blank">Markdown</a> for formatting. HTML is not allowed and will be ignored.</div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(eventModel.DescriptionMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Live Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@eventModel.DescriptionMarkdown" />
                         </div>
-                        <div class="card-body py-3">
+                    }
+
+                    <div class="mb-3">
+                        <label for="moreDetails" class="form-label">More Details (Markdown)</label>
+                        <EasyMDEEditor @bind-Value="eventModel.MoreDetailsMarkdown"
+                                       EditorId="event-edit-more-details"
+                                       MinHeight="170"
+                                       Placeholder="Additional event details, agenda, reminders, etc." />
+                        <div class="form-text">This is optional. Use Markdown for formatting extended event details.</div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(eventModel.MoreDetailsMarkdown))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">More Details Preview:</label>
+                            <BlazorMarkdown.Markdown Content="@eventModel.MoreDetailsMarkdown" />
+                        </div>
+                    }
+
+                 
+
+                </div>
+                </div>
+            }
+            else if (selectedOpsTab == "flyer")
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-paperclip"></i> Flyer List</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Event Flyer</label>
+                            <div class="input-group">
+                                <InputFile OnChange="OnFlyerSelected" class="form-control" />
+                                <button type="button" class="btn btn-outline-primary" @onclick="UploadFlyerAsync" disabled="@(selectedFlyerFile == null)">
+                                    Upload Flyer
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(eventModel.FlyerUrl))
+                            {
+                                <div class="form-text">
+                                    Current flyer: <a href="@eventModel.FlyerUrl" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                </div>
+                                @if (IsImageFlyer(eventModel.FlyerUrl))
+                                {
+                                    <div class="mt-2">
+                                        <img src="@eventModel.FlyerUrl" class="img-fluid rounded border" style="max-width: 260px; max-height: 260px; object-fit: contain;" alt="Primary flyer preview" />
+                                    </div>
+                                }
+                            }
+                            @if (!string.IsNullOrWhiteSpace(flyerUploadMessage))
+                            {
+                                <div class="form-text">@flyerUploadMessage</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (selectedOpsTab == "schedule")
+            {
+                <!-- Primary Event Day -->
+                <div class="card border-primary mb-3">
+                    <div class="card-header bg-primary text-white py-2">
+                        <h6 class="mb-0"><i class="bi bi-calendar-date"></i> Schedule</h6>
+                    </div>
+                    <div class="card-body py-3">
                             <div class="row mb-2">
                                 <div class="col-md-6">
                                     <label for="eventDate" class="form-label">Event Date *</label>
@@ -937,151 +1290,291 @@ else if (eventModel != null)
                             <div class="mb-2">
                                 <label for="dayDescription" class="form-label">Day-Specific Description (optional)</label>
                                 <textarea class="form-control" id="dayDescription" rows="2" @bind="primaryDay.Description" placeholder="Specific activities or details for this day"></textarea>
-                            </div>
                         </div>
                     </div>
-                    
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
-                        <label class="form-check-label" for="requiresVolunteers">
-                            Volunteers Needed
-                        </label>
-                    </div>
-                    @if (eventModel.RequiresVolunteers)
-                    {
-                        <div class="card mb-4 border-warning">
-                            <div class="card-header">
-                                <strong><i class="bi bi-people"></i> Volunteer Details</strong>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Volunteer Signup Link</label>
-                                    <input type="url" class="form-control" @bind="eventModel.ExcelImportId" placeholder="https://www.signupgenius.com/go/..." />
-                                    <div class="form-text">Store the volunteer signup URL for this event.</div>
-                                </div>
-                                <div class="row g-3 mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Signup Opens</label>
-                                        <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowStart" @bind:format="yyyy-MM-ddTHH:mm" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Signup Closes</label>
-                                        <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowEnd" @bind:format="yyyy-MM-ddTHH:mm" />
-                                    </div>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(eventModel.ExcelImportId))
+                </div>
+                
+                <!-- Additional Event Days (if any exist) -->
+                @if (additionalDays.Any())
+                {
+                    <div class="card mb-4 border-info">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                            <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Additional Event Days <span class="badge bg-info ms-2">Multi-Day Event</span></h5>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAdditionalDay">
+                                <i class="bi bi-plus"></i> Add Another Day
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                @foreach (var day in additionalDays.OrderBy(d => d.DayNumber))
                                 {
-                                    <div class="alert alert-info">
-                                        <a href="@eventModel.ExcelImportId" target="_blank">View Volunteer Signup</a>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card border-info">
+                                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                <small class="text-muted">Day @day.DayNumber</small>
+                                                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveAdditionalDay(day)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                            <div class="card-body py-2">
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Day Title</label>
+                                                    <input type="text" class="form-control form-control-sm" @bind="day.DayTitle" placeholder="e.g., 'Fire Safety Demo'" />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Date *</label>
+                                                    <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" required />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Location (optional)</label>
+                                                    <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
+                                                </div>
+                                                
+                                                <!-- Time Range Section -->
+                                                <div class="mb-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" checked="@GetIsAllDay(day)" @onchange="@(e => OnAllDayChanged(day, (bool?)e.Value ?? false))" />
+                                                        <label class="form-check-label small">All Day Event</label>
+                                                    </div>
+                                                </div>
+                                                
+                                                @if (!GetIsAllDay(day))
+                                                {
+                                                    <div class="row mb-2">
+                                                        <div class="col-6">
+                                                            <label class="form-label small">Start Time</label>
+                                                            <input type="time" class="form-control form-control-sm" value="@GetStartTimeString(day)" @onchange="@(e => UpdateStartTimeFromInput(day, e.Value?.ToString()))" />
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small">End Time</label>
+                                                            <input type="time" class="form-control form-control-sm" value="@GetEndTimeString(day)" @onchange="@(e => UpdateEndTimeFromInput(day, e.Value?.ToString()))" />
+                                                        </div>
+                                                    </div>
+                                                }
+                                                
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Description</label>
+                                                    <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" @bind="day.IsActive" />
+                                                    <label class="form-check-label small">Active</label>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 }
                             </div>
                         </div>
-                    }
-                </div>
-            </div>
-
-            <!-- Additional Event Days (if any exist) -->
-            @if (additionalDays.Any())
-            {
-                <div class="card mb-4 border-info">
-                    <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Additional Event Days <span class="badge bg-info ms-2">Multi-Day Event</span></h5>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAdditionalDay">
-                            <i class="bi bi-plus"></i> Add Another Day
-                        </button>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            @foreach (var day in additionalDays.OrderBy(d => d.DayNumber))
-                            {
-                                <div class="col-md-6 mb-3">
-                                    <div class="card border-info">
-                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                            <small class="text-muted">Day @day.DayNumber</small>
-                                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveAdditionalDay(day)">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                        <div class="card-body py-2">
-                                            <div class="mb-2">
-                                                <label class="form-label small">Day Title</label>
-                                                <input type="text" class="form-control form-control-sm" @bind="day.DayTitle" placeholder="e.g., 'Fire Safety Demo'" />
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small">Date *</label>
-                                                <input type="date" class="form-control form-control-sm" @bind="day.Date" @bind:format="yyyy-MM-dd" required />
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small">Location (optional)</label>
-                                                <input type="text" class="form-control form-control-sm" @bind="day.Location" placeholder="Override default location" />
-                                            </div>
-                                            
-                                            <!-- Time Range Section -->
-                                            <div class="mb-2">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" checked="@GetIsAllDay(day)" @onchange="@(e => OnAllDayChanged(day, (bool?)e.Value ?? false))" />
-                                                    <label class="form-check-label small">All Day Event</label>
-                                                </div>
-                                            </div>
-                                            
-                                            @if (!GetIsAllDay(day))
-                                            {
-                                                <div class="row mb-2">
-                                                    <div class="col-6">
-                                                        <label class="form-label small">Start Time</label>
-                                                        <input type="time" class="form-control form-control-sm" value="@GetStartTimeString(day)" @onchange="@(e => UpdateStartTimeFromInput(day, e.Value?.ToString()))" />
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="form-label small">End Time</label>
-                                                        <input type="time" class="form-control form-control-sm" value="@GetEndTimeString(day)" @onchange="@(e => UpdateEndTimeFromInput(day, e.Value?.ToString()))" />
-                                                    </div>
-                                                </div>
-                                            }
-                                            
-                                            <div class="mb-2">
-                                                <label class="form-label small">Description</label>
-                                                <textarea class="form-control form-control-sm" rows="2" @bind="day.Description" placeholder="Day-specific activities"></textarea>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" @bind="day.IsActive" />
-                                                <label class="form-check-label small">Active</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                }
+                else if (originalEventDays.Count > 1)
+                {
+                    <div class="card mb-4 border-warning">
+                        <div class="card-body text-center py-4">
+                            <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> This was originally a @originalEventDays.Count-day event</h6>
+                            <button type="button" class="btn btn-outline-warning" @onclick="RestoreAdditionalDays">
+                                <i class="bi bi-arrow-clockwise"></i> Restore Additional Days
+                            </button>
+                            <p class="text-muted small mt-2">Click to restore the additional days from the original event</p>
                         </div>
                     </div>
-                </div>
+                }
+                else
+                {
+                    <div class="card mb-4 border-info">
+                        <div class="card-body text-center py-4">
+                            <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> Convert to multi-day event?</h6>
+                            <button type="button" class="btn btn-outline-info" @onclick="AddAdditionalDay">
+                                <i class="bi bi-plus-circle"></i> Add Additional Days
+                            </button>
+                            <p class="text-muted small mt-2">Perfect for events like Fire Prevention Week, Book Fair, Spirit Week, etc.</p>
+                        </div>
+                    </div>
+                }
             }
-            else if (originalEventDays.Count > 1)
+            else if (selectedOpsTab == "controls")
             {
-                <!-- Option to restore multi-day if it was originally multi-day -->
-                <div class="card mb-4 border-warning">
-                    <div class="card-body text-center py-4">
-                        <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> This was originally a @originalEventDays.Count-day event</h6>
-                        <button type="button" class="btn btn-outline-warning" @onclick="RestoreAdditionalDays">
-                            <i class="bi bi-arrow-clockwise"></i> Restore Additional Days
-                        </button>
-                        <p class="text-muted small mt-2">Click to restore the additional days from the original event</p>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-broadcast"></i> Event Controls</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (string.IsNullOrWhiteSpace(selectedDirectorControlType))
+                        {
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Event Director</label>
+                                    <select class="form-select" @bind="selectedDirectorControlType" @bind:after="ApplyDirectorSelection">
+                                        <option value="">No Director (Optional)</option>
+                                        @foreach (var directorType in directorControlTypes)
+                                        {
+                                            <option value="@directorType">@directorType</option>
+                                        }
+                                    </select>
+                                    <div class="form-text">Director is optional for simple events. Only one director control is allowed.</div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <div class="form-text text-warning">If you want to change the director, remove it first.</div>
+                            </div>
+                        }
+
+                        @{
+                            var availableNonDirectorControlTypes = GetAvailableNonDirectorControlTypes().ToList();
+                        }
+                        @if (availableNonDirectorControlTypes.Any())
+                        {
+                            <div class="row g-2 align-items-end mb-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Add Additional Control</label>
+                                    <select class="form-select" @bind="selectedNonDirectorControlType">
+                                        @foreach (var controlType in availableNonDirectorControlTypes)
+                                        {
+                                            <option value="@controlType">@controlType</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-outline-primary w-100" @onclick="AddNonDirectorControl" disabled="@string.IsNullOrWhiteSpace(selectedNonDirectorControlType)">
+                                        Add Control
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Order</th>
+                                        <th>Type</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (eventModel.EventControls.Any())
+                                    {
+                                        @foreach (var control in eventModel.EventControls.OrderBy(c => c.SequenceOrder))
+                                        {
+                                            <tr>
+                                                <td>@control.SequenceOrder</td>
+                                                <td><code>@control.ControlType</code></td>
+                                                <td>@(control.IsDirector ? "Director" : "Control")</td>
+                                                <td>
+                                                    <input class="form-check-input" type="checkbox" @bind="control.IsActive" />
+                                                </td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-outline-primary btn-sm me-2" href="@GetControlPageUrl(control)">Open</a>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoveControl(control)">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-muted">No controls configured yet.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (GetNoteControls().Any())
+                        {
+                            <div class="card mt-3 border-info">
+                                <div class="card-header bg-info text-white">
+                                    <strong>Note Taker Notes</strong>
+                                </div>
+                                <div class="card-body">
+                                    @foreach (var noteControl in GetNoteControls())
+                                    {
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <strong>@noteControl.DisplayName</strong>
+                                                <span class="badge @(noteControl.PublicInformation ? "bg-success" : "bg-secondary")">
+                                                    @(noteControl.PublicInformation ? "Public" : "Private")
+                                                </span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(noteControl.NotesMarkdown))
+                                            {
+                                                <div class="mt-2">
+                                                    <BlazorMarkdown.Markdown Content="@noteControl.NotesMarkdown" />
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-muted mt-2">No notes entered yet.</div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
             }
-            else
+            else if (selectedOpsTab == "volunteers")
             {
-                <!-- Multi-Day Option for single-day events -->
-                <div class="card mb-4 border-info">
-                    <div class="card-body text-center py-4">
-                        <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> Convert to multi-day event?</h6>
-                        <button type="button" class="btn btn-outline-info" @onclick="AddAdditionalDay">
-                            <i class="bi bi-plus-circle"></i> Add Additional Days
-                        </button>
-                        <p class="text-muted small mt-2">Perfect for events like Fire Prevention Week, Book Fair, Spirit Week, etc.</p>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-people"></i> Volunteers</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="requiresVolunteers" @bind="eventModel.RequiresVolunteers">
+                            <label class="form-check-label" for="requiresVolunteers">
+                                Volunteers Needed
+                            </label>
+                        </div>
+                        @if (eventModel.RequiresVolunteers)
+                        {
+                            <div class="card border-warning">
+                                <div class="card-header">
+                                    <strong><i class="bi bi-people"></i> Volunteer Details</strong>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Volunteer Signup Link</label>
+                                        <input type="url" class="form-control" @bind="eventModel.ExcelImportId" placeholder="https://www.signupgenius.com/go/..." />
+                                        <div class="form-text">Store the volunteer signup URL for this event.</div>
+                                    </div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Signup Opens</label>
+                                            <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowStart" @bind:format="yyyy-MM-ddTHH:mm" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Signup Closes</label>
+                                            <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowEnd" @bind:format="yyyy-MM-ddTHH:mm" />
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(eventModel.ExcelImportId))
+                                    {
+                                        <div class="alert alert-info mb-0">
+                                            <a href="@eventModel.ExcelImportId" target="_blank">View Volunteer Signup</a>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-light border mb-0">Volunteers are currently disabled for this event.</div>
+                        }
                     </div>
                 </div>
             }
-        </div>
+
+            </div>
 
         <!-- Action Panel -->
         <div class="col-lg-4">

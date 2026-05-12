@@ -6,14 +6,20 @@
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
-<PageTitle>Talent Show Rehearsal Control</PageTitle>
+@if (!Embedded)
+{
+    <PageTitle>@(PageTitleText)</PageTitle>
+}
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-broadcast"></i> Talent Show Rehearsal Control</h1>
-    <a href="/admin/events" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Back to Events
-    </a>
-</div>
+@if (!Embedded)
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-broadcast"></i> @PageTitleText</h1>
+        <a href="@EffectiveBackUrl" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+}
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
@@ -29,7 +35,7 @@
     <div class="card-body">
         <div class="row g-3 align-items-end">
             <div class="col-md-4">
-                <label class="form-label">Test Show</label>
+                <label class="form-label">Show Template</label>
                 <InputSelect class="form-select" @bind-Value="selectedShowKey">
                     @foreach (var key in availableShowKeys)
                     {
@@ -256,6 +262,12 @@
 }
 
 @code {
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public string? TitleText { get; set; }
+    [Parameter] public string? BackUrl { get; set; }
+    [Parameter] public string? PreferredShowKey { get; set; }
+    [Parameter] public string? SessionCodeOverride { get; set; }
+
     private HubConnection? hubConnection;
     private List<string> availableShowKeys = new();
     private string selectedShowKey = "luxford-got-talent";
@@ -268,6 +280,8 @@
     private bool isBusy;
     private string errorMessage = string.Empty;
     private string statusMessage = string.Empty;
+    private string PageTitleText => string.IsNullOrWhiteSpace(TitleText) ? "Talent Show Rehearsal Control" : TitleText;
+    private string EffectiveBackUrl => string.IsNullOrWhiteSpace(BackUrl) ? "/admin/events" : BackUrl;
 
     protected override async Task OnInitializedAsync()
     {
@@ -281,6 +295,13 @@
         try
         {
             availableShowKeys = await Http.GetFromJsonAsync<List<string>>("api/talentshow-test/shows") ?? new();
+            var preferredShowKey = PreferredShowKey?.Trim();
+            if (!string.IsNullOrWhiteSpace(preferredShowKey) &&
+                availableShowKeys.Contains(preferredShowKey, StringComparer.OrdinalIgnoreCase))
+            {
+                selectedShowKey = availableShowKeys.First(key => key.Equals(preferredShowKey, StringComparison.OrdinalIgnoreCase));
+            }
+
             if (!availableShowKeys.Any())
             {
                 availableShowKeys.Add(selectedShowKey);
@@ -314,7 +335,7 @@
             state = new TalentShowRealtimeState
             {
                 ShowName = rehearsalPackage.ShowName,
-                SessionCode = rehearsalPackage.SessionCode,
+                SessionCode = string.IsNullOrWhiteSpace(SessionCodeOverride) ? rehearsalPackage.SessionCode : SessionCodeOverride.Trim(),
                 IsLiveMode = false,
                 OverallState = TalentShowOverallState.PreShow,
                 LiveSubState = TalentShowLiveSubState.HostTalk,
