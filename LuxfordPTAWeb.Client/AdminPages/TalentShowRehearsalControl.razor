@@ -43,12 +43,12 @@
                 </button>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Session Code</label>
+                <label class="form-label">Event Session</label>
                 <InputText class="form-control" @bind-Value="state.SessionCode" />
             </div>
             <div class="col-md-3">
-                <a class="btn btn-outline-success w-100" href="@($"/display/talent-show/{state.SessionCode}")" target="_blank" rel="noopener noreferrer">
-                    Open Display
+                <a class="btn btn-outline-success w-100" href="/eventconnect" target="_blank" rel="noopener noreferrer">
+                    Open Event Connect
                 </a>
             </div>
         </div>
@@ -131,6 +131,61 @@
             </div>
         </div>
     </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Connected Devices / Displays</h5>
+        </div>
+        <div class="card-body">
+            @if (!connectedDevices.Any())
+            {
+                <em>No displays connected yet. Open <strong>/eventconnect</strong> on a device to generate a pairing code.</em>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Pairing Code</th>
+                                <th>Device</th>
+                                <th>Assigned Session</th>
+                                <th>Assigned Display</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var device in connectedDevices.OrderBy(d => d.DisplayName))
+                            {
+                                <tr>
+                                    <td><strong>@device.PairingCode</strong></td>
+                                    <td>@device.DisplayName</td>
+                                    <td>@(string.IsNullOrWhiteSpace(device.AssignedSessionCode) ? "Unassigned" : device.AssignedSessionCode)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(device.AssignedDisplayRole) ? "Unassigned" : device.AssignedDisplayRole)</td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <select class="form-select form-select-sm" style="max-width: 190px;" value="@GetSelectedRole(device.PairingCode)" @onchange="(e) => SetSelectedRole(device.PairingCode, e.Value?.ToString())">
+                                                @foreach (var role in TalentShowDisplayRole.All)
+                                                {
+                                                    <option value="@role">@role</option>
+                                                }
+                                            </select>
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => AssignDeviceAsync(device.PairingCode)" disabled="@(!isConnected || string.IsNullOrWhiteSpace(state.SessionCode))">
+                                                Assign
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="() => UnassignDeviceAsync(device.PairingCode)" disabled="@(!isConnected)">
+                                                Clear
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -139,6 +194,8 @@
     private string selectedShowKey = "luxford-got-talent";
     private TalentShowRehearsalPackage? rehearsalPackage;
     private TalentShowRealtimeState state = new();
+    private List<TalentShowConnectedDevice> connectedDevices = new();
+    private readonly Dictionary<string, string> deviceRoleSelections = new(StringComparer.OrdinalIgnoreCase);
     private bool isConnected;
     private bool isBusy;
     private string errorMessage = string.Empty;
@@ -230,6 +287,13 @@
             InvokeAsync(StateHasChanged);
         });
 
+        hubConnection.On<List<TalentShowConnectedDevice>>("DeviceRegistryUpdated", incomingDevices =>
+        {
+            connectedDevices = incomingDevices;
+            EnsureRoleSelections();
+            InvokeAsync(StateHasChanged);
+        });
+
         hubConnection.On("SessionCleared", () =>
         {
             statusMessage = "Session was cleared.";
@@ -238,6 +302,9 @@
         });
 
         await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("SubscribeController");
+        connectedDevices = await hubConnection.InvokeAsync<List<TalentShowConnectedDevice>>("GetDeviceRegistry");
+        EnsureRoleSelections();
         isConnected = true;
     }
 
@@ -305,6 +372,61 @@
         if (index >= 0 && index < state.Items.Count)
         {
             state.CurrentIndex = index;
+        }
+    }
+
+    private string GetSelectedRole(string pairingCode)
+    {
+        return deviceRoleSelections.TryGetValue(pairingCode, out var role)
+            ? role
+            : TalentShowDisplayRole.MainBoard;
+    }
+
+    private void SetSelectedRole(string pairingCode, string? role)
+    {
+        if (string.IsNullOrWhiteSpace(pairingCode))
+        {
+            return;
+        }
+
+        var normalized = TalentShowDisplayRole.All
+            .FirstOrDefault(r => r.Equals(role, StringComparison.OrdinalIgnoreCase))
+            ?? TalentShowDisplayRole.MainBoard;
+        deviceRoleSelections[pairingCode] = normalized;
+    }
+
+    private async Task AssignDeviceAsync(string pairingCode)
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("AssignDeviceToSession", pairingCode, state.SessionCode, GetSelectedRole(pairingCode));
+        statusMessage = $"Assigned {pairingCode} to {state.SessionCode} as {GetSelectedRole(pairingCode)}.";
+    }
+
+    private async Task UnassignDeviceAsync(string pairingCode)
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("RemoveDeviceAssignment", pairingCode);
+        statusMessage = $"Cleared assignment for {pairingCode}.";
+    }
+
+    private void EnsureRoleSelections()
+    {
+        foreach (var device in connectedDevices)
+        {
+            if (!deviceRoleSelections.ContainsKey(device.PairingCode))
+            {
+                deviceRoleSelections[device.PairingCode] = string.IsNullOrWhiteSpace(device.AssignedDisplayRole)
+                    ? TalentShowDisplayRole.MainBoard
+                    : device.AssignedDisplayRole;
+            }
         }
     }
 

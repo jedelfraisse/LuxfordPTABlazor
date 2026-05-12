@@ -39,3 +39,43 @@ public class TalentShowRealtimeState
     public List<TalentShowScheduleItem> Items { get; set; } = new();
     public TalentShowPresentationSettings Presentation { get; set; } = new();
 }
+
+public static class TalentShowDisplayRole
+{
+    public const string MainBoard = "MainBoard";
+    public const string BackstageDirector = "BackstageDirector";
+    public const string JudgesVote = "JudgesVote";
+
+    public static readonly string[] All =
+    [
+        MainBoard,
+        BackstageDirector,
+        JudgesVote
+    ];
+}
+
+public class TalentShowDeviceRegistrationResult
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string PairingCode { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+}
+
+public class TalentShowConnectedDevice
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string ConnectionId { get; set; } = string.Empty;
+    public string PairingCode { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string AssignedSessionCode { get; set; } = string.Empty;
+    public string AssignedDisplayRole { get; set; } = string.Empty;
+    public DateTime LastSeenUtc { get; set; } = DateTime.UtcNow;
+    public bool IsAssigned => !string.IsNullOrWhiteSpace(AssignedSessionCode);
+}
+
+public class TalentShowDeviceAssignment
+{
+    public string PairingCode { get; set; } = string.Empty;
+    public string SessionCode { get; set; } = string.Empty;
+    public string DisplayRole { get; set; } = string.Empty;
+}
