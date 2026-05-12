@@ -156,7 +156,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.OnDelete(DeleteBehavior.SetNull);
 
 		builder.Entity<EventTemplate>()
+			.HasOne(t => t.SourceEvent)
+			.WithMany()
+			.HasForeignKey(t => t.SourceEventId)
+			.OnDelete(DeleteBehavior.Restrict);
+
+		builder.Entity<EventTemplate>()
 			.HasIndex(t => new { t.IsActive, t.EventCatId });
+
+		builder.Entity<EventTemplate>()
+			.HasIndex(t => t.SourceEventId);
 	}
 
 	public static async Task SeedBoardPositionTitlesAsync(ApplicationDbContext db)

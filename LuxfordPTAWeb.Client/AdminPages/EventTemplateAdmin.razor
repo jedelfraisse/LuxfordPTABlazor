@@ -80,6 +80,17 @@
                             }
                         </InputSelect>
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Source Event (optional)</label>
+                        <InputSelect class="form-select" @bind-Value="editingTemplate.SourceEventId">
+                            <option value="">None</option>
+                            @foreach (var sourceEvent in availableSourceEvents.OrderByDescending(e => e.Date))
+                            {
+                                <option value="@sourceEvent.Id">@FormatSourceEventLabel(sourceEvent)</option>
+                            }
+                        </InputSelect>
+                        <div class="form-text">When selected, template-based event creation also copies day structure and timing from this completed/active source event.</div>
+                    </div>
                 </div>
 
                 <div class="row mb-3">
@@ -161,6 +172,7 @@
                             <th>Name</th>
                             <th>Category</th>
                             <th>Subcategory</th>
+                            <th>Source Event</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -178,6 +190,7 @@
                                 </td>
                                 <td>@template.EventCat?.Name</td>
                                 <td>@template.EventCatSub?.Name</td>
+                                <td>@(template.SourceEvent != null ? FormatSourceEventLabel(template.SourceEvent) : "—")</td>
                                 <td>
                                     <span class="badge @(template.IsActive ? "bg-success" : "bg-secondary")">
                                         @(template.IsActive ? "Active" : "Inactive")
@@ -256,6 +269,7 @@
     private List<EventCat> eventCategories = new();
     private List<EventCatSub> eventSubCategories = new();
     private List<SchoolYear> schoolYears = new();
+    private List<Event> availableSourceEvents = new();
 
     private EventTemplate? editingTemplate;
     private bool showForm = false;
@@ -286,6 +300,7 @@
             eventCategories = await Http.GetFromJsonAsync<List<EventCat>>("api/eventcat") ?? new();
             eventSubCategories = await Http.GetFromJsonAsync<List<EventCatSub>>("api/eventcatsub") ?? new();
             schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears") ?? new();
+            availableSourceEvents = await Http.GetFromJsonAsync<List<Event>>("api/events/available-for-copy") ?? new();
         }
         catch (Exception ex)
         {
@@ -302,7 +317,8 @@
         editingTemplate = new EventTemplate
         {
             IsActive = true,
-            EventCatId = 0
+            EventCatId = 0,
+            SourceEventId = null
         };
         showForm = true;
         successMessage = string.Empty;
@@ -319,6 +335,7 @@
             IsActive = template.IsActive,
             EventCatId = template.EventCatId,
             EventSubTypeId = template.EventSubTypeId,
+            SourceEventId = template.SourceEventId,
             DefaultTitle = template.DefaultTitle,
             DefaultLocation = template.DefaultLocation,
             DefaultDescriptionMarkdown = template.DefaultDescriptionMarkdown,
@@ -435,6 +452,11 @@
             .Where(sc => sc.EventCatId == eventCatId && sc.IsActive)
             .OrderBy(sc => sc.DisplayOrder)
             .ThenBy(sc => sc.Name);
+    }
+
+    private static string FormatSourceEventLabel(Event sourceEvent)
+    {
+        return $"{sourceEvent.Date:yyyy-MM-dd} - {sourceEvent.Title}";
     }
 
     private void StartCreateEventFromTemplate(EventTemplate template)

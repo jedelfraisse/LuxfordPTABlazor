@@ -12,6 +12,8 @@ public class EventTemplate
 
     public int? EventSubTypeId { get; set; }
     public EventCatSub? EventCatSub { get; set; }
+    public int? SourceEventId { get; set; }
+    public Event? SourceEvent { get; set; }
 
     public string DefaultTitle { get; set; } = string.Empty;
     public string DefaultLocation { get; set; } = string.Empty;
