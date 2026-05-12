@@ -6,48 +6,111 @@
   "items": [
     {
       "order": 1,
-      "performerName": "Maya R.",
-      "actTitle": "Piano Medley",
-      "category": "Instrumental",
+      "performerName": "Jordan Keene",
+      "actTitle": "Dig a Little Deeper",
+      "category": "Vocal",
       "durationMinutes": 4,
-      "introLine": "Please welcome Maya with a piano medley.",
-      "outroLine": "Great job, Maya!"
+      "introLine": "Starting us off tonight is an amazing 5th grader with a big voice and even bigger confidence. Please welcome Jordan Keene!",
+      "outroLine": "Great start to the show, Jordan!"
     },
     {
       "order": 2,
-      "performerName": "Team Sparks",
-      "actTitle": "Hip-Hop Crew Routine",
-      "category": "Dance",
-      "durationMinutes": 5,
-      "introLine": "Next up is Team Sparks with a dance routine.",
-      "outroLine": "Let's hear it for Team Sparks!"
+      "performerName": "Monvitha Nardela",
+      "actTitle": "Take Down (K-Pop)",
+      "category": "Vocal",
+      "durationMinutes": 4,
+      "introLine": "Next up is someone bringing tons of energy to the stage. Get ready for Monvitha Nardela!",
+      "outroLine": "Awesome energy, Monvitha!"
     },
     {
       "order": 3,
-      "performerName": "Jonah P.",
-      "actTitle": "Comedy Set",
-      "category": "Comedy",
-      "durationMinutes": 3,
-      "introLine": "Please welcome Jonah to the stage for comedy.",
-      "outroLine": "Thanks, Jonah!"
+      "performerName": "Amara Davis Smith",
+      "actTitle": "Debut",
+      "category": "Dance",
+      "durationMinutes": 4,
+      "introLine": "Who's ready for some dancing? Please welcome Amara Davis Smith!",
+      "outroLine": "Amazing dance, Amara!"
     },
     {
       "order": 4,
-      "performerName": "Ava L. & Noah K.",
-      "actTitle": "Duet: A Million Dreams",
+      "performerName": "Hayley Watkinson & Cora Shepherd",
+      "actTitle": "Ordinary",
       "category": "Vocal",
       "durationMinutes": 4,
-      "introLine": "Now performing, Ava and Noah with a duet.",
-      "outroLine": "Beautiful performance!"
+      "introLine": "This next performance is a beautiful duet from two talented 4th graders. Please welcome Hayley Watkinson and Cora Shepherd!",
+      "outroLine": "Beautiful duet!"
     },
     {
       "order": 5,
-      "performerName": "Dragon Crew",
-      "actTitle": "Finale Mashup",
-      "category": "Group",
-      "durationMinutes": 6,
-      "introLine": "Closing tonight's show: Dragon Crew!",
-      "outroLine": "That wraps Luxford Got Talent. Thank you!"
+      "performerName": "Marina Hawick",
+      "actTitle": "The Climb",
+      "category": "Dance",
+      "durationMinutes": 4,
+      "introLine": "Our next performer proves that even 2nd graders can light up the stage. Here's Marina Hawick dancing to The Climb!",
+      "outroLine": "Great performance, Marina!"
+    },
+    {
+      "order": 6,
+      "performerName": "Victor Crawford",
+      "actTitle": "Feel It",
+      "category": "Vocal",
+      "durationMinutes": 4,
+      "introLine": "Please welcome our final performer before intermission... Victor Crawford!",
+      "outroLine": "Great job, Victor!"
+    },
+    {
+      "order": 7,
+      "performerName": "Penelope Hatch",
+      "actTitle": "Sleeping Beauty Waltz",
+      "category": "Instrumental",
+      "durationMinutes": 4,
+      "introLine": "Please welcome our talented pianist, Penelope Hatch!",
+      "outroLine": "Wonderful piano performance!"
+    },
+    {
+      "order": 8,
+      "performerName": "Briella Adontor",
+      "actTitle": "It's Been So Long",
+      "category": "Vocal",
+      "durationMinutes": 4,
+      "introLine": "Next up is another incredible 5th grade performer. Please welcome Briella Adontor!",
+      "outroLine": "Fantastic singing, Briella!"
+    },
+    {
+      "order": 9,
+      "performerName": "Harper Henderson & Ava Van Watch",
+      "actTitle": "Dance Performance",
+      "category": "Dance",
+      "durationMinutes": 4,
+      "introLine": "Get ready for another exciting dance performance! Please welcome Harper Henderson and Ava Van Watch!",
+      "outroLine": "Great dance performance!"
+    },
+    {
+      "order": 10,
+      "performerName": "Kitfikoon",
+      "actTitle": "Rubik's Cube Performance",
+      "category": "Specialty",
+      "durationMinutes": 3,
+      "introLine": "Not all talents are singing and dancing. Please welcome Kitfikoon with an amazing Rubik's Cube performance!",
+      "outroLine": "Incredible speed and focus!"
+    },
+    {
+      "order": 11,
+      "performerName": "Zack Brandance",
+      "actTitle": "Guitar Performance",
+      "category": "Instrumental",
+      "durationMinutes": 4,
+      "introLine": "Next up, give a warm welcome to guitarist Zack Brandance!",
+      "outroLine": "Nice guitar work, Zack!"
+    },
+    {
+      "order": 12,
+      "performerName": "Ethan Watkinson",
+      "actTitle": "Guitar Performance",
+      "category": "Instrumental",
+      "durationMinutes": 4,
+      "introLine": "And our final student performer of the night... please welcome Ethan Watkinson!",
+      "outroLine": "What a strong finish to the student lineup!"
     }
   ]
 }
