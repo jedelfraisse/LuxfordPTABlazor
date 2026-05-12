@@ -97,6 +97,14 @@ public class TalentShowDeviceRegistrationResult
     public string DisplayName { get; set; } = string.Empty;
 }
 
+public class TalentShowDeviceRegistrationRequest
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public string ExistingDeviceId { get; set; } = string.Empty;
+    public string ExistingPairingCode { get; set; } = string.Empty;
+    public bool ForceNewCode { get; set; }
+}
+
 public class TalentShowConnectedDevice
 {
     public string DeviceId { get; set; } = string.Empty;

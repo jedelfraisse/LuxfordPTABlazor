@@ -195,7 +195,7 @@
         <div class="card-body">
             @if (!connectedDevices.Any())
             {
-                <em>No displays connected yet. Open <strong>/eventconnect</strong> on a device to generate a pairing code.</em>
+                <em>No displays connected yet. Open <strong>/display</strong> on a device to generate a pairing code.</em>
             }
             else
             {
@@ -215,7 +215,18 @@
                             {
                                 <tr>
                                     <td><strong>@device.PairingCode</strong></td>
-                                    <td>@device.DisplayName</td>
+                                    <td style="min-width: 250px;">
+                                        <div class="input-group input-group-sm">
+                                            <input class="form-control"
+                                                   value="@GetEditableDisplayName(device.PairingCode, device.DisplayName)"
+                                                   @onchange="(e) => SetEditableDisplayName(device.PairingCode, e.Value?.ToString())" />
+                                            <button class="btn btn-outline-secondary"
+                                                    @onclick="() => UpdateDeviceNameAsync(device.PairingCode)"
+                                                    disabled="@(!isConnected)">
+                                                Rename
+                                            </button>
+                                        </div>
+                                    </td>
                                     <td>@(string.IsNullOrWhiteSpace(device.AssignedSessionCode) ? "Unassigned" : device.AssignedSessionCode)</td>
                                     <td>@(string.IsNullOrWhiteSpace(device.AssignedDisplayRole) ? "Unassigned" : device.AssignedDisplayRole)</td>
                                     <td>
@@ -252,6 +263,7 @@
     private TalentShowRealtimeState state = new();
     private List<TalentShowConnectedDevice> connectedDevices = new();
     private readonly Dictionary<string, string> deviceRoleSelections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> deviceNameEdits = new(StringComparer.OrdinalIgnoreCase);
     private bool isConnected;
     private bool isBusy;
     private string errorMessage = string.Empty;
@@ -352,6 +364,7 @@
         {
             connectedDevices = incomingDevices;
             EnsureRoleSelections();
+            EnsureNameSelections();
             InvokeAsync(StateHasChanged);
         });
 
@@ -366,6 +379,7 @@
         await hubConnection.InvokeAsync("SubscribeController");
         connectedDevices = await hubConnection.InvokeAsync<List<TalentShowConnectedDevice>>("GetDeviceRegistry");
         EnsureRoleSelections();
+        EnsureNameSelections();
         isConnected = true;
     }
 
@@ -525,6 +539,40 @@
         statusMessage = $"Cleared assignment for {pairingCode}.";
     }
 
+    private string GetEditableDisplayName(string pairingCode, string fallbackName)
+    {
+        if (deviceNameEdits.TryGetValue(pairingCode, out var edit) && !string.IsNullOrWhiteSpace(edit))
+        {
+            return edit;
+        }
+
+        return fallbackName;
+    }
+
+    private void SetEditableDisplayName(string pairingCode, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(pairingCode))
+        {
+            return;
+        }
+
+        deviceNameEdits[pairingCode] = string.IsNullOrWhiteSpace(name) ? string.Empty : name.Trim();
+    }
+
+    private async Task UpdateDeviceNameAsync(string pairingCode)
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var selectedDevice = connectedDevices.FirstOrDefault(d =>
+            d.PairingCode.Equals(pairingCode, StringComparison.OrdinalIgnoreCase));
+        var requestedName = GetEditableDisplayName(pairingCode, selectedDevice?.DisplayName ?? string.Empty);
+        await hubConnection.InvokeAsync("UpdateDeviceDisplayName", pairingCode, requestedName);
+        statusMessage = $"Renamed {pairingCode} to {requestedName}.";
+    }
+
     private void EnsureRoleSelections()
     {
         foreach (var device in connectedDevices)
@@ -534,6 +582,17 @@
                 deviceRoleSelections[device.PairingCode] = string.IsNullOrWhiteSpace(device.AssignedDisplayRole)
                     ? TalentShowDisplayRole.MainBoard
                     : device.AssignedDisplayRole;
+            }
+        }
+    }
+
+    private void EnsureNameSelections()
+    {
+        foreach (var device in connectedDevices)
+        {
+            if (!deviceNameEdits.TryGetValue(device.PairingCode, out var existing) || string.IsNullOrWhiteSpace(existing))
+            {
+                deviceNameEdits[device.PairingCode] = device.DisplayName;
             }
         }
     }

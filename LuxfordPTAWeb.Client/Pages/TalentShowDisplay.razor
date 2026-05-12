@@ -6,9 +6,10 @@
 @using LuxfordPTAWeb.Shared.DTOs
 @using Microsoft.AspNetCore.SignalR.Client
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<PageTitle>Event Connect</PageTitle>
+<PageTitle>Display</PageTitle>
 
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
@@ -39,10 +40,16 @@
                                     <label class="form-label">Device Name</label>
                                     <InputText class="form-control" @bind-Value="deviceNameInput" />
                                 </div>
-                                <div class="col-md-3 d-flex align-items-end">
-                                    <button class="btn btn-outline-light w-100" @onclick="RegisterDeviceAsync">Regenerate Code</button>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="w-100">
+                                        <button class="btn btn-outline-light w-100" @onclick="RegisterDeviceAsync">Connect Display</button>
+                                        <div class="form-check mt-2">
+                                            <InputCheckbox class="form-check-input" @bind-Value="requestNewCodeOnRegister" id="newCodeCheck" />
+                                            <label class="form-check-label small" for="newCodeCheck">Generate a new code</label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <div class="col-md-3 text-md-end mt-3 mt-md-0">
                                     <div class="small text-uppercase text-secondary">Pairing Code</div>
                                     <div class="display-4 fw-bold">@pairingCode</div>
                                 </div>
@@ -69,10 +76,12 @@
 
             @if (!isAssigned)
             {
-                <div class="card bg-black text-light border-secondary">
-                    <div class="card-body text-center py-5">
-                        <h3>Waiting for controller assignment…</h3>
-                        <p class="mb-0">Open the event control page and assign pairing code <strong>@pairingCode</strong>.</p>
+                <div class="waiting-display-panel">
+                    <div class="waiting-title">Waiting for content...</div>
+                    <div class="waiting-code">@pairingCode</div>
+                    <div class="waiting-connection">
+                        <span class="waiting-dot @(isConnected ? "connected" : string.Empty)"></span>
+                        <span>@(isConnected ? "Connected" : "Disconnected")</span>
                     </div>
                 </div>
             }
@@ -231,6 +240,7 @@
     private HubConnection? hubConnection;
     private TalentShowRealtimeState state = new();
     private string pairingCode = "-----";
+    private string deviceId = string.Empty;
     private string deviceNameInput = $"Display-{DateTime.Now:HHmm}";
     private string statusMessage = "Connecting to event hub...";
     private string assignedRole = TalentShowDisplayRole.MainBoard;
@@ -239,6 +249,9 @@
     private bool isConnected;
     private bool isAssigned;
     private bool isDirectAudienceVoteMode;
+    private bool requestNewCodeOnRegister;
+
+    private const string DisplayRegistrationStorageKey = "talentShowDisplayRegistration";
 
     private string voterName = string.Empty;
     private int talentScore = 3;
@@ -263,6 +276,7 @@
             return;
         }
 
+        await RestoreDeviceRegistrationAsync();
         await RegisterDeviceAsync();
     }
 
@@ -332,11 +346,65 @@
             return;
         }
 
-        var registration = await hubConnection.InvokeAsync<TalentShowDeviceRegistrationResult>("RegisterDevice", deviceNameInput);
+        var registrationRequest = new TalentShowDeviceRegistrationRequest
+        {
+            DisplayName = deviceNameInput,
+            ExistingDeviceId = requestNewCodeOnRegister ? string.Empty : deviceId,
+            ExistingPairingCode = requestNewCodeOnRegister ? string.Empty : pairingCode,
+            ForceNewCode = requestNewCodeOnRegister
+        };
+
+        var registration = await hubConnection.InvokeAsync<TalentShowDeviceRegistrationResult>("RegisterDevice", registrationRequest);
+        deviceId = registration.DeviceId;
         pairingCode = registration.PairingCode;
+        deviceNameInput = registration.DisplayName;
         assignedSessionCode = string.Empty;
         isAssigned = false;
+        await PersistDeviceRegistrationAsync();
         statusMessage = $"Device registered. Pairing code: {pairingCode}";
+    }
+
+    private async Task RestoreDeviceRegistrationAsync()
+    {
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", DisplayRegistrationStorageKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        var cache = System.Text.Json.JsonSerializer.Deserialize<DisplayRegistrationCache>(json);
+        if (cache == null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(cache.DeviceId))
+        {
+            deviceId = cache.DeviceId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(cache.PairingCode))
+        {
+            pairingCode = cache.PairingCode;
+        }
+
+        if (!string.IsNullOrWhiteSpace(cache.DisplayName))
+        {
+            deviceNameInput = cache.DisplayName;
+        }
+    }
+
+    private async Task PersistDeviceRegistrationAsync()
+    {
+        var cache = new DisplayRegistrationCache
+        {
+            DeviceId = deviceId,
+            PairingCode = pairingCode,
+            DisplayName = deviceNameInput
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(cache);
+        await JS.InvokeVoidAsync("localStorage.setItem", DisplayRegistrationStorageKey, json);
     }
 
     private RenderFragment RenderVoteForm(bool isJudge, string nameLabel) => @<div class="mt-3">
@@ -435,6 +503,13 @@
         return new string(code.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
     }
 
+    private sealed class DisplayRegistrationCache
+    {
+        public string DeviceId { get; set; } = string.Empty;
+        public string PairingCode { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (hubConnection != null)
@@ -443,3 +518,50 @@
         }
     }
 }
+
+<style>
+    .waiting-display-panel {
+        background: linear-gradient(145deg, #6f73d2, #6b5fd0);
+        color: #eef1ff;
+        border-radius: 0.75rem;
+        padding: 3.5rem 1.5rem;
+        text-align: center;
+        min-height: 56vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+    }
+
+    .waiting-title {
+        font-size: clamp(1.9rem, 3vw, 3rem);
+        font-weight: 500;
+        letter-spacing: 0.03em;
+    }
+
+    .waiting-code {
+        font-size: clamp(4rem, 11vw, 8.5rem);
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    .waiting-connection {
+        font-size: clamp(1.6rem, 2.2vw, 2.6rem);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .waiting-dot {
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 50%;
+        background: #9aa0c0;
+    }
+
+    .waiting-dot.connected {
+        background: #36d37e;
+    }
+</style>
