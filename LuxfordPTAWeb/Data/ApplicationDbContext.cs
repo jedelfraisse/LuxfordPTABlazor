@@ -18,6 +18,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<EventCatSub> EventCatSubs { get; set; }
 	public DbSet<EventTemplate> EventTemplates { get; set; }
 	public DbSet<EventControl> EventControls { get; set; }
+	public DbSet<TalentShowSessionState> TalentShowSessionStates { get; set; }
+	public DbSet<TalentShowAct> TalentShowActs { get; set; }
+	public DbSet<TalentShowVote> TalentShowVotes { get; set; }
+	public DbSet<TalentShowDisplayAssignmentHistory> TalentShowDisplayAssignmentHistories { get; set; }
 	public DbSet<ProgramCard> ProgramCards { get; set; }
 
 	// Summit Proposal: Bug Reports
@@ -110,6 +114,77 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
 		builder.Entity<EventControl>()
 			.HasIndex(ec => new { ec.EventId, ec.SequenceOrder });
+
+		builder.Entity<TalentShowSessionState>()
+			.HasOne(ts => ts.Event)
+			.WithOne(e => e.TalentShowSessionState)
+			.HasForeignKey<TalentShowSessionState>(ts => ts.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowSessionState>()
+			.Property(ts => ts.CurrentState)
+			.HasMaxLength(40);
+
+		builder.Entity<TalentShowSessionState>()
+			.Property(ts => ts.SessionCode)
+			.HasMaxLength(24);
+
+		builder.Entity<TalentShowSessionState>()
+			.HasIndex(ts => ts.EventId)
+			.IsUnique();
+
+		builder.Entity<TalentShowSessionState>()
+			.HasIndex(ts => ts.SessionCode);
+
+		builder.Entity<TalentShowAct>()
+			.HasOne(ta => ta.Event)
+			.WithMany(e => e.TalentShowActs)
+			.HasForeignKey(ta => ta.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowAct>()
+			.Property(ta => ta.PerformerName)
+			.HasMaxLength(120);
+
+		builder.Entity<TalentShowAct>()
+			.Property(ta => ta.Title)
+			.HasMaxLength(120);
+
+		builder.Entity<TalentShowAct>()
+			.HasIndex(ta => new { ta.EventId, ta.OrderIndex })
+			.IsUnique();
+
+		builder.Entity<TalentShowVote>()
+			.HasOne(tv => tv.Event)
+			.WithMany(e => e.TalentShowVotes)
+			.HasForeignKey(tv => tv.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowVote>()
+			.HasOne(tv => tv.Act)
+			.WithMany()
+			.HasForeignKey(tv => tv.ActId)
+			.OnDelete(DeleteBehavior.NoAction);
+
+		builder.Entity<TalentShowVote>()
+			.HasIndex(tv => new { tv.EventId, tv.TimestampUtc });
+
+		builder.Entity<TalentShowDisplayAssignmentHistory>()
+			.HasOne(th => th.Event)
+			.WithMany(e => e.TalentShowDisplayAssignments)
+			.HasForeignKey(th => th.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowDisplayAssignmentHistory>()
+			.Property(th => th.DisplayCode)
+			.HasMaxLength(16);
+
+		builder.Entity<TalentShowDisplayAssignmentHistory>()
+			.Property(th => th.Role)
+			.HasMaxLength(40);
+
+		builder.Entity<TalentShowDisplayAssignmentHistory>()
+			.HasIndex(th => new { th.EventId, th.AssignedAt });
 
 		// Event Status enum configuration
 		builder.Entity<Event>()

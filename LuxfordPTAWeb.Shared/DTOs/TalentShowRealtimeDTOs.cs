@@ -33,6 +33,7 @@ public class TalentShowRealtimeState
 {
     public string ShowName { get; set; } = string.Empty;
     public string SessionCode { get; set; } = string.Empty;
+    public string CurrentState { get; set; } = TalentShowLifecycleState.PreShow;
     public bool IsLiveMode { get; set; }
     public string OverallState { get; set; } = TalentShowOverallState.PreShow;
     public string LiveSubState { get; set; } = TalentShowLiveSubState.HostTalk;
@@ -44,6 +45,30 @@ public class TalentShowRealtimeState
     public List<TalentShowScheduleItem> Items { get; set; } = new();
     public TalentShowPresentationSettings Presentation { get; set; } = new();
     public List<TalentShowVoteSubmission> Votes { get; set; } = new();
+}
+
+public static class TalentShowLifecycleState
+{
+    public const string Planning = "Planning";
+    public const string TryOuts = "TryOuts";
+    public const string Rehearsal = "Rehearsal";
+    public const string PreShow = "PreShow";
+    public const string HostTalk = "HostTalk";
+    public const string ActShow = "ActShow";
+    public const string Intermission = "Intermission";
+    public const string PostShow = "PostShow";
+
+    public static readonly string[] All =
+    [
+        Planning,
+        TryOuts,
+        Rehearsal,
+        PreShow,
+        HostTalk,
+        ActShow,
+        Intermission,
+        PostShow
+    ];
 }
 
 public static class TalentShowOverallState

@@ -30,6 +30,7 @@ else
             @if (normalizedControlName == "talent-show")
             {
                 <TalentShowRehearsalControl Embedded="true"
+                                           EventId="@eventItem.Id"
                                            PreferredShowKey="@eventItem.Slug"
                                            SessionCodeOverride="@BuildTalentShowSessionCode(eventItem)" />
             }

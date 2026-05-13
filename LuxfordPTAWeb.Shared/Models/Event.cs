@@ -91,6 +91,10 @@ public class Event : IAuditableEntity
 	// NEW: Events copied from this event
 	public ICollection<Event> CopiedEvents { get; set; } = new List<Event>();
 	public ICollection<EventControl> EventControls { get; set; } = new List<EventControl>();
+	public ICollection<TalentShowAct> TalentShowActs { get; set; } = new List<TalentShowAct>();
+	public ICollection<TalentShowVote> TalentShowVotes { get; set; } = new List<TalentShowVote>();
+	public ICollection<TalentShowDisplayAssignmentHistory> TalentShowDisplayAssignments { get; set; } = new List<TalentShowDisplayAssignmentHistory>();
+	public TalentShowSessionState? TalentShowSessionState { get; set; }
 
 	// Duration helpers (these ARE useful and used)
 	public TimeSpan? EventDuration => EventEndTime != default && EventStartTime != default

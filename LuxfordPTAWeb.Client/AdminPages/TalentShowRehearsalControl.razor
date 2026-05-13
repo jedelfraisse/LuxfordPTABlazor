@@ -34,22 +34,25 @@
 <div class="card mb-3">
     <div class="card-body">
         <div class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label">Show Template</label>
-                <InputSelect class="form-select" @bind-Value="selectedShowKey">
-                    @foreach (var key in availableShowKeys)
-                    {
-                        <option value="@key">@key</option>
-                    }
-                </InputSelect>
-            </div>
+            @if (!IsEventScoped)
+            {
+                <div class="col-md-4">
+                    <label class="form-label">Show Template</label>
+                    <InputSelect class="form-select" @bind-Value="selectedShowKey">
+                        @foreach (var key in availableShowKeys)
+                        {
+                            <option value="@key">@key</option>
+                        }
+                    </InputSelect>
+                </div>
+            }
             <div class="col-md-2">
                 <button class="btn btn-primary w-100" @onclick="LoadShowAsync" disabled="@isBusy">
                     Load
                 </button>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Event Session</label>
+                <label class="form-label">Session Code</label>
                 <InputText class="form-control" @bind-Value="state.SessionCode" />
             </div>
             <div class="col-md-3">
@@ -61,7 +64,7 @@
     </div>
 </div>
 
-@if (rehearsalPackage != null)
+@if (hasLoadedState)
 {
     <div class="card mb-3">
         <div class="card-body">
@@ -73,17 +76,17 @@
             </div>
             <div class="row g-2 mt-3">
                 <div class="col-md-3">
-                    <label class="form-label mb-1">Overall State</label>
-                    <InputSelect class="form-select form-select-sm" @bind-Value="state.OverallState">
-                        @foreach (var overall in TalentShowOverallState.All)
+                    <label class="form-label mb-1">Current State</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.CurrentState">
+                        @foreach (var lifecycleState in TalentShowLifecycleState.All)
                         {
-                            <option value="@overall">@overall</option>
+                            <option value="@lifecycleState">@lifecycleState</option>
                         }
                     </InputSelect>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label mb-1">Live Sub-State</label>
-                    <InputSelect class="form-select form-select-sm" @bind-Value="state.LiveSubState" disabled="@(state.OverallState != TalentShowOverallState.Live)">
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.LiveSubState" disabled="@(state.CurrentState is not TalentShowLifecycleState.HostTalk and not TalentShowLifecycleState.ActShow and not TalentShowLifecycleState.Intermission)">
                         @foreach (var sub in TalentShowLiveSubState.All)
                         {
                             <option value="@sub">@sub</option>
@@ -92,7 +95,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label mb-1">Next Sub-State</label>
-                    <InputSelect class="form-select form-select-sm" @bind-Value="state.NextLiveSubState" disabled="@(state.OverallState != TalentShowOverallState.Live)">
+                    <InputSelect class="form-select form-select-sm" @bind-Value="state.NextLiveSubState" disabled="@(state.CurrentState is not TalentShowLifecycleState.HostTalk and not TalentShowLifecycleState.ActShow and not TalentShowLifecycleState.Intermission)">
                         @foreach (var sub in TalentShowLiveSubState.All)
                         {
                             <option value="@sub">@sub</option>
@@ -263,6 +266,7 @@
 
 @code {
     [Parameter] public bool Embedded { get; set; }
+    [Parameter] public int? EventId { get; set; }
     [Parameter] public string? TitleText { get; set; }
     [Parameter] public string? BackUrl { get; set; }
     [Parameter] public string? PreferredShowKey { get; set; }
@@ -280,12 +284,17 @@
     private bool isBusy;
     private string errorMessage = string.Empty;
     private string statusMessage = string.Empty;
+    private bool hasLoadedState;
+    private bool IsEventScoped => EventId.HasValue && EventId.Value > 0;
     private string PageTitleText => string.IsNullOrWhiteSpace(TitleText) ? "Talent Show Rehearsal Control" : TitleText;
     private string EffectiveBackUrl => string.IsNullOrWhiteSpace(BackUrl) ? "/admin/events" : BackUrl;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadShowKeysAsync();
+        if (!IsEventScoped)
+        {
+            await LoadShowKeysAsync();
+        }
         await EnsureHubConnectionAsync();
         await LoadShowAsync();
     }
@@ -325,6 +334,21 @@
 
         try
         {
+            if (IsEventScoped)
+            {
+                state = await Http.GetFromJsonAsync<TalentShowRealtimeState>($"api/talentshow/{EventId}/state") ?? new TalentShowRealtimeState();
+                if (!string.IsNullOrWhiteSpace(SessionCodeOverride))
+                {
+                    state.SessionCode = SessionCodeOverride.Trim();
+                }
+
+                hasLoadedState = true;
+                statusMessage = "Loaded event-scoped Talent Show state.";
+                await JoinSessionAsync();
+                await PublishStateAsync();
+                return;
+            }
+
             rehearsalPackage = await Http.GetFromJsonAsync<TalentShowRehearsalPackage>($"api/talentshow-test/shows/{selectedShowKey}");
             if (rehearsalPackage == null)
             {
@@ -348,6 +372,7 @@
                 UpdatedAtUtc = DateTime.UtcNow
             };
 
+            hasLoadedState = true;
             statusMessage = $"Loaded {rehearsalPackage.ShowName}.";
             await JoinSessionAsync();
             await PublishStateAsync();
@@ -432,10 +457,16 @@
             return;
         }
 
+        ApplyLegacyStateFromCurrentState();
         state.IsLiveMode = state.OverallState == TalentShowOverallState.Live;
         if (state.OverallState != TalentShowOverallState.Live)
         {
             state.LiveSubState = TalentShowLiveSubState.HostTalk;
+        }
+
+        if (IsEventScoped)
+        {
+            await Http.PostAsJsonAsync($"api/talentshow/{EventId}/state", state);
         }
 
         state.UpdatedAtUtc = DateTime.UtcNow;
@@ -448,6 +479,17 @@
         if (hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
         {
             return;
+        }
+
+        if (IsEventScoped)
+        {
+            state.CurrentIndex = state.Items.Any() ? 0 : -1;
+            state.CurrentState = TalentShowLifecycleState.PreShow;
+            state.OverallState = TalentShowOverallState.PreShow;
+            state.LiveSubState = TalentShowLiveSubState.HostTalk;
+            state.NextLiveSubState = TalentShowLiveSubState.ActShow;
+            state.Votes.Clear();
+            await Http.PostAsJsonAsync($"api/talentshow/{EventId}/state", state);
         }
 
         await hubConnection.InvokeAsync("ClearSession", state.SessionCode);
@@ -483,6 +525,40 @@
     private void MarkSegmentStartedNow()
     {
         state.SegmentStartedAtUtc = DateTime.UtcNow;
+    }
+
+    private void ApplyLegacyStateFromCurrentState()
+    {
+        state.CurrentState = NormalizeCurrentState(state.CurrentState);
+
+        state.OverallState = state.CurrentState switch
+        {
+            TalentShowLifecycleState.PostShow => TalentShowOverallState.PostShow,
+            TalentShowLifecycleState.HostTalk or TalentShowLifecycleState.ActShow or TalentShowLifecycleState.Intermission => TalentShowOverallState.Live,
+            _ => TalentShowOverallState.PreShow
+        };
+
+        state.LiveSubState = state.CurrentState switch
+        {
+            TalentShowLifecycleState.HostTalk => TalentShowLiveSubState.HostTalk,
+            TalentShowLifecycleState.Intermission => TalentShowLiveSubState.PauseIntermission,
+            _ => TalentShowLiveSubState.ActShow
+        };
+
+        state.NextLiveSubState = state.LiveSubState == TalentShowLiveSubState.HostTalk
+            ? TalentShowLiveSubState.ActShow
+            : TalentShowLiveSubState.HostTalk;
+    }
+
+    private static string NormalizeCurrentState(string? currentState)
+    {
+        if (!string.IsNullOrWhiteSpace(currentState) &&
+            TalentShowLifecycleState.All.Contains(currentState, StringComparer.OrdinalIgnoreCase))
+        {
+            return TalentShowLifecycleState.All.First(state => state.Equals(currentState, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return TalentShowLifecycleState.PreShow;
     }
 
     private void UpdateEstimatedMinutesForCurrentState()
