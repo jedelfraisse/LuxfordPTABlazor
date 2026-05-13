@@ -75,14 +75,23 @@
                 <button class="btn btn-outline-danger" @onclick="ClearSessionAsync" disabled="@(!isConnected || isBusy)">Clear Session</button>
             </div>
             <div class="row g-2 mt-3">
-                <div class="col-md-3">
-                    <label class="form-label mb-1">Current State</label>
-                    <InputSelect class="form-select form-select-sm" @bind-Value="state.CurrentState">
-                        @foreach (var lifecycleState in TalentShowLifecycleState.All)
+                <div class="col-12">
+                    <label class="form-label mb-2"><strong>Lifecycle Stage</strong></label>
+                    <div class="d-flex gap-2 align-items-center flex-wrap" style="margin-bottom: 1rem;">
+                        @for (int i = 0; i < TalentShowLifecycleState.All.Length; i++)
                         {
-                            <option value="@lifecycleState">@lifecycleState</option>
+                            var stateVal = TalentShowLifecycleState.All[i];
+                            var isActive = state.CurrentState == stateVal;
+                            var stateNum = i + 1;
+                            <button 
+                                class="btn @(isActive ? "btn-success" : "btn-outline-secondary") btn-sm"
+                                style="min-width: 70px; font-weight: @(isActive ? "bold" : "normal")"
+                                @onclick="() => TransitionToStateAsync(stateVal)"
+                                disabled="@isBusy">
+                                @stateNum. @stateVal
+                            </button>
                         }
-                    </InputSelect>
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label mb-1">Live Sub-State</label>
@@ -510,6 +519,48 @@
         {
             state.CurrentIndex++;
             UpdateEstimatedMinutesForCurrentState();
+        }
+    }
+
+    private async Task TransitionToStateAsync(string targetState)
+    {
+        if (!IsEventScoped)
+        {
+            state.CurrentState = targetState;
+            ApplyLegacyStateFromCurrentState();
+            await PublishStateAsync();
+            return;
+        }
+
+        isBusy = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var dto = new TalentShowLifecycleTransitionDTO { TargetState = targetState };
+            var response = await Http.PostAsJsonAsync($"api/talentshow/{EventId}/transition-lifecycle", dto);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var updatedState = await response.Content.ReadFromJsonAsync<TalentShowRealtimeState>();
+                if (updatedState != null)
+                {
+                    state = updatedState;
+                    statusMessage = $"Transitioned to {targetState}.";
+                    await PublishStateAsync();
+                }
+            }
+            else
+            {
+                errorMessage = $"Failed to transition state: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error transitioning state: {ex.Message}";
+        }
+        finally
+        {
+            isBusy = false;
         }
     }
 
