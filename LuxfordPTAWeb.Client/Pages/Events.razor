@@ -52,7 +52,7 @@
             @foreach (var evt in upcomingEvents.Take(6))
             {
                 <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100 border-start border-4 border-success">
+                    <div class="card h-100 border-start border-4" style="@GetEventBorderStyle(evt)">
                         <div class="card-body">
                             <h6 class="card-title">@evt.Title</h6>
                             <p class="text-muted mb-2">
@@ -605,6 +605,23 @@ else
             "text-secondary" => "bg-secondary",
             _ => "bg-secondary"
         };
+    }
+
+    private static string GetEventBorderStyle(Event evt)
+    {
+        var borderColor = evt.EventCat?.ColorClass switch
+        {
+            "text-danger" => "#dc3545",
+            "text-success" => "#198754",
+            "text-primary" => "#0d6efd",
+            "text-info" => "#0dcaf0",
+            "text-warning" => "#ffc107",
+            "text-secondary" => "#6c757d",
+            "text-purple" => "#7F4592",
+            _ => "#198754"
+        };
+
+        return $"border-left-color: {borderColor} !important;";
     }
 
     private string TruncateDescription(string description, int maxLength)

@@ -852,6 +852,24 @@
         };
     }
 
+    private static string GetControlTypeLabel(string? controlType)
+    {
+        return controlType switch
+        {
+            "TalentShowDirectorControl" => "Talent Show Director",
+            "BingoDirectorControl" => "Bingo Director",
+            "ElectionDirectorControl" => "Election Director",
+            "BingoControl" => "Bingo Helper",
+            "ElectionControl" => "Election Helper",
+            "SponsorDisplayControl" => "Sponsor Display",
+            "MeetingAgendaControl" => "Meeting Agenda",
+            "NoteTakerControl" => "Note Taker",
+            "SlideshowControl" => "Slideshow",
+            "FeedBackFormControl" => "Feedback Form",
+            _ => controlType ?? string.Empty
+        };
+    }
+
     private void SelectOpsTab(string tab)
     {
         selectedOpsTab = tab;
@@ -1028,7 +1046,7 @@ else if (eventModel != null)
             </li>
             <li class="nav-item">
                 <button type="button" class="nav-link @(selectedOpsTab == "controls" ? "active" : string.Empty)" @onclick='() => SelectOpsTab("controls")'>
-                    Event Controls
+                    Event Helpers
                 </button>
             </li>
             <li class="nav-item">
@@ -1397,9 +1415,12 @@ else if (eventModel != null)
             {
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-broadcast"></i> Event Controls</h5>
+                        <h5 class="mb-0"><i class="bi bi-broadcast"></i> Event Helpers</h5>
                     </div>
                     <div class="card-body">
+                        <div class="form-text mb-3">
+                            The director manages event flow and status. Additional helpers support displays, agendas, notes, and other event tasks.
+                        </div>
                         @if (string.IsNullOrWhiteSpace(selectedDirectorControlType))
                         {
                             <div class="row g-2 align-items-end mb-3">
@@ -1409,10 +1430,10 @@ else if (eventModel != null)
                                         <option value="">No Director (Optional)</option>
                                         @foreach (var directorType in directorControlTypes)
                                         {
-                                            <option value="@directorType">@directorType</option>
+                                            <option value="@directorType">@GetControlTypeLabel(directorType)</option>
                                         }
                                     </select>
-                                    <div class="form-text">Director is optional for simple events. Only one director control is allowed.</div>
+                                    <div class="form-text">Director is optional for simple events. Only one director helper is allowed.</div>
                                 </div>
                             </div>
                         }
@@ -1430,17 +1451,17 @@ else if (eventModel != null)
                         {
                             <div class="row g-2 align-items-end mb-3">
                                 <div class="col-md-8">
-                                    <label class="form-label">Add Additional Control</label>
+                                    <label class="form-label">Add Additional Helper</label>
                                     <select class="form-select" @bind="selectedNonDirectorControlType">
                                         @foreach (var controlType in availableNonDirectorControlTypes)
                                         {
-                                            <option value="@controlType">@controlType</option>
+                                            <option value="@controlType">@GetControlTypeLabel(controlType)</option>
                                         }
                                     </select>
                                 </div>
                                 <div class="col-md-4">
                                     <button type="button" class="btn btn-outline-primary w-100" @onclick="AddNonDirectorControl" disabled="@string.IsNullOrWhiteSpace(selectedNonDirectorControlType)">
-                                        Add Control
+                                        Add Helper
                                     </button>
                                 </div>
                             </div>
@@ -1464,8 +1485,8 @@ else if (eventModel != null)
                                         {
                                             <tr>
                                                 <td>@control.SequenceOrder</td>
-                                                <td><code>@control.ControlType</code></td>
-                                                <td>@(control.IsDirector ? "Director" : "Control")</td>
+                                                <td><code>@GetControlTypeLabel(control.ControlType)</code></td>
+                                                <td>@(control.IsDirector ? "Director" : "Helper")</td>
                                                 <td>
                                                     <input class="form-check-input" type="checkbox" @bind="control.IsActive" />
                                                 </td>
@@ -1481,7 +1502,7 @@ else if (eventModel != null)
                                     else
                                     {
                                         <tr>
-                                            <td colspan="5" class="text-muted">No controls configured yet.</td>
+                                            <td colspan="5" class="text-muted">No helpers configured yet.</td>
                                         </tr>
                                     }
                                 </tbody>

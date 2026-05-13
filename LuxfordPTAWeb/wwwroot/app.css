@@ -311,8 +311,8 @@ h1:focus {
 }
 
 .pta-header-nav .pta-nav-link:focus {
-    box-shadow: 0 0 0 3px #4CAF50;
-    background: #e8f5e9;
+    box-shadow: 0 0 0 3px rgba(127, 69, 146, 0.25);
+    background: transparent;
 }
 
 .pta-header-nav .pta-nav-icon {
@@ -335,31 +335,37 @@ h1:focus {
 .pta-header-nav .pta-nav-link.active.text-purple {
     border-color: #7F4592;
     background: #f3e5f5;
+    color: #7F4592;
 }
 
 .pta-header-nav .pta-nav-link.active.text-success {
     border-color: #198754;
     background: #eaf6ea;
+    color: #198754;
 }
 
 .pta-header-nav .pta-nav-link.active.text-primary {
     border-color: #0d6efd;
     background: #eaf1fa;
+    color: #0d6efd;
 }
 
 .pta-header-nav .pta-nav-link.active.text-info {
     border-color: #0dcaf0;
     background: #eaf7fa;
+    color: #0b91ad;
 }
 
 .pta-header-nav .pta-nav-link.active.text-warning {
     border-color: #ffc107;
     background: #fffbe6;
+    color: #b38600;
 }
 
 .pta-header-nav .pta-nav-link.active.text-secondary {
     border-color: #6c757d;
     background: #f3f3f3;
+    color: #6c757d;
 }
 
 /* Mobile Menu Overlay */
@@ -643,8 +649,8 @@ h1:focus {
 }
 
 .pta-nav-link:focus {
-    box-shadow: 0 0 0 3px #4CAF50;
-    background: #e8f5e9;
+    box-shadow: 0 0 0 3px rgba(127, 69, 146, 0.25);
+    background: transparent;
 }
 
 .pta-nav-icon {
@@ -667,32 +673,45 @@ h1:focus {
 .pta-nav-link.active.text-purple {
     border-color: #7F4592;
     background: #f3e5f5;
+    color: #7F4592;
 }
 
 .pta-nav-link.active.text-success {
     border-color: #198754;
     background: #eaf6ea;
+    color: #198754;
 }
 
 .pta-nav-link.active.text-primary {
     border-color: #0d6efd;
     background: #eaf1fa;
+    color: #0d6efd;
 }
 
 .pta-nav-link.active.text-info {
     border-color: #0dcaf0;
     background: #eaf7fa;
+    color: #0b91ad;
 }
 
 .pta-nav-link.active.text-warning {
     border-color: #ffc107;
     background: #fffbe6;
+    color: #b38600;
 }
 
 .pta-nav-link.active.text-secondary {
     border-color: #6c757d;
     background: #f3f3f3;
+    color: #6c757d;
 }
+
+footer a.active.text-purple { color: #7F4592 !important; }
+footer a.active.text-success { color: #198754 !important; }
+footer a.active.text-primary { color: #0d6efd !important; }
+footer a.active.text-info { color: #0b91ad !important; }
+footer a.active.text-warning { color: #b38600 !important; }
+footer a.active.text-secondary { color: #6c757d !important; }
 
 /* Login Display in Tray - Always on separate line */
 .login-display-tray {
