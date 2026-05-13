@@ -44,9 +44,9 @@
                         <div class="card bg-dark text-light border-warning mb-3">
                             <div class="card-body">
                                 <h3 class="text-warning">Backstage Director View</h3>
+                                <p class="mb-1"><strong>Current Lifecycle Stage:</strong> <span class="badge bg-warning text-dark">@state.CurrentState</span></p>
                                 <p class="mb-1"><strong>Overall:</strong> @state.OverallState</p>
                                 <p class="mb-1"><strong>Live Sub-State:</strong> @state.LiveSubState</p>
-                                <p class="mb-1"><strong>Next Sub-State:</strong> @state.NextLiveSubState</p>
                                 <p class="mb-1"><strong>Estimated Timer:</strong> @GetRemainingTimerText()</p>
                                 @if (GetCurrentItem() is { } currentBackstage)
                                 {
@@ -100,26 +100,38 @@
                     default:
                         <div class="card bg-dark text-light border-success mb-3 @state.Presentation.ThemeClass">
                             <div class="card-body">
-                                <h3 class="mb-2">@state.ShowName</h3>
-                                @if (state.OverallState == TalentShowOverallState.PreShow)
+                                <h3 class="mb-3">@state.ShowName</h3>
+                                
+                                <div class="lifecycle-state-bar mb-4">
+                                    @foreach (var stateVal in TalentShowLifecycleState.All)
+                                    {
+                                        var isCurrentState = state.CurrentState == stateVal;
+                                        var stateIndex = System.Array.IndexOf(TalentShowLifecycleState.All, stateVal);
+                                        <span class="lifecycle-badge @(isCurrentState ? "active" : "inactive")">
+                                            @(stateIndex + 1)
+                                        </span>
+                                    }
+                                </div>
+                                
+                                @if (state.CurrentState == TalentShowLifecycleState.PreShow)
                                 {
                                     <h1 class="display-5">Pre-Show</h1>
                                     <p>@state.Presentation.WelcomeMessage</p>
                                     <p><strong>Sponsor Loop / Upcoming Events</strong></p>
                                 }
-                                else if (state.OverallState == TalentShowOverallState.PostShow)
+                                else if (state.CurrentState == TalentShowLifecycleState.PostShow)
                                 {
                                     <h1 class="display-5">Post-Show</h1>
                                     <p>Thank you for attending Luxford Got Talent!</p>
                                     <p><strong>Sponsors and upcoming PTA events</strong></p>
                                 }
-                                else if (state.LiveSubState == TalentShowLiveSubState.PauseIntermission)
+                                else if (state.CurrentState == TalentShowLifecycleState.Intermission)
                                 {
                                     <h1 class="display-5">Intermission</h1>
                                     <p>@state.Presentation.IntermissionMessage</p>
                                     <p><strong>Sponsors and upcoming PTA events</strong></p>
                                 }
-                                else if (state.LiveSubState == TalentShowLiveSubState.HostTalk)
+                                else if (state.CurrentState == TalentShowLifecycleState.HostTalk)
                                 {
                                     <h1 class="display-5">Host Segment</h1>
                                     <p>The hosts are addressing the audience.</p>
@@ -128,7 +140,7 @@
                                         <p class="mb-0"><strong>Next Act:</strong> @hostNext.ActTitle (@hostNext.PerformerName)</p>
                                     }
                                 }
-                                else if (GetCurrentItem() is { } currentMain)
+                                else if (state.CurrentState == TalentShowLifecycleState.ActShow && GetCurrentItem() is { } currentMain)
                                 {
                                     <h1 class="display-4 mt-3">Now Performing: @currentMain.ActTitle</h1>
                                     <h3>@currentMain.PerformerName</h3>
@@ -137,6 +149,15 @@
                                     {
                                         <hr />
                                         <p class="mb-0"><strong>Up Next:</strong> @nextMain.ActTitle (@nextMain.PerformerName)</p>
+                                    }
+                                }
+                                else if (state.CurrentState is TalentShowLifecycleState.Planning or TalentShowLifecycleState.TryOuts or TalentShowLifecycleState.Rehearsal)
+                                {
+                                    <h1 class="display-5">@state.CurrentState</h1>
+                                    <p>The show is in @state.CurrentState phase.</p>
+                                    @if (state.Items.Any())
+                                    {
+                                        <p><strong>Acts scheduled: @state.Items.Count</strong></p>
                                     }
                                 }
                                 else
@@ -590,5 +611,41 @@
 
     .footer-sep {
         opacity: 0.45;
+    }
+
+    .lifecycle-state-bar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0.5rem;
+        border: 1px solid rgba(54, 211, 126, 0.2);
+    }
+
+    .lifecycle-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .lifecycle-badge.active {
+        background: #36d37e;
+        color: #0a0a18;
+        box-shadow: 0 0 12px rgba(54, 211, 126, 0.6);
+        transform: scale(1.1);
+    }
+
+    .lifecycle-badge.inactive {
+        background: rgba(100, 100, 130, 0.5);
+        color: #b8c0e0;
+        border: 1px solid rgba(54, 211, 126, 0.3);
     }
 </style>
