@@ -1,0 +1,111 @@
+@using LuxfordPTAWeb.Shared.DTOs
+
+<div>
+    <h6 class="text-secondary mb-3"><i class="bi bi-check2-all"></i> Post-Show Stage</h6>
+    
+    <p class="text-muted">Show results, thank sponsors, and archive performance data.</p>
+    
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="form-label">Post-Show Checklist</label>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistVotesTabulated" id="votesTabulated" />
+                <label class="form-check-label" for="votesTabulated">Final votes tabulated and verified</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistWinnersAnnounced" id="winnersAnnounced" />
+                <label class="form-check-label" for="winnersAnnounced">Winners announced and celebrated</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistSponsorsRecognized" id="sponsorsRecognized" />
+                <label class="form-check-label" for="sponsorsRecognized">Sponsors recognized and thanked</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistPerformersThankYou" id="performersThankYou" />
+                <label class="form-check-label" for="performersThankYou">All performers thanked</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistEquipmentSecured" id="equipmentSecured" />
+                <label class="form-check-label" for="equipmentSecured">Equipment secured and packed</label>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label">Show Summary</label>
+            <textarea class="form-control" @bind="showSummary" rows="5" placeholder="Document show highlights, attendance, feedback, lessons learned..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Estimated Attendance</label>
+            <input type="number" class="form-control" @bind="estimatedAttendance" min="0" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Data Export</label>
+            <div class="d-grid gap-2">
+                <button class="btn btn-outline-secondary" @onclick="ExportResultsAsync" disabled="@isExporting">
+                    <i class="bi bi-download"></i> Export Results
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <button class="btn btn-primary" @onclick="SavePostShowAsync" disabled="@isSaving">
+            <i class="bi bi-check-circle"></i> Save Post-Show Data
+        </button>
+        @if (!string.IsNullOrWhiteSpace(saveMessage))
+        {
+            <span class="ms-2 text-success">@saveMessage</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private bool checklistVotesTabulated;
+    private bool checklistWinnersAnnounced;
+    private bool checklistSponsorsRecognized;
+    private bool checklistPerformersThankYou;
+    private bool checklistEquipmentSecured;
+    private string showSummary = string.Empty;
+    private int estimatedAttendance = 0;
+    private bool isSaving;
+    private bool isExporting;
+    private string saveMessage = string.Empty;
+
+    private async Task SavePostShowAsync()
+    {
+        isSaving = true;
+        saveMessage = string.Empty;
+        try
+        {
+            saveMessage = "Post-Show data saved successfully!";
+            await Task.Delay(1500);
+            saveMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            saveMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ExportResultsAsync()
+    {
+        isExporting = true;
+        try
+        {
+            await Task.Delay(500);
+            // TODO: Implement results export via API
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+}

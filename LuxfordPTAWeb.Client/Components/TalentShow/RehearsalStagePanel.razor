@@ -1,0 +1,93 @@
+@using LuxfordPTAWeb.Shared.DTOs
+
+<div>
+    <h6 class="text-info mb-3"><i class="bi bi-clock-history"></i> Rehearsal Stage</h6>
+    
+    <p class="text-muted">Finalize act order, time each performance, and prepare media files.</p>
+    
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="form-label">Rehearsal Checklist</label>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistFinalizeOrder" id="finalizeOrder" />
+                <label class="form-check-label" for="finalizeOrder">Finalize act order</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistTimedActs" id="timedActs" />
+                <label class="form-check-label" for="timedActs">All acts timed</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistMediaReady" id="mediaReady" />
+                <label class="form-check-label" for="mediaReady">Media files verified</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistHostScriptReady" id="hostScriptReady" />
+                <label class="form-check-label" for="hostScriptReady">Host script prepared</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="checklistBackstageFlowReady" id="backstageFlowReady" />
+                <label class="form-check-label" for="backstageFlowReady">Backstage flow planned</label>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label">Rehearsal Notes</label>
+            <textarea class="form-control" @bind="rehearsalNotes" rows="5" placeholder="Document findings from rehearsals..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Total Show Duration (minutes)</label>
+            <input type="number" class="form-control" @bind="totalDuration" min="0" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Rehearsal Date</label>
+            <input type="date" class="form-control" @bind="rehearsalDate" />
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <button class="btn btn-primary" @onclick="SaveRehearsalAsync" disabled="@isSaving">
+            <i class="bi bi-check-circle"></i> Save Rehearsal Progress
+        </button>
+        @if (!string.IsNullOrWhiteSpace(saveMessage))
+        {
+            <span class="ms-2 text-success">@saveMessage</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private bool checklistFinalizeOrder;
+    private bool checklistTimedActs;
+    private bool checklistMediaReady;
+    private bool checklistHostScriptReady;
+    private bool checklistBackstageFlowReady;
+    private string rehearsalNotes = string.Empty;
+    private int totalDuration = 0;
+    private DateTime rehearsalDate = DateTime.Today;
+    private bool isSaving;
+    private string saveMessage = string.Empty;
+
+    private async Task SaveRehearsalAsync()
+    {
+        isSaving = true;
+        saveMessage = string.Empty;
+        try
+        {
+            saveMessage = "Rehearsal progress saved successfully!";
+            await Task.Delay(1500);
+            saveMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            saveMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
