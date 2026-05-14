@@ -1603,5 +1603,398 @@ public class TalentShowController : ControllerBase
         public TalentShowGlobalSetupConfigDTO GlobalSetup { get; set; } = new();
         public TalentShowSignupSettingsDTO Signups { get; set; } = new();
         public TalentShowTryOutsConfigDTO TryOuts { get; set; } = new();
+        public TalentShowShowConfigDTO Show { get; set; } = new();
+    }
+
+    // ============================================================================
+    // THE SHOW MODULE ENDPOINTS
+    // ============================================================================
+
+    [HttpGet("show/configure")]
+    public async Task<ActionResult<TalentShowShowConfigDTO>> GetShowConfiguration(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+        
+        if (!showConfig.Segments.Any())
+        {
+            var acts = await _db.TalentShowActs
+                .Where(a => a.EventId == eventId && a.SelectedForShow)
+                .OrderBy(a => a.OrderIndex)
+                .ToListAsync();
+
+            showConfig.Segments = acts.Select((act, index) => new TalentShowSegmentDTO
+            {
+                SegmentId = act.Id,
+                SegmentType = TalentShowSegmentType.Act,
+                ActId = act.Id,
+                Title = act.Title,
+                OrderIndex = index + 1,
+                IsHidden = false,
+                DisplayInstructions = new TalentShowDisplayInstructionsDTO
+                {
+                    HostTeleprompter = act.IntroLine,
+                    Backstage = act.Notes,
+                    MainBoard = $"{act.PerformerName} - {act.Title}",
+                    TimerPresetSeconds = act.DurationSeconds
+                },
+                MediaFile = act.MediaFilePath,
+                ExpectedDurationSeconds = act.DurationSeconds,
+                Status = TalentShowSegmentStatus.Waiting
+            }).ToList();
+        }
+
+        var globalSetup = NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem);
+        showConfig.EnableJudgesVoting = globalSetup.JudgesVotingEnabledByDefault;
+        showConfig.EnableAudienceVoting = globalSetup.AudienceVotingEnabledByDefault;
+
+        return Ok(showConfig);
+    }
+
+    [HttpPost("show/configure")]
+    public async Task<IActionResult> SaveShowConfiguration(int eventId, [FromBody] TalentShowShowConfigDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        settings.Show = dto ?? new TalentShowShowConfigDTO();
+
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpGet("show/runtime")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> GetShowRuntimeState(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+        
+        var runtimeState = new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime,
+            JudgesVotingOpen = false,
+            AudienceVotingOpen = false
+        };
+
+        return Ok(runtimeState);
+    }
+
+    [HttpPost("show/advance")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> AdvanceShowSegment(int eventId, [FromBody] TalentShowSegmentAdvanceDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        var currentSegment = showConfig.Segments.FirstOrDefault(s => s.SegmentId == dto.SegmentId);
+        if (currentSegment == null)
+        {
+            return BadRequest("Segment not found.");
+        }
+
+        currentSegment.Status = TalentShowSegmentStatus.Live;
+        showConfig.CurrentSegmentId = dto.SegmentId;
+        showConfig.IsLiveMode = true;
+
+        if (showConfig.ShowStartTime == null)
+        {
+            showConfig.ShowStartTime = DateTime.UtcNow;
+        }
+
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime
+        });
+    }
+
+    [HttpPost("show/jump")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> JumpToShowSegment(int eventId, [FromBody] TalentShowJumpSegmentDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        var targetSegment = showConfig.Segments.FirstOrDefault(s => s.SegmentId == dto.SegmentId);
+        if (targetSegment == null)
+        {
+            return BadRequest("Segment not found.");
+        }
+
+        // Mark current as completed
+        var currentSegment = showConfig.Segments.FirstOrDefault(s => s.SegmentId == showConfig.CurrentSegmentId);
+        if (currentSegment != null && currentSegment.Status == TalentShowSegmentStatus.Live)
+        {
+            currentSegment.Status = TalentShowSegmentStatus.Completed;
+        }
+
+        targetSegment.Status = TalentShowSegmentStatus.Live;
+        showConfig.CurrentSegmentId = dto.SegmentId;
+
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime
+        });
+    }
+
+    [HttpPost("show/skip")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> SkipShowSegment(int eventId, [FromBody] TalentShowSegmentSkipDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        var segment = showConfig.Segments.FirstOrDefault(s => s.SegmentId == dto.SegmentId);
+        if (segment == null)
+        {
+            return BadRequest("Segment not found.");
+        }
+
+        segment.Status = TalentShowSegmentStatus.Skipped;
+        
+        // Move skipped segment to bottom
+        showConfig.Segments.Remove(segment);
+        showConfig.Segments.Add(segment);
+
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime
+        });
+    }
+
+    [HttpPost("show/reorder")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> ReorderShowSegments(int eventId, [FromBody] TalentShowSegmentReorderDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        var reorderedSegments = new List<TalentShowSegmentDTO>();
+        foreach (var segmentId in dto.OrderedSegmentIds)
+        {
+            var segment = showConfig.Segments.FirstOrDefault(s => s.SegmentId == segmentId);
+            if (segment != null)
+            {
+                reorderedSegments.Add(segment);
+            }
+        }
+
+        for (int i = 0; i < reorderedSegments.Count; i++)
+        {
+            reorderedSegments[i].OrderIndex = i + 1;
+        }
+
+        showConfig.Segments = reorderedSegments;
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime
+        });
+    }
+
+    [HttpPost("show/insert")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> InsertShowSegment(int eventId, [FromBody] TalentShowSegmentInsertDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        var newSegmentId = (showConfig.Segments.Select(s => s.SegmentId).DefaultIfEmpty(0).Max()) + 1;
+        var newSegment = new TalentShowSegmentDTO
+        {
+            SegmentId = newSegmentId,
+            SegmentType = dto.SegmentType,
+            Title = dto.Title,
+            OrderIndex = dto.InsertAtIndex,
+            DisplayInstructions = new TalentShowDisplayInstructionsDTO
+            {
+                HostTeleprompter = dto.HostTeleprompter ?? string.Empty,
+                Backstage = dto.Backstage ?? string.Empty,
+                MainBoard = dto.Title,
+                TimerPresetSeconds = dto.DurationSeconds
+            },
+            MediaFile = dto.MediaFile ?? string.Empty,
+            ExpectedDurationSeconds = dto.DurationSeconds,
+            Status = TalentShowSegmentStatus.Waiting
+        };
+
+        showConfig.Segments.Insert(dto.InsertAtIndex, newSegment);
+
+        // Re-index all segments
+        for (int i = 0; i < showConfig.Segments.Count; i++)
+        {
+            showConfig.Segments[i].OrderIndex = i + 1;
+        }
+
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime
+        });
+    }
+
+    [HttpPost("show/vote/judge")]
+    public async Task<IActionResult> SubmitJudgeVote(int eventId, [FromBody] TalentShowJudgeVoteDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var vote = new TalentShowVote
+        {
+            EventId = eventId,
+            ActId = dto.ActId,
+            DeviceOrUserId = dto.JudgeId.ToString(),
+            VoterName = string.Empty,
+            IsJudge = true,
+            TalentScore = Math.Clamp(dto.Score, 1, 5),
+            StagePresenceScore = Math.Clamp(dto.Score, 1, 5),
+            CreativityScore = Math.Clamp(dto.Score, 1, 5),
+            CrowdEngagementScore = Math.Clamp(dto.Score, 1, 5),
+            TimestampUtc = DateTime.UtcNow
+        };
+
+        vote.TotalScore = (vote.TalentScore + vote.StagePresenceScore + vote.CreativityScore + vote.CrowdEngagementScore) / 4;
+
+        _db.TalentShowVotes.Add(vote);
+        await _db.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [HttpPost("show/voting/control")]
+    public async Task<ActionResult<TalentShowRuntimeStateDTO>> ControlShowVoting(int eventId, [FromBody] TalentShowVotingControlDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var showConfig = settings.Show ?? new TalentShowShowConfigDTO();
+
+        if (dto.OpenJudgesVoting)
+        {
+            showConfig.EnableJudgesVoting = true;
+        }
+        if (dto.OpenAudienceVoting)
+        {
+            showConfig.EnableAudienceVoting = true;
+        }
+        if (dto.CloseVoting)
+        {
+            showConfig.EnableJudgesVoting = false;
+            showConfig.EnableAudienceVoting = false;
+        }
+
+        settings.Show = showConfig;
+        control.SettingsJson = JsonSerializer.Serialize(settings, JsonOptions);
+        await _db.SaveChangesAsync();
+
+        return Ok(new TalentShowRuntimeStateDTO
+        {
+            CurrentSegmentId = showConfig.CurrentSegmentId,
+            Segments = showConfig.Segments,
+            IsLiveMode = showConfig.IsLiveMode,
+            ShowStartTime = showConfig.ShowStartTime,
+            JudgesVotingOpen = showConfig.EnableJudgesVoting,
+            AudienceVotingOpen = showConfig.EnableAudienceVoting
+        });
     }
 }

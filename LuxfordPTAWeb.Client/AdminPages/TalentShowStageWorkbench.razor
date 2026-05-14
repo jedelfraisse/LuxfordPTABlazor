@@ -64,7 +64,7 @@ else
         new("Sign-Ups", "Configure intake and review submissions.", "signups", true),
         new("Try-Outs", "Configure try-out sessions and run queue decisions.", "tryouts", false),
         new("Rehearsals", "Prepare segment order, timing, media, and cues.", "rehearsals", false),
-        new("The Show", "Run the finalized timeline during the live event.", "show", false)
+        new("The Show", "Run the finalized timeline during the live event.", "show", true)
     ];
 
     protected override async Task OnInitializedAsync()
@@ -113,17 +113,17 @@ else
                 yield return new HubAction("Preview", $"/talent-show/signups/{eventItem!.Id}", "btn btn-outline-dark btn-sm");
             }
 
+            if (hub.RouteKey == "show")
+            {
+                yield return new HubAction("Configure", $"{basePath}/tools/show/configure", "btn btn-outline-primary btn-sm");
+                yield return new HubAction("Live", $"{basePath}/tools/show/live", "btn btn-outline-secondary btn-sm");
+                yield return new HubAction("Public", GetPublicEventHref(), "btn btn-outline-dark btn-sm");
+            }
+
             yield break;
         }
 
         yield return new HubAction("Configure", $"{basePath}/subevents/{hub.RouteKey}/configure", "btn btn-outline-primary btn-sm");
-
-        if (hub.RouteKey == "show")
-        {
-            yield return new HubAction("Live", $"{basePath}/subevents/show/live", "btn btn-outline-secondary btn-sm");
-            yield return new HubAction("Public", GetPublicEventHref(), "btn btn-outline-dark btn-sm");
-            yield break;
-        }
 
         yield return new HubAction("Sessions", $"{basePath}/subevents/{hub.RouteKey}/sessions", "btn btn-outline-secondary btn-sm");
     }

@@ -70,11 +70,13 @@ else
     {
         <GlobalSetupConfigurePanel EventId="@eventItem.Id" />
     }
-    else if (!isToolRoute && normalizedSubEventType == "show" && normalizedMode is "configure" or "live" or "run")
+    else if (isToolRoute && normalizedToolName == "show" && normalizedMode == "configure")
     {
-        <div class="alert alert-info mb-0">
-            The Show workspace is scaffolded and ready for implementation.
-        </div>
+        <ShowConfigurePanel EventId="@eventItem.Id" />
+    }
+    else if (isToolRoute && normalizedToolName == "show" && normalizedMode is "live" or "run")
+    {
+        <ShowLivePanel EventId="@eventItem.Id" />
     }
     else
     {
@@ -135,7 +137,7 @@ else
 
         if (isToolRoute)
         {
-            if (normalizedToolName is not ("signups" or "global-setup" or "display-setup"))
+            if (normalizedToolName is not ("signups" or "global-setup" or "display-setup" or "show"))
             {
                 return false;
             }
@@ -144,6 +146,7 @@ else
             {
                 "signups" => normalizedMode is "configure" or "review" or "run" or "preview",
                 "global-setup" or "display-setup" => normalizedMode == "configure",
+                "show" => normalizedMode is "configure" or "live" or "run",
                 _ => false
             };
         }

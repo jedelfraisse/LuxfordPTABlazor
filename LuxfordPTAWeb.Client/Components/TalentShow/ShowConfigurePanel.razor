@@ -1,0 +1,266 @@
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="text-primary mb-0"><i class="bi bi-gear"></i> Show Configuration</h6>
+        <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/tools/show/live")">Go to Live</a>
+    </div>
+    <p class="text-muted">Load and prepare the final segment timeline. Verify all media and cues are ready before the show begins.</p>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading show configuration...</em></div>
+    }
+    else if (showConfig == null)
+    {
+        <div class="alert alert-warning">No show configuration found. Please create one.</div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Show Settings</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Enable Judges Voting</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" @bind="showConfig.EnableJudgesVoting" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Enable Audience Voting</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" @bind="showConfig.EnableAudienceVoting" />
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm" @onclick="SaveSettingsAsync">Save Settings</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Segment Timeline (@showConfig.Segments.Count segments)</h6>
+                <span class="badge bg-info">@GetReadySegmentCount() / @showConfig.Segments.Count ready</span>
+            </div>
+            <div class="card-body">
+                @if (!showConfig.Segments.Any())
+                {
+                    <div class="alert alert-light border">No segments in timeline.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">Order</th>
+                                    <th>Type</th>
+                                    <th>Title</th>
+                                    <th>Duration</th>
+                                    <th>Media</th>
+                                    <th>Cues</th>
+                                    <th>Hidden</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var segment in showConfig.Segments)
+                                {
+                                    <tr>
+                                        <td>@segment.OrderIndex</td>
+                                        <td><span class="badge bg-secondary">@segment.SegmentType</span></td>
+                                        <td>
+                                            <div>@segment.Title</div>
+                                            @if (!string.IsNullOrWhiteSpace(segment.DisplayInstructions?.HostTeleprompter))
+                                            {
+                                                <small class="text-muted">📝 Host: @segment.DisplayInstructions.HostTeleprompter</small>
+                                            }
+                                        </td>
+                                        <td>@segment.ExpectedDurationSeconds s</td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(segment.MediaFile))
+                                            {
+                                                <span class="badge bg-success"><i class="bi bi-check"></i> Media</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-dark">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (segment.CueList?.Any() == true)
+                                            {
+                                                <span class="badge bg-success">@segment.CueList.Count cues</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-dark">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (segment.IsHidden)
+                                            {
+                                                <span class="badge bg-warning">Hidden</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Display Instructions Preview</h6>
+            </div>
+            <div class="card-body">
+                @if (selectedSegmentForPreview != null)
+                {
+                    <div class="mb-3">
+                        <h6>@selectedSegmentForPreview.Title (@selectedSegmentForPreview.SegmentType)</h6>
+                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.HostTeleprompter))
+                        {
+                            <div class="mb-2">
+                                <strong>📝 Host Teleprompter:</strong>
+                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.HostTeleprompter</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.Backstage))
+                        {
+                            <div class="mb-2">
+                                <strong>🎭 Backstage:</strong>
+                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.Backstage</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.MainBoard))
+                        {
+                            <div class="mb-2">
+                                <strong>🎬 MainBoard:</strong>
+                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.MainBoard</div>
+                            </div>
+                        }
+                        @if (selectedSegmentForPreview.DisplayInstructions?.TimerPresetSeconds > 0)
+                        {
+                            <div>
+                                <strong>⏱️ Timer Preset:</strong> @selectedSegmentForPreview.DisplayInstructions.TimerPresetSeconds seconds
+                            </div>
+                        }
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => selectedSegmentForPreview = null">Clear Preview</button>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">Click a segment above to preview its display instructions.</p>
+                }
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button class="btn btn-success btn-sm" @onclick="StartShowAsync" disabled="@(GetReadySegmentCount() == 0)">
+                Start Show
+            </button>
+            <span class="ms-2 text-muted small">@GetReadySegmentCount() of @showConfig.Segments.Count segments ready</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private TalentShowShowConfigDTO? showConfig;
+    private TalentShowSegmentDTO? selectedSegmentForPreview;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadConfigurationAsync();
+    }
+
+    private async Task LoadConfigurationAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            showConfig = await Http.GetFromJsonAsync<TalentShowShowConfigDTO>($"/api/talentshow/{EventId}/show/configure")
+                ?? new TalentShowShowConfigDTO();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading configuration: {ex.Message}";
+            showConfig = new TalentShowShowConfigDTO();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (showConfig == null) return;
+
+        errorMessage = string.Empty;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/show/configure", showConfig);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Failed to save settings.";
+                return;
+            }
+
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving settings: {ex.Message}";
+        }
+    }
+
+    private async Task StartShowAsync()
+    {
+        if (showConfig == null || !showConfig.Segments.Any()) return;
+
+        errorMessage = string.Empty;
+        try
+        {
+            var firstSegment = showConfig.Segments.First();
+            var advanceDto = new TalentShowSegmentAdvanceDTO { SegmentId = firstSegment.SegmentId };
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/show/advance", advanceDto);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Failed to start show.";
+                return;
+            }
+
+            await LoadConfigurationAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error starting show: {ex.Message}";
+        }
+    }
+
+    private int GetReadySegmentCount()
+    {
+        if (showConfig?.Segments == null) return 0;
+        return showConfig.Segments.Count(s => 
+            !string.IsNullOrWhiteSpace(s.Title) && 
+            s.ExpectedDurationSeconds > 0);
+    }
+}

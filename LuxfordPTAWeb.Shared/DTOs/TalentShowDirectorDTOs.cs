@@ -190,3 +190,168 @@ public class TalentShowTryOutEntryUpsertDTO
     public string Status { get; set; } = string.Empty;
     public bool Selected { get; set; }
 }
+
+// ============================================================================
+// THE SHOW MODULE DTOs
+// ============================================================================
+
+public static class TalentShowSegmentType
+{
+    public const string Act = "Act";
+    public const string ActIntro = "ActIntro";
+    public const string HostAnnouncement = "HostAnnouncement";
+    public const string Intermission = "Intermission";
+    public const string AwardSegment = "AwardSegment";
+    public const string SponsorLoop = "SponsorLoop";
+    public const string IntroVideo = "IntroVideo";
+    public const string BackstageReset = "BackstageReset";
+    public const string HiddenSegment = "HiddenSegment";
+    public const string CustomSegment = "CustomSegment";
+
+    public static List<string> All => new()
+    {
+        Act, ActIntro, HostAnnouncement, Intermission, AwardSegment,
+        SponsorLoop, IntroVideo, BackstageReset, HiddenSegment, CustomSegment
+    };
+}
+
+public static class TalentShowSegmentStatus
+{
+    public const string Waiting = "Waiting";
+    public const string Live = "Live";
+    public const string Completed = "Completed";
+    public const string Skipped = "Skipped";
+
+    public static List<string> All => new() { Waiting, Live, Completed, Skipped };
+}
+
+public class TalentShowDisplayInstructionsDTO
+{
+    public string HostTeleprompter { get; set; } = string.Empty;
+    public string Backstage { get; set; } = string.Empty;
+    public string MainBoard { get; set; } = string.Empty;
+    public int TimerPresetSeconds { get; set; }
+}
+
+public class TalentShowSegmentDTO
+{
+    public int SegmentId { get; set; }
+    public string SegmentType { get; set; } = string.Empty;
+    public int? ActId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int OrderIndex { get; set; }
+    public bool IsHidden { get; set; }
+    public TalentShowDisplayInstructionsDTO DisplayInstructions { get; set; } = new();
+    public string MediaFile { get; set; } = string.Empty;
+    public List<string> CueList { get; set; } = [];
+    public string? TechRequirements { get; set; }
+    public int ExpectedDurationSeconds { get; set; }
+    public int ActualDurationSeconds { get; set; }
+    public bool RunsLong { get; set; }
+    public string Status { get; set; } = TalentShowSegmentStatus.Waiting;
+}
+
+public class TalentShowShowConfigDTO
+{
+    public List<TalentShowSegmentDTO> Segments { get; set; } = [];
+    public int CurrentSegmentId { get; set; }
+    public bool EnableJudgesVoting { get; set; } = true;
+    public bool EnableAudienceVoting { get; set; } = true;
+    public bool IsLiveMode { get; set; }
+    public DateTime? ShowStartTime { get; set; }
+}
+
+public class TalentShowRuntimeStateDTO
+{
+    public int CurrentSegmentId { get; set; }
+    public List<TalentShowSegmentDTO> Segments { get; set; } = [];
+    public bool IsLiveMode { get; set; }
+    public DateTime? ShowStartTime { get; set; }
+    public bool JudgesVotingOpen { get; set; }
+    public bool AudienceVotingOpen { get; set; }
+    public Dictionary<string, object> DisplayStates { get; set; } = [];
+}
+
+public class TalentShowSegmentAdvanceDTO
+{
+    public int SegmentId { get; set; }
+}
+
+public class TalentShowSegmentSkipDTO
+{
+    public int SegmentId { get; set; }
+}
+
+public class TalentShowSegmentReorderDTO
+{
+    public List<int> OrderedSegmentIds { get; set; } = [];
+}
+
+public class TalentShowSegmentInsertDTO
+{
+    public string SegmentType { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public int InsertAtIndex { get; set; }
+    public string? MediaFile { get; set; }
+    public string? HostTeleprompter { get; set; }
+    public string? Backstage { get; set; }
+    public int DurationSeconds { get; set; }
+}
+
+public class TalentShowJumpSegmentDTO
+{
+    public int SegmentId { get; set; }
+}
+
+public class TalentShowJudgeVoteDTO
+{
+    public int JudgeId { get; set; }
+    public int ActId { get; set; }
+    public int Score { get; set; }
+    public string Notes { get; set; } = string.Empty;
+}
+
+public class TalentShowAudienceVoteDTO
+{
+    public int ActId { get; set; }
+    public string? UserId { get; set; }
+    public int Score { get; set; }
+}
+
+public class TalentShowVotingControlDTO
+{
+    public bool OpenJudgesVoting { get; set; }
+    public bool OpenAudienceVoting { get; set; }
+    public bool CloseVoting { get; set; }
+}
+
+public class TalentShowMediaControlDTO
+{
+    public string Action { get; set; } = string.Empty; // "play", "pause", "stop"
+    public string MediaFile { get; set; } = string.Empty;
+}
+
+public class TalentShowCueControlDTO
+{
+    public string CueId { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty; // "trigger", "clear"
+}
+
+public class TalentShowTimerControlDTO
+{
+    public string Action { get; set; } = string.Empty; // "start", "stop", "reset", "set"
+    public int Seconds { get; set; }
+}
+
+public class TalentShowShowSummaryDTO
+{
+    public int TotalSegmentsCompleted { get; set; }
+    public int TotalActsPerformed { get; set; }
+    public DateTime? ShowEndTime { get; set; }
+    public int TotalDurationSeconds { get; set; }
+    public int JudgesVotesCount { get; set; }
+    public int AudienceVotesCount { get; set; }
+    public List<TalentShowVoteResultRowDTO> JudgesResults { get; set; } = [];
+    public List<TalentShowVoteResultRowDTO> AudienceResults { get; set; } = [];
+    public string? ShowLogPath { get; set; }
+}
