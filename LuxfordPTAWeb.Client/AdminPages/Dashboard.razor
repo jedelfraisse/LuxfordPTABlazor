@@ -23,19 +23,16 @@
 		</div>
 		<div class="card-body">
 			<div class="row g-3">
-				<!-- Events Management -->
+				<!-- School Years -->
 				<div class="col-md-4">
-					<div class="card h-100 border-primary">
+					<div class="card h-100 border-secondary">
 						<div class="card-body text-center">
-							<i class="bi bi-calendar-event text-primary" style="font-size: 2.5rem;"></i>
-							<h5 class="mt-3">Events</h5>
-							<p class="text-muted small">Manage school year events, categories, and calendar</p>
+							<i class="bi bi-calendar3 text-secondary" style="font-size: 2.5rem;"></i>
+							<h5 class="mt-3">School Years</h5>
+							<p class="text-muted small">Manage school years and academic periods</p>
 							<div class="d-grid gap-2">
-								<a href="/admin/events" class="btn btn-outline-primary btn-sm">
-									<i class="bi bi-calendar-event"></i> Manage Events
-								</a>
-								<a href="/admin/event-categories" class="btn btn-outline-secondary btn-sm">
-									<i class="bi bi-tags"></i> Event Categories
+								<a href="/admin/school-years" class="btn btn-outline-secondary btn-sm">
+									<i class="bi bi-calendar3"></i> Manage School Years
 								</a>
 							</div>
 						</div>
@@ -77,6 +74,29 @@
 					</div>
 				</div>
 
+				
+				<!-- Events Management -->
+				<div class="col-md-4">
+					<div class="card h-100 border-primary">
+						<div class="card-body text-center">
+							<i class="bi bi-calendar-event text-primary" style="font-size: 2.5rem;"></i>
+							<h5 class="mt-3">Events</h5>
+							<p class="text-muted small">Manage school year events, categories, and calendar</p>
+							<div class="d-grid gap-2">
+								<a href="/admin/events" class="btn btn-outline-primary btn-sm">
+									<i class="bi bi-calendar-event"></i> Manage Events
+								</a>
+								<a href="/admin/event-categories" class="btn btn-outline-secondary btn-sm">
+									<i class="bi bi-tags"></i> Event Categories
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
+
+			
+
+			
 				<!-- Sponsors -->
 				<div class="col-md-4">
 					<div class="card h-100 border-warning">
@@ -87,22 +107,6 @@
 							<div class="d-grid gap-2">
 								<a href="/admin/sponsors" class="btn btn-outline-warning btn-sm">
 									<i class="bi bi-award"></i> Manage Sponsors
-								</a>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<!-- School Years -->
-				<div class="col-md-4">
-					<div class="card h-100 border-secondary">
-						<div class="card-body text-center">
-							<i class="bi bi-calendar3 text-secondary" style="font-size: 2.5rem;"></i>
-							<h5 class="mt-3">School Years</h5>
-							<p class="text-muted small">Manage school years and academic periods</p>
-							<div class="d-grid gap-2">
-								<a href="/admin/school-years" class="btn btn-outline-secondary btn-sm">
-									<i class="bi bi-calendar3"></i> Manage School Years
 								</a>
 							</div>
 						</div>
@@ -134,7 +138,7 @@
 else
 {
 	<div class="alert alert-warning">
-		<h6><i class="bi bi-calendar-x"></i> No Current School Year</h6>
+		<h6><i class="bi bi-calendar-x"></i>Loading school year or No Current School Year found</h6>
 		<p>Please create a new school year to get started.</p>
 		<a href="/admin/school-years" class="btn btn-outline-warning me-2">
 			<i class="bi bi-calendar3"></i> School Years

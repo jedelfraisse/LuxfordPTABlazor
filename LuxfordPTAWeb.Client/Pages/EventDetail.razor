@@ -1,6 +1,7 @@
 @page "/events/{slug}"
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Models
 
 <PageTitle>@(eventItem?.Title ?? "Event Details")</PageTitle>
@@ -58,48 +59,17 @@ else
                 </p>
             }
 
+            @if (HasPublishedTalentShowSignups(eventItem))
+            {
+                <p class="mb-0">
+                    <a class="btn btn-outline-primary btn-sm" href="@GetTalentShowSignupHref(eventItem)">
+                        <i class="bi bi-mic"></i> Performer Sign-Up
+                    </a>
+                </p>
+            }
+
         </div>
     </div>
-
-    @if (GetFlyerUrls(eventItem).Any())
-    {
-        <div class="card mb-4">
-            <div class="card-header"><strong>Flyers</strong></div>
-            <div class="card-body">
-                @{
-                    var flyerIndex = 1;
-                }
-                @foreach (var flyerUrl in GetFlyerUrls(eventItem))
-                {
-                    var flyerLabel = GetFlyerLabel(flyerUrl, flyerIndex);
-                    <div class="mb-4">
-                        <h6 class="mb-2">@flyerLabel</h6>
-                        @if (IsPdfFlyer(flyerUrl))
-                        {
-                            <div class="ratio ratio-16x9 border rounded">
-                                <object data="@flyerUrl" type="application/pdf">
-                                    <div class="p-3">
-                                        <a href="@flyerUrl" target="_blank" rel="noopener noreferrer">Open PDF flyer</a>
-                                    </div>
-                                </object>
-                            </div>
-                        }
-                        else if (IsImageFlyer(flyerUrl))
-                        {
-                            <img src="@flyerUrl" class="img-fluid rounded border" alt="@flyerLabel" />
-                        }
-                        else
-                        {
-                            <a href="@flyerUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
-                                Open Flyer
-                            </a>
-                        }
-                    </div>
-                    flyerIndex++;
-                }
-            </div>
-        </div>
-    }
 
     @if (!string.IsNullOrWhiteSpace(eventItem.DescriptionHtml))
     {
@@ -119,7 +89,7 @@ else
             </div>
         </div>
     }
-
+    
     @if (!string.IsNullOrWhiteSpace(eventItem.MoreDetailsHtml))
     {
         <div class="card mb-4">
@@ -160,11 +130,56 @@ else
             </div>
         </div>
     }
+
+    @if (GetFlyerUrls(eventItem).Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header"><strong>Flyers</strong></div>
+            <div class="card-body">
+                @{
+                    var flyerIndex = 1;
+                }
+                @foreach (var flyerUrl in GetFlyerUrls(eventItem))
+                {
+                    var flyerLabel = GetFlyerLabel(flyerUrl, flyerIndex);
+                    <div class="mb-4">
+                        @if (IsPdfFlyer(flyerUrl))
+                        {
+                            <div class="ratio ratio-16x9 border rounded">
+                                <object data="@flyerUrl" type="application/pdf">
+                                    <div class="p-3">
+                                        <a href="@flyerUrl" target="_blank" rel="noopener noreferrer">Open PDF flyer</a>
+                                    </div>
+                                </object>
+                            </div>
+                        }
+                        else if (IsImageFlyer(flyerUrl))
+                        {
+                            <img src="@flyerUrl" class="img-fluid rounded border" alt="@flyerLabel" />
+                        }
+                        else
+                        {
+                            <a href="@flyerUrl" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                Open Flyer
+                            </a>
+                        }
+                    </div>
+                    flyerIndex++;
+                }
+            </div>
+        </div>
+    }
+
+
+
+
+
 }
 
 @code {
     [Parameter] public string Slug { get; set; } = string.Empty;
     private Event? eventItem;
+    private TalentShowSignupSettingsDTO? publicSignupSettings;
     private bool isLoading = true;
 
     protected override async Task OnParametersSetAsync()
@@ -178,10 +193,16 @@ else
         try
         {
             eventItem = await Http.GetFromJsonAsync<Event>($"api/events/by-slug/{Slug}");
+            publicSignupSettings = null;
+            if (eventItem != null)
+            {
+                publicSignupSettings = await LoadPublicSignupSettingsAsync(eventItem.Id);
+            }
         }
         catch
         {
             eventItem = null;
+            publicSignupSettings = null;
         }
         finally
         {
@@ -232,6 +253,29 @@ else
         }
 
         return "Volunteers needed";
+    }
+
+    private async Task<TalentShowSignupSettingsDTO?> LoadPublicSignupSettingsAsync(int eventId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<TalentShowSignupSettingsDTO>($"/api/talentshow/{eventId}/public/signups/configure");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private bool HasPublishedTalentShowSignups(Event evt)
+    {
+        return evt.EventControls?.Any(c => c.IsActive && c.IsDirector && c.ControlType == "TalentShowDirectorControl") == true
+            && publicSignupSettings?.IsPublished == true;
+    }
+
+    private static string GetTalentShowSignupHref(Event evt)
+    {
+        return $"/talent-show/signups/{evt.Id}";
     }
 
     private static IEnumerable<EventControl> GetPublicNotes(Event evt)

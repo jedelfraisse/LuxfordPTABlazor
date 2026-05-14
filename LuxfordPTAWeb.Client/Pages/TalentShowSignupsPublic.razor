@@ -1,0 +1,235 @@
+@page "/talent-show/signups/{eventId:int}"
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>@(settings?.Title ?? "Talent Show Sign-Ups")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info"><em>Loading sign-up form...</em></div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-warning">@errorMessage</div>
+}
+else if (settings == null || eventItem == null)
+{
+    <div class="alert alert-warning">Sign-up form is unavailable.</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">@settings.Title</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="@GetEventDetailsHref()">
+            <i class="bi bi-arrow-left"></i> Back to Event
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(settings.Subtitle))
+    {
+        <p class="text-muted mb-3">@settings.Subtitle</p>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div><strong>Event:</strong> @eventItem.Title</div>
+            <div><strong>Sign-up window:</strong> @FormatDate(settings.SignupStart) - @FormatDate(settings.SignupEnd)</div>
+            <div><strong>Status:</strong> @(IsSignupOpenNow() ? "Open" : "Closed")</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!IsSignupOpenNow())
+    {
+        <div class="alert alert-warning mb-0">Sign-ups are currently closed.</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Submit your act</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Performer name(s)</label>
+                        <input class="form-control" @bind="submission.PerformerNames" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Act title</label>
+                        <input class="form-control" @bind="submission.ActTitle" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Grade</label>
+                        <input class="form-control" @bind="submission.Grade" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Teacher</label>
+                        <input class="form-control" @bind="submission.Teacher" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Contact email</label>
+                        <input type="email" class="form-control" @bind="submission.ContactEmail" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Contact phone</label>
+                        <input class="form-control" @bind="submission.ContactPhone" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Act description</label>
+                        <textarea class="form-control" rows="3" @bind="submission.ActDescription"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Special requirements</label>
+                        <textarea class="form-control" rows="2" @bind="submission.SpecialRequirements"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Media upload link or path (optional)</label>
+                        <input class="form-control" @bind="submission.MediaUpload" />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(formError))
+                {
+                    <div class="alert alert-danger mt-3 mb-0">@formError</div>
+                }
+
+                <div class="mt-3">
+                    <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Submitting...</span>
+                        }
+                        else
+                        {
+                            <span>Submit Sign-Up</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int eventId { get; set; }
+
+    private Event? eventItem;
+    private TalentShowSignupSettingsDTO? settings;
+    private TalentShowSignupUpsertDTO submission = new();
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private string errorMessage = string.Empty;
+    private string formError = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        formError = string.Empty;
+        successMessage = string.Empty;
+        settings = null;
+        eventItem = null;
+
+        try
+        {
+            settings = await Http.GetFromJsonAsync<TalentShowSignupSettingsDTO>($"/api/talentshow/{eventId}/public/signups/configure");
+            eventItem = await Http.GetFromJsonAsync<Event>($"/api/events/{eventId}");
+
+            if (settings == null || eventItem == null)
+            {
+                errorMessage = "Sign-up form is unavailable.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unable to load sign-up form: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        formError = string.Empty;
+        successMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(submission.PerformerNames))
+        {
+            formError = "Performer name(s) are required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(submission.ActTitle))
+        {
+            formError = "Act title is required.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{eventId}/public/signups/submissions", submission);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                formError = string.IsNullOrWhiteSpace(body) ? "Failed to submit sign-up." : body;
+                return;
+            }
+
+            submission = new TalentShowSignupUpsertDTO();
+            successMessage = string.IsNullOrWhiteSpace(settings?.ConfirmationMessage)
+                ? "Thanks! Your sign-up has been submitted for review."
+                : settings.ConfirmationMessage;
+        }
+        catch (Exception ex)
+        {
+            formError = $"Error submitting sign-up: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private bool IsSignupOpenNow()
+    {
+        if (settings == null || !settings.IsPublished)
+        {
+            return false;
+        }
+
+        var now = DateTime.Now;
+        var startOk = !settings.SignupStart.HasValue || now >= settings.SignupStart.Value;
+        var endOk = !settings.SignupEnd.HasValue || now <= settings.SignupEnd.Value;
+        return startOk && endOk;
+    }
+
+    private string GetEventDetailsHref()
+    {
+        if (string.IsNullOrWhiteSpace(eventItem?.Slug))
+        {
+            return "/events";
+        }
+
+        return $"/events/{Uri.EscapeDataString(eventItem.Slug)}";
+    }
+
+    private static string FormatDate(DateTime? value)
+    {
+        return value?.ToLocalTime().ToString("MMM d, yyyy h:mm tt") ?? "Not set";
+    }
+}

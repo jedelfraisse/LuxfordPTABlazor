@@ -4,6 +4,7 @@ using LuxfordPTAWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxfordPTAWeb.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513201110_AddTalentShowSignups")]
+    partial class AddTalentShowSignups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1202,67 +1205,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.ToTable("TalentShowSignups");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.TalentShowTryOutEntry", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("ActId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ActTitle")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PerformerNames")
-                        .IsRequired()
-                        .HasMaxLength(240)
-                        .HasColumnType("nvarchar(240)");
-
-                    b.Property<bool>("Selected")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SessionLabel")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("SignupId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("SlotTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SignupId");
-
-                    b.HasIndex("EventId", "SlotTime");
-
-                    b.ToTable("TalentShowTryOutEntries");
-                });
-
             modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.TalentShowVote", b =>
                 {
                     b.Property<int>("Id")
@@ -1695,24 +1637,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.TalentShowTryOutEntry", b =>
-                {
-                    b.HasOne("LuxfordPTAWeb.Shared.Models.Event", "Event")
-                        .WithMany("TalentShowTryOutEntries")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("LuxfordPTAWeb.Shared.Models.TalentShowSignup", "Signup")
-                        .WithMany()
-                        .HasForeignKey("SignupId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.Navigation("Event");
-
-                    b.Navigation("Signup");
-                });
-
             modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.TalentShowVote", b =>
                 {
                     b.HasOne("LuxfordPTAWeb.Shared.Models.TalentShowAct", "Act")
@@ -1808,8 +1732,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("TalentShowSessionState");
 
                     b.Navigation("TalentShowSignups");
-
-                    b.Navigation("TalentShowTryOutEntries");
 
                     b.Navigation("TalentShowVotes");
                 });

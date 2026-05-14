@@ -92,6 +92,8 @@ public class Event : IAuditableEntity
 	public ICollection<Event> CopiedEvents { get; set; } = new List<Event>();
 	public ICollection<EventControl> EventControls { get; set; } = new List<EventControl>();
 	public ICollection<TalentShowAct> TalentShowActs { get; set; } = new List<TalentShowAct>();
+	public ICollection<TalentShowSignup> TalentShowSignups { get; set; } = new List<TalentShowSignup>();
+	public ICollection<TalentShowTryOutEntry> TalentShowTryOutEntries { get; set; } = new List<TalentShowTryOutEntry>();
 	public ICollection<TalentShowVote> TalentShowVotes { get; set; } = new List<TalentShowVote>();
 	public ICollection<TalentShowDisplayAssignmentHistory> TalentShowDisplayAssignments { get; set; } = new List<TalentShowDisplayAssignmentHistory>();
 	public TalentShowSessionState? TalentShowSessionState { get; set; }

@@ -1,4 +1,4 @@
-@page "/events/{slug}/control/sponsors"
+@page "/admin/eventcontrols/sponsors/{eventId:int}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @using System.Text.Json
 @using LuxfordPTAWeb.Shared.DTOs
@@ -116,7 +116,7 @@ else
 }
 
 @code {
-    [Parameter] public string Slug { get; set; } = string.Empty;
+    [Parameter] public int eventId { get; set; }
 
     private Event? eventItem;
     private EventControl? sponsorControl;
@@ -132,7 +132,7 @@ else
         isLoading = true;
         try
         {
-            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/by-slug/{Slug}");
+            eventItem = await Http.GetFromJsonAsync<Event>($"api/events/{eventId}");
             sponsorControl = eventItem?.EventControls?
                 .Where(c => c.IsActive && c.ControlType == "SponsorDisplayControl")
                 .OrderBy(c => c.SequenceOrder)

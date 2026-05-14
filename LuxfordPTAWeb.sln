@@ -10,12 +10,22 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solutions", "Solutions", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		DigitalDragonInto.md = DigitalDragonInto.md
 		event-managment-devplan.md = event-managment-devplan.md
 		InitalSeedData.sql = InitalSeedData.sql
 		Newsletter.md = Newsletter.md
 		OverallDev.md = OverallDev.md
 		Checklists\PTAOfficerChecklist.md = Checklists\PTAOfficerChecklist.md
 		Readme.md = Readme.md
+		TalentShowControl-Planning.md = TalentShowControl-Planning.md
+		TalentShowControl-DirectorHub.md = TalentShowControl-DirectorHub.md
+		TalentShowControl-DataContracts.md = TalentShowControl-DataContracts.md
+		TalentShowControl-Plan.md = TalentShowControl-Plan.md
+		TalentShowControl-ActTechnicalRequirements.md = TalentShowControl-ActTechnicalRequirements.md
+		TalentShowControl-Rehearsals.md = TalentShowControl-Rehearsals.md
+		TalentShowControl-Show.md = TalentShowControl-Show.md
+		TalentShowControl-SignUp.md = TalentShowControl-SignUp.md
+		TalentShowControl-TryOuts.md = TalentShowControl-TryOuts.md
 		Checklists\TreasurerCheckList.md = Checklists\TreasurerCheckList.md
 	EndProjectSection
 EndProject

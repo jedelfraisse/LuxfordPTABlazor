@@ -15,6 +15,7 @@ public class TalentShowController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private const string TalentShowDirectorControlType = "TalentShowDirectorControl";
 
     public TalentShowController(ApplicationDbContext db)
     {
@@ -177,6 +178,408 @@ public class TalentShowController : ControllerBase
             .ToListAsync();
 
         return Ok(ToRealtimeState(session, acts, votes));
+    }
+
+    [HttpGet("planning/configure")]
+    public async Task<ActionResult<TalentShowPlanningConfigDTO>> GetPlanningConfiguration(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        if (control == null)
+        {
+            return Ok(new TalentShowPlanningConfigDTO());
+        }
+
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var planning = NormalizePlanningConfig(settings.Planning);
+        var globalSetup = NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem);
+        return Ok(NormalizePlanningConfig(ApplyGlobalDefaultsToPlanning(planning, globalSetup)));
+    }
+
+    [HttpPut("planning/configure")]
+    public async Task<IActionResult> SavePlanningConfiguration(int eventId, [FromBody] TalentShowPlanningConfigDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        settings.Planning = NormalizePlanningConfig(dto);
+        control.SettingsJson = JsonSerializer.Serialize(settings);
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpGet("global/configure")]
+    public async Task<ActionResult<TalentShowGlobalSetupConfigDTO>> GetGlobalConfiguration(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        var normalized = NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem);
+        normalized.EventTitle = eventItem.Title?.Trim() ?? normalized.EventTitle;
+        return Ok(normalized);
+    }
+
+    [HttpPut("global/configure")]
+    public async Task<IActionResult> SaveGlobalConfiguration(int eventId, [FromBody] TalentShowGlobalSetupConfigDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var normalizedGlobalSetup = NormalizeGlobalSetupConfig(dto, eventItem);
+        settings.GlobalSetup = normalizedGlobalSetup;
+        eventItem.Title = normalizedGlobalSetup.EventTitle;
+        control.SettingsJson = JsonSerializer.Serialize(settings);
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpGet("signups/configure")]
+    public async Task<ActionResult<TalentShowSignupSettingsDTO>> GetSignupConfiguration(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        var planningForDefaults = NormalizePlanningConfig(ApplyGlobalDefaultsToPlanning(
+            NormalizePlanningConfig(settings.Planning),
+            NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem)));
+
+        return Ok(NormalizeSignupSettings(settings.Signups, planningForDefaults, eventItem));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("public/signups/configure")]
+    public async Task<ActionResult<TalentShowSignupSettingsDTO>> GetPublicSignupConfiguration(int eventId)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var settings = await GetNormalizedSignupSettingsAsync(eventItem);
+        if (!settings.IsPublished)
+        {
+            return NotFound("Sign-ups are not published for this event.");
+        }
+
+        return Ok(settings);
+    }
+
+    [HttpPut("signups/configure")]
+    public async Task<IActionResult> SaveSignupConfiguration(int eventId, [FromBody] TalentShowSignupSettingsDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        var planningForDefaults = NormalizePlanningConfig(ApplyGlobalDefaultsToPlanning(
+            NormalizePlanningConfig(settings.Planning),
+            NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem)));
+        settings.Signups = NormalizeSignupSettings(dto, planningForDefaults, eventItem);
+        control.SettingsJson = JsonSerializer.Serialize(settings);
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpGet("signups/submissions")]
+    public async Task<ActionResult<IEnumerable<TalentShowSignup>>> GetSignupSubmissions(int eventId, [FromQuery] string? status)
+    {
+        var eventExists = await _db.Events.AnyAsync(e => e.Id == eventId);
+        if (!eventExists)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var query = _db.TalentShowSignups
+            .Where(s => s.EventId == eventId);
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(s => s.Status == status.Trim());
+        }
+
+        var signups = await query
+            .OrderByDescending(s => s.CreatedAtUtc)
+            .ToListAsync();
+
+        return Ok(signups);
+    }
+
+    [HttpPost("signups/submissions")]
+    public async Task<ActionResult<TalentShowSignup>> CreateSignupSubmission(int eventId, [FromBody] TalentShowSignupUpsertDTO dto)
+    {
+        var eventExists = await _db.Events.AnyAsync(e => e.Id == eventId);
+        if (!eventExists)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var signup = new TalentShowSignup
+        {
+            EventId = eventId,
+            PerformerNames = dto.PerformerNames?.Trim() ?? string.Empty,
+            Grade = dto.Grade?.Trim() ?? string.Empty,
+            Teacher = dto.Teacher?.Trim() ?? string.Empty,
+            ActTitle = dto.ActTitle?.Trim() ?? string.Empty,
+            ActDescription = dto.ActDescription?.Trim() ?? string.Empty,
+            ContactEmail = dto.ContactEmail?.Trim() ?? string.Empty,
+            ContactPhone = dto.ContactPhone?.Trim() ?? string.Empty,
+            SpecialRequirements = dto.SpecialRequirements?.Trim() ?? string.Empty,
+            MediaUpload = dto.MediaUpload?.Trim() ?? string.Empty,
+            Status = TalentShowSignupStatus.Pending,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TalentShowSignups.Add(signup);
+        await _db.SaveChangesAsync();
+        return Ok(signup);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("public/signups/submissions")]
+    public async Task<ActionResult<TalentShowSignup>> CreatePublicSignupSubmission(int eventId, [FromBody] TalentShowSignupUpsertDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var settings = await GetNormalizedSignupSettingsAsync(eventItem);
+        if (!settings.IsPublished)
+        {
+            return BadRequest("Sign-ups are not published for this event.");
+        }
+
+        if (!IsSignupWindowOpen(settings))
+        {
+            return BadRequest("Sign-up window is currently closed.");
+        }
+
+        var signup = new TalentShowSignup
+        {
+            EventId = eventId,
+            PerformerNames = dto.PerformerNames?.Trim() ?? string.Empty,
+            Grade = dto.Grade?.Trim() ?? string.Empty,
+            Teacher = dto.Teacher?.Trim() ?? string.Empty,
+            ActTitle = dto.ActTitle?.Trim() ?? string.Empty,
+            ActDescription = dto.ActDescription?.Trim() ?? string.Empty,
+            ContactEmail = dto.ContactEmail?.Trim() ?? string.Empty,
+            ContactPhone = dto.ContactPhone?.Trim() ?? string.Empty,
+            SpecialRequirements = dto.SpecialRequirements?.Trim() ?? string.Empty,
+            MediaUpload = dto.MediaUpload?.Trim() ?? string.Empty,
+            Status = TalentShowSignupStatus.Pending,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TalentShowSignups.Add(signup);
+        await _db.SaveChangesAsync();
+        return Ok(signup);
+    }
+
+    [HttpPut("signups/submissions/{signupId:int}")]
+    public async Task<IActionResult> UpdateSignupSubmission(int eventId, int signupId, [FromBody] TalentShowSignupUpsertDTO dto)
+    {
+        var signup = await _db.TalentShowSignups.FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == signupId);
+        if (signup == null)
+        {
+            return NotFound("Sign-up not found.");
+        }
+
+        signup.PerformerNames = dto.PerformerNames?.Trim() ?? string.Empty;
+        signup.Grade = dto.Grade?.Trim() ?? string.Empty;
+        signup.Teacher = dto.Teacher?.Trim() ?? string.Empty;
+        signup.ActTitle = dto.ActTitle?.Trim() ?? string.Empty;
+        signup.ActDescription = dto.ActDescription?.Trim() ?? string.Empty;
+        signup.ContactEmail = dto.ContactEmail?.Trim() ?? string.Empty;
+        signup.ContactPhone = dto.ContactPhone?.Trim() ?? string.Empty;
+        signup.SpecialRequirements = dto.SpecialRequirements?.Trim() ?? string.Empty;
+        signup.MediaUpload = dto.MediaUpload?.Trim() ?? string.Empty;
+        signup.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("signups/submissions/{signupId:int}/review")]
+    public async Task<ActionResult<TalentShowSignup>> ReviewSignupSubmission(int eventId, int signupId, [FromBody] TalentShowSignupReviewDecisionDTO dto)
+    {
+        var signup = await _db.TalentShowSignups.FirstOrDefaultAsync(s => s.EventId == eventId && s.Id == signupId);
+        if (signup == null)
+        {
+            return NotFound("Sign-up not found.");
+        }
+
+        var normalizedAction = NormalizeSignupAction(dto.Action);
+        if (string.IsNullOrWhiteSpace(normalizedAction))
+        {
+            return BadRequest($"Invalid review action. Valid actions: {string.Join(", ", TalentShowSignupStatus.All)}");
+        }
+
+        signup.Status = normalizedAction;
+        signup.ReviewReason = dto.Reason?.Trim() ?? string.Empty;
+        signup.AllowResubmission = dto.AllowResubmission;
+        signup.TryOutSession = dto.TryOutSession?.Trim() ?? string.Empty;
+        signup.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (normalizedAction == TalentShowSignupStatus.ApprovedDirect)
+        {
+            await EnsureActForSignupAsync(eventId, signup);
+        }
+        else if (normalizedAction == TalentShowSignupStatus.InvitedToTryOuts)
+        {
+            await EnsureTryOutEntryForSignupAsync(eventId, signup, dto.TryOutSession);
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(signup);
+    }
+
+    [HttpGet("tryouts/configure")]
+    public async Task<ActionResult<TalentShowTryOutsConfigDTO>> GetTryOutsConfiguration(int eventId)
+    {
+        var eventExists = await _db.Events.AnyAsync(e => e.Id == eventId);
+        if (!eventExists)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        return Ok(NormalizeTryOutsConfig(settings.TryOuts));
+    }
+
+    [HttpPut("tryouts/configure")]
+    public async Task<IActionResult> SaveTryOutsConfiguration(int eventId, [FromBody] TalentShowTryOutsConfigDTO dto)
+    {
+        var eventItem = await _db.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (eventItem == null)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var control = await GetOrCreateTalentShowDirectorControlAsync(eventItem);
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        settings.TryOuts = NormalizeTryOutsConfig(dto);
+        control.SettingsJson = JsonSerializer.Serialize(settings);
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpGet("tryouts/entries")]
+    public async Task<ActionResult<IEnumerable<TalentShowTryOutEntry>>> GetTryOutEntries(int eventId)
+    {
+        var eventExists = await _db.Events.AnyAsync(e => e.Id == eventId);
+        if (!eventExists)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var entries = await _db.TalentShowTryOutEntries
+            .Where(te => te.EventId == eventId)
+            .OrderBy(te => te.SlotTime ?? DateTime.MaxValue)
+            .ThenBy(te => te.CreatedAtUtc)
+            .ToListAsync();
+
+        return Ok(entries);
+    }
+
+    [HttpPost("tryouts/entries")]
+    public async Task<ActionResult<TalentShowTryOutEntry>> CreateTryOutEntry(int eventId, [FromBody] TalentShowTryOutEntryUpsertDTO dto)
+    {
+        var eventExists = await _db.Events.AnyAsync(e => e.Id == eventId);
+        if (!eventExists)
+        {
+            return NotFound("Event not found.");
+        }
+
+        var entry = new TalentShowTryOutEntry
+        {
+            EventId = eventId,
+            SignupId = dto.SignupId,
+            PerformerNames = dto.PerformerNames?.Trim() ?? string.Empty,
+            ActTitle = dto.ActTitle?.Trim() ?? string.Empty,
+            SlotTime = dto.SlotTime,
+            SessionLabel = dto.SessionLabel?.Trim() ?? string.Empty,
+            Notes = dto.Notes?.Trim() ?? string.Empty,
+            Status = NormalizeTryOutEntryStatus(dto.Status),
+            Selected = dto.Selected,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TalentShowTryOutEntries.Add(entry);
+        await _db.SaveChangesAsync();
+        return Ok(entry);
+    }
+
+    [HttpPut("tryouts/entries/{entryId:int}")]
+    public async Task<IActionResult> UpdateTryOutEntry(int eventId, int entryId, [FromBody] TalentShowTryOutEntryUpsertDTO dto)
+    {
+        var entry = await _db.TalentShowTryOutEntries.FirstOrDefaultAsync(te => te.EventId == eventId && te.Id == entryId);
+        if (entry == null)
+        {
+            return NotFound("Try-out entry not found.");
+        }
+
+        entry.SlotTime = dto.SlotTime;
+        entry.SessionLabel = dto.SessionLabel?.Trim() ?? string.Empty;
+        entry.Notes = dto.Notes?.Trim() ?? string.Empty;
+        entry.Status = NormalizeTryOutEntryStatus(dto.Status);
+        entry.Selected = dto.Selected;
+        entry.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (entry.Selected)
+        {
+            await EnsureActForTryOutEntryAsync(eventId, entry);
+        }
+
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     [HttpGet("acts")]
@@ -631,4 +1034,574 @@ public class TalentShowController : ControllerBase
     }
 
     private static int ClampScore(int score) => Math.Clamp(score, 1, 5);
+
+    private async Task<EventControl?> GetTalentShowDirectorControlAsync(int eventId)
+    {
+        return await _db.EventControls
+            .FirstOrDefaultAsync(c => c.EventId == eventId && c.ControlType == TalentShowDirectorControlType && c.IsDirector);
+    }
+
+    private async Task<TalentShowSignupSettingsDTO> GetNormalizedSignupSettingsAsync(Event eventItem)
+    {
+        var control = await GetTalentShowDirectorControlAsync(eventItem.Id);
+        var settings = control == null
+            ? new TalentShowDirectorSettings()
+            : ParseDirectorSettings(control.SettingsJson);
+
+        var planningForDefaults = NormalizePlanningConfig(ApplyGlobalDefaultsToPlanning(
+            NormalizePlanningConfig(settings.Planning),
+            NormalizeGlobalSetupConfig(settings.GlobalSetup, eventItem)));
+
+        return NormalizeSignupSettings(settings.Signups, planningForDefaults, eventItem);
+    }
+
+    private static bool IsSignupWindowOpen(TalentShowSignupSettingsDTO settings)
+    {
+        var now = DateTime.UtcNow;
+        var startUtc = settings.SignupStart?.ToUniversalTime();
+        var endUtc = settings.SignupEnd?.ToUniversalTime();
+
+        if (startUtc.HasValue && now < startUtc.Value)
+        {
+            return false;
+        }
+
+        if (endUtc.HasValue && now > endUtc.Value)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<EventControl> GetOrCreateTalentShowDirectorControlAsync(Event eventItem)
+    {
+        var existingControl = await GetTalentShowDirectorControlAsync(eventItem.Id);
+        if (existingControl != null)
+        {
+            return existingControl;
+        }
+
+        var nextOrder = await _db.EventControls
+            .Where(c => c.EventId == eventItem.Id)
+            .Select(c => (int?)c.SequenceOrder)
+            .MaxAsync() ?? 0;
+
+        var newControl = new EventControl
+        {
+            EventId = eventItem.Id,
+            ControlType = TalentShowDirectorControlType,
+            DisplayName = TalentShowDirectorControlType,
+            IsDirector = true,
+            PublicInformation = false,
+            SettingsJson = "{}",
+            NotesMarkdown = string.Empty,
+            NotesHtml = string.Empty,
+            SequenceOrder = nextOrder + 1,
+            IsActive = true
+        };
+
+        _db.EventControls.Add(newControl);
+        return newControl;
+    }
+
+    private static TalentShowPlanningConfigDTO NormalizePlanningConfig(TalentShowPlanningConfigDTO dto)
+    {
+        var normalized = dto ?? new TalentShowPlanningConfigDTO();
+
+        normalized.MeetingDates = (normalized.MeetingDates ?? [])
+            .Where(meeting => meeting.Date != default)
+            .OrderBy(meeting => meeting.Date)
+            .Select(meeting => new TalentShowPlanningMeetingDateDTO
+            {
+                MeetingDateId = string.IsNullOrWhiteSpace(meeting.MeetingDateId)
+                    ? Guid.NewGuid().ToString("N")
+                    : meeting.MeetingDateId.Trim(),
+                Date = meeting.Date,
+                AddedByUserId = meeting.AddedByUserId?.Trim() ?? string.Empty,
+                LockedToUserId = string.IsNullOrWhiteSpace(meeting.LockedToUserId)
+                    ? null
+                    : meeting.LockedToUserId.Trim(),
+                Notes = meeting.Notes?.Trim() ?? string.Empty
+            })
+            .ToList();
+
+        normalized.AgendaTemplateItems = (normalized.AgendaTemplateItems ?? [])
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        normalized.AssignedHelpers = (normalized.AssignedHelpers ?? [])
+            .Where(helper => !string.IsNullOrWhiteSpace(helper))
+            .Select(helper => helper.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        normalized.MaxActs = normalized.MaxActs <= 0 ? 25 : normalized.MaxActs;
+        normalized.JudgeCount = normalized.JudgeCount <= 0 ? 1 : normalized.JudgeCount;
+        normalized.ExternalSignupUrl = string.IsNullOrWhiteSpace(normalized.ExternalSignupUrl)
+            ? null
+            : normalized.ExternalSignupUrl.Trim();
+        normalized.RulesMarkdown = normalized.RulesMarkdown?.Trim() ?? string.Empty;
+        normalized.RulesPdfPath = string.IsNullOrWhiteSpace(normalized.RulesPdfPath)
+            ? null
+            : normalized.RulesPdfPath.Trim();
+        normalized.JudgeNames = (normalized.JudgeNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.SignupStart.HasValue && normalized.SignupEnd.HasValue && normalized.SignupEnd < normalized.SignupStart)
+        {
+            (normalized.SignupStart, normalized.SignupEnd) = (normalized.SignupEnd, normalized.SignupStart);
+        }
+
+        if (normalized.MaxActsFlexible)
+        {
+            var min = normalized.MaxActsMin ?? normalized.MaxActs;
+            var max = normalized.MaxActsMax ?? normalized.MaxActs;
+            min = min <= 0 ? 1 : min;
+            max = max < min ? min : max;
+
+            normalized.MaxActsMin = min;
+            normalized.MaxActsMax = max;
+            normalized.MaxActs = Math.Clamp(normalized.MaxActs, min, max);
+        }
+        else
+        {
+            normalized.MaxActsMin = null;
+            normalized.MaxActsMax = null;
+        }
+
+        normalized.Categories = (normalized.Categories ?? [])
+            .Where(category => !string.IsNullOrWhiteSpace(category.Name))
+            .Select((category, index) => new TalentShowPlanningCategoryDTO
+            {
+                CategoryId = string.IsNullOrWhiteSpace(category.CategoryId)
+                    ? $"cat-{index + 1}"
+                    : category.CategoryId.Trim(),
+                Name = category.Name.Trim(),
+                Description = category.Description?.Trim() ?? string.Empty,
+                OrderIndex = index + 1
+            })
+            .ToList();
+
+        normalized.Notes = (normalized.Notes ?? [])
+            .Where(note => !string.IsNullOrWhiteSpace(note.Text))
+            .Select(note => new TalentShowPlanningNoteDTO
+            {
+                NoteId = string.IsNullOrWhiteSpace(note.NoteId) ? Guid.NewGuid().ToString("N") : note.NoteId.Trim(),
+                Text = note.Text.Trim(),
+                CreatedAt = note.CreatedAt == default ? DateTime.UtcNow : note.CreatedAt,
+                CreatedBy = note.CreatedBy?.Trim() ?? string.Empty
+            })
+            .ToList();
+
+        normalized.Questions = (normalized.Questions ?? [])
+            .Where(question => !string.IsNullOrWhiteSpace(question.Text))
+            .Select(question => new TalentShowPlanningQuestionDTO
+            {
+                QuestionId = string.IsNullOrWhiteSpace(question.QuestionId) ? Guid.NewGuid().ToString("N") : question.QuestionId.Trim(),
+                Text = question.Text.Trim(),
+                Resolved = question.Resolved,
+                ResolvedAt = question.Resolved ? question.ResolvedAt ?? DateTime.UtcNow : null
+            })
+            .ToList();
+
+        return normalized;
+    }
+
+    private static TalentShowSignupSettingsDTO NormalizeSignupSettings(
+        TalentShowSignupSettingsDTO? dto,
+        TalentShowPlanningConfigDTO planning,
+        Event eventItem)
+    {
+        var normalized = dto ?? new TalentShowSignupSettingsDTO();
+        normalized.Title = string.IsNullOrWhiteSpace(normalized.Title)
+            ? "Talent Show Sign-Ups"
+            : normalized.Title.Trim();
+        normalized.Subtitle = normalized.Subtitle?.Trim() ?? string.Empty;
+        normalized.PublicUrl = string.IsNullOrWhiteSpace(normalized.PublicUrl)
+            ? $"/talent-show/signups/{eventItem.Id}"
+            : normalized.PublicUrl.Trim();
+        normalized.ConfirmationMessage = normalized.ConfirmationMessage?.Trim() ?? string.Empty;
+
+        if (normalized.SignupStart == null && planning.SignupStart != null)
+        {
+            normalized.SignupStart = planning.SignupStart;
+        }
+
+        if (normalized.SignupEnd == null && planning.SignupEnd != null)
+        {
+            normalized.SignupEnd = planning.SignupEnd;
+        }
+
+        if (normalized.SignupStart.HasValue && normalized.SignupEnd.HasValue && normalized.SignupEnd < normalized.SignupStart)
+        {
+            (normalized.SignupStart, normalized.SignupEnd) = (normalized.SignupEnd, normalized.SignupStart);
+        }
+
+        return normalized;
+    }
+
+    private static TalentShowTryOutsConfigDTO NormalizeTryOutsConfig(TalentShowTryOutsConfigDTO? dto)
+    {
+        var normalized = dto ?? new TalentShowTryOutsConfigDTO();
+        normalized.SessionLabels = (normalized.SessionLabels ?? [])
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Select(label => label.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        normalized.AssignedHelpers = (normalized.AssignedHelpers ?? [])
+            .Where(helper => !string.IsNullOrWhiteSpace(helper))
+            .Select(helper => helper.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        normalized.SlotLengthMinutes = normalized.SlotLengthMinutes <= 0 ? 5 : normalized.SlotLengthMinutes;
+        normalized.BreakMinutes = normalized.BreakMinutes < 0 ? 0 : normalized.BreakMinutes;
+        normalized.MaxPerformersPerSession = normalized.MaxPerformersPerSession <= 0 ? 30 : normalized.MaxPerformersPerSession;
+        normalized.ScoringScaleMax = normalized.ScoringScaleMax <= 0 ? 5 : normalized.ScoringScaleMax;
+        normalized.ScoringFields = (normalized.ScoringFields ?? [])
+            .Where(field => !string.IsNullOrWhiteSpace(field.Label))
+            .Select((field, index) => new TalentShowTryOutScoringFieldDTO
+            {
+                FieldId = string.IsNullOrWhiteSpace(field.FieldId)
+                    ? $"score-{index + 1}"
+                    : field.FieldId.Trim(),
+                Label = field.Label.Trim(),
+                MaxScore = field.MaxScore <= 0 ? normalized.ScoringScaleMax : field.MaxScore,
+                OrderIndex = index + 1
+            })
+            .ToList();
+
+        if (!normalized.ScoringFields.Any())
+        {
+            normalized.ScoringFields =
+            [
+                new TalentShowTryOutScoringFieldDTO { FieldId = "score-1", Label = "Stage presence", MaxScore = normalized.ScoringScaleMax, OrderIndex = 1 },
+                new TalentShowTryOutScoringFieldDTO { FieldId = "score-2", Label = "Preparedness", MaxScore = normalized.ScoringScaleMax, OrderIndex = 2 },
+                new TalentShowTryOutScoringFieldDTO { FieldId = "score-3", Label = "Creativity", MaxScore = normalized.ScoringScaleMax, OrderIndex = 3 },
+                new TalentShowTryOutScoringFieldDTO { FieldId = "score-4", Label = "Overall impression", MaxScore = normalized.ScoringScaleMax, OrderIndex = 4 }
+            ];
+        }
+
+        return normalized;
+    }
+
+    private static TalentShowGlobalSetupConfigDTO NormalizeGlobalSetupConfig(TalentShowGlobalSetupConfigDTO? dto, Event? eventItem = null)
+    {
+        var normalized = dto ?? new TalentShowGlobalSetupConfigDTO();
+        normalized.EventTitle = string.IsNullOrWhiteSpace(normalized.EventTitle)
+            ? (eventItem?.Title?.Trim() ?? "Talent Show")
+            : normalized.EventTitle.Trim();
+        normalized.Theme = normalized.Theme?.Trim() ?? string.Empty;
+        normalized.BrandingMessage = normalized.BrandingMessage?.Trim() ?? string.Empty;
+        normalized.DefaultDisplaySettings = normalized.DefaultDisplaySettings?.Trim() ?? string.Empty;
+        normalized.DefaultMediaRules = normalized.DefaultMediaRules?.Trim() ?? string.Empty;
+        normalized.DefaultCueRules = normalized.DefaultCueRules?.Trim() ?? string.Empty;
+        normalized.DefaultSegmentBehavior = normalized.DefaultSegmentBehavior?.Trim() ?? string.Empty;
+        normalized.DefaultMaxActs = normalized.DefaultMaxActs <= 0 ? 25 : normalized.DefaultMaxActs;
+        normalized.DefaultJudgeCount = normalized.DefaultJudgeCount <= 0 ? 3 : normalized.DefaultJudgeCount;
+        normalized.DefaultExternalSignupUrl = string.IsNullOrWhiteSpace(normalized.DefaultExternalSignupUrl)
+            ? null
+            : normalized.DefaultExternalSignupUrl.Trim();
+        normalized.DefaultRulesMarkdown = normalized.DefaultRulesMarkdown?.Trim() ?? string.Empty;
+        normalized.DefaultRulesPdfPath = string.IsNullOrWhiteSpace(normalized.DefaultRulesPdfPath)
+            ? null
+            : normalized.DefaultRulesPdfPath.Trim();
+        normalized.DefaultJudgeNames = (normalized.DefaultJudgeNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        normalized.DefaultCategories = (normalized.DefaultCategories ?? [])
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .Select(category => category.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.DefaultSignupStart.HasValue && normalized.DefaultSignupEnd.HasValue &&
+            normalized.DefaultSignupEnd < normalized.DefaultSignupStart)
+        {
+            (normalized.DefaultSignupStart, normalized.DefaultSignupEnd) = (normalized.DefaultSignupEnd, normalized.DefaultSignupStart);
+        }
+
+        if (normalized.DefaultMaxActsFlexible)
+        {
+            var min = normalized.DefaultMaxActsMin ?? normalized.DefaultMaxActs;
+            var max = normalized.DefaultMaxActsMax ?? normalized.DefaultMaxActs;
+            min = min <= 0 ? 1 : min;
+            max = max < min ? min : max;
+            normalized.DefaultMaxActsMin = min;
+            normalized.DefaultMaxActsMax = max;
+            normalized.DefaultMaxActs = Math.Clamp(normalized.DefaultMaxActs, min, max);
+        }
+        else
+        {
+            normalized.DefaultMaxActsMin = null;
+            normalized.DefaultMaxActsMax = null;
+        }
+
+        return normalized;
+    }
+
+    private static TalentShowPlanningConfigDTO ApplyGlobalDefaultsToPlanning(
+        TalentShowPlanningConfigDTO planning,
+        TalentShowGlobalSetupConfigDTO globalSetup)
+    {
+        var merged = planning ?? new TalentShowPlanningConfigDTO();
+        var global = globalSetup ?? new TalentShowGlobalSetupConfigDTO();
+
+        if (merged.MaxActs == 25 && global.DefaultMaxActs > 0)
+        {
+            merged.MaxActs = global.DefaultMaxActs;
+        }
+
+        if (!merged.MaxActsFlexible && global.DefaultMaxActsFlexible)
+        {
+            merged.MaxActsFlexible = true;
+        }
+
+        if (merged.MaxActsMin == null && global.DefaultMaxActsMin.HasValue)
+        {
+            merged.MaxActsMin = global.DefaultMaxActsMin;
+        }
+
+        if (merged.MaxActsMax == null && global.DefaultMaxActsMax.HasValue)
+        {
+            merged.MaxActsMax = global.DefaultMaxActsMax;
+        }
+
+        if (merged.JudgeCount == 3 && global.DefaultJudgeCount > 0)
+        {
+            merged.JudgeCount = global.DefaultJudgeCount;
+        }
+
+        if (!merged.JudgeNames.Any() && global.DefaultJudgeNames.Any())
+        {
+            merged.JudgeNames = global.DefaultJudgeNames.ToList();
+        }
+
+        if (merged.SignupStart == null && global.DefaultSignupStart != null)
+        {
+            merged.SignupStart = global.DefaultSignupStart;
+        }
+
+        if (merged.SignupEnd == null && global.DefaultSignupEnd != null)
+        {
+            merged.SignupEnd = global.DefaultSignupEnd;
+        }
+
+        if (string.IsNullOrWhiteSpace(merged.ExternalSignupUrl) && !string.IsNullOrWhiteSpace(global.DefaultExternalSignupUrl))
+        {
+            merged.ExternalSignupUrl = global.DefaultExternalSignupUrl;
+        }
+
+        if (!merged.Categories.Any() && global.DefaultCategories.Any())
+        {
+            merged.Categories = global.DefaultCategories
+                .Select((name, index) => new TalentShowPlanningCategoryDTO
+                {
+                    CategoryId = $"cat-{index + 1}",
+                    Name = name,
+                    OrderIndex = index + 1
+                })
+                .ToList();
+        }
+
+        if (string.IsNullOrWhiteSpace(merged.RulesMarkdown) && !string.IsNullOrWhiteSpace(global.DefaultRulesMarkdown))
+        {
+            merged.RulesMarkdown = global.DefaultRulesMarkdown;
+        }
+
+        if (string.IsNullOrWhiteSpace(merged.RulesPdfPath) && !string.IsNullOrWhiteSpace(global.DefaultRulesPdfPath))
+        {
+            merged.RulesPdfPath = global.DefaultRulesPdfPath;
+        }
+
+        if (!merged.PublishRules && global.DefaultPublishRules &&
+            (string.IsNullOrWhiteSpace(merged.RulesMarkdown) || string.IsNullOrWhiteSpace(merged.RulesPdfPath)))
+        {
+            merged.PublishRules = true;
+        }
+
+        return merged;
+    }
+
+    private static string NormalizeTryOutEntryStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return TalentShowTryOutEntryStatus.Scheduled;
+        }
+
+        var normalized = status.Trim();
+        return TalentShowTryOutEntryStatus.All.FirstOrDefault(s =>
+                   s.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+               ?? TalentShowTryOutEntryStatus.Scheduled;
+    }
+
+    private static string NormalizeSignupAction(string? action)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+        {
+            return string.Empty;
+        }
+
+        var normalized = action.Trim();
+        return TalentShowSignupStatus.All.FirstOrDefault(status =>
+            status.Equals(normalized, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+    }
+
+    private async Task EnsureActForSignupAsync(int eventId, TalentShowSignup signup)
+    {
+        var existingAct = await _db.TalentShowActs.FirstOrDefaultAsync(a =>
+            a.EventId == eventId &&
+            a.PerformerName == signup.PerformerNames &&
+            a.Title == signup.ActTitle);
+
+        if (existingAct != null)
+        {
+            existingAct.SelectedForShow = true;
+            if (string.IsNullOrWhiteSpace(existingAct.Notes))
+            {
+                existingAct.Notes = signup.SpecialRequirements;
+            }
+
+            return;
+        }
+
+        var category = await TryResolveCategoryForSignupAsync(eventId);
+        var newAct = new TalentShowAct
+        {
+            EventId = eventId,
+            PerformerName = signup.PerformerNames,
+            Title = signup.ActTitle,
+            Category = category,
+            DurationSeconds = 60,
+            OrderIndex = await NextOrderIndexAsync(eventId),
+            IntroLine = string.Empty,
+            OutroLine = string.Empty,
+            MediaFilePath = signup.MediaUpload,
+            Notes = signup.SpecialRequirements,
+            SelectedForShow = true
+        };
+
+        _db.TalentShowActs.Add(newAct);
+    }
+
+    private async Task EnsureTryOutEntryForSignupAsync(int eventId, TalentShowSignup signup, string? sessionLabel)
+    {
+        var existingEntry = await _db.TalentShowTryOutEntries.FirstOrDefaultAsync(te =>
+            te.EventId == eventId && te.SignupId == signup.Id);
+
+        if (existingEntry != null)
+        {
+            existingEntry.SessionLabel = string.IsNullOrWhiteSpace(sessionLabel)
+                ? existingEntry.SessionLabel
+                : sessionLabel.Trim();
+            existingEntry.Status = TalentShowTryOutEntryStatus.Scheduled;
+            existingEntry.UpdatedAtUtc = DateTime.UtcNow;
+            return;
+        }
+
+        var newEntry = new TalentShowTryOutEntry
+        {
+            EventId = eventId,
+            SignupId = signup.Id,
+            PerformerNames = signup.PerformerNames,
+            ActTitle = signup.ActTitle,
+            SessionLabel = sessionLabel?.Trim() ?? string.Empty,
+            Notes = signup.SpecialRequirements,
+            Selected = false,
+            Status = TalentShowTryOutEntryStatus.Scheduled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TalentShowTryOutEntries.Add(newEntry);
+    }
+
+    private async Task EnsureActForTryOutEntryAsync(int eventId, TalentShowTryOutEntry entry)
+    {
+        var existingAct = await _db.TalentShowActs.FirstOrDefaultAsync(a =>
+            a.EventId == eventId &&
+            a.PerformerName == entry.PerformerNames &&
+            a.Title == entry.ActTitle);
+
+        if (existingAct != null)
+        {
+            existingAct.SelectedForShow = true;
+            if (string.IsNullOrWhiteSpace(existingAct.Notes))
+            {
+                existingAct.Notes = entry.Notes;
+            }
+
+            entry.ActId = existingAct.Id;
+            return;
+        }
+
+        var category = await TryResolveCategoryForSignupAsync(eventId);
+        var act = new TalentShowAct
+        {
+            EventId = eventId,
+            PerformerName = entry.PerformerNames,
+            Title = entry.ActTitle,
+            Category = category,
+            DurationSeconds = 60,
+            OrderIndex = await NextOrderIndexAsync(eventId),
+            IntroLine = string.Empty,
+            OutroLine = string.Empty,
+            MediaFilePath = string.Empty,
+            Notes = entry.Notes,
+            SelectedForShow = true
+        };
+
+        _db.TalentShowActs.Add(act);
+        await _db.SaveChangesAsync();
+        entry.ActId = act.Id;
+    }
+
+    private async Task<string> TryResolveCategoryForSignupAsync(int eventId)
+    {
+        var control = await GetTalentShowDirectorControlAsync(eventId);
+        if (control == null)
+        {
+            return string.Empty;
+        }
+
+        var settings = ParseDirectorSettings(control.SettingsJson);
+        return settings.Planning.Categories
+            .OrderBy(c => c.OrderIndex)
+            .Select(c => c.Name)
+            .FirstOrDefault() ?? string.Empty;
+    }
+
+    private static TalentShowDirectorSettings ParseDirectorSettings(string? settingsJson)
+    {
+        if (string.IsNullOrWhiteSpace(settingsJson))
+        {
+            return new TalentShowDirectorSettings();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<TalentShowDirectorSettings>(settingsJson, JsonOptions)
+                   ?? new TalentShowDirectorSettings();
+        }
+        catch (JsonException)
+        {
+            return new TalentShowDirectorSettings();
+        }
+    }
+
+    private sealed class TalentShowDirectorSettings
+    {
+        public TalentShowPlanningConfigDTO Planning { get; set; } = new();
+        public TalentShowGlobalSetupConfigDTO GlobalSetup { get; set; } = new();
+        public TalentShowSignupSettingsDTO Signups { get; set; } = new();
+        public TalentShowTryOutsConfigDTO TryOuts { get; set; } = new();
+    }
 }

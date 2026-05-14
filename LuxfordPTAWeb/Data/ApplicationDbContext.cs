@@ -20,6 +20,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<EventControl> EventControls { get; set; }
 	public DbSet<TalentShowSessionState> TalentShowSessionStates { get; set; }
 	public DbSet<TalentShowAct> TalentShowActs { get; set; }
+	public DbSet<TalentShowSignup> TalentShowSignups { get; set; }
+	public DbSet<TalentShowTryOutEntry> TalentShowTryOutEntries { get; set; }
 	public DbSet<TalentShowVote> TalentShowVotes { get; set; }
 	public DbSet<TalentShowDisplayAssignmentHistory> TalentShowDisplayAssignmentHistories { get; set; }
 	public DbSet<ProgramCard> ProgramCards { get; set; }
@@ -153,6 +155,58 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		builder.Entity<TalentShowAct>()
 			.HasIndex(ta => new { ta.EventId, ta.OrderIndex })
 			.IsUnique();
+
+		builder.Entity<TalentShowSignup>()
+			.HasOne(ts => ts.Event)
+			.WithMany(e => e.TalentShowSignups)
+			.HasForeignKey(ts => ts.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowSignup>()
+			.Property(ts => ts.PerformerNames)
+			.HasMaxLength(240);
+
+		builder.Entity<TalentShowSignup>()
+			.Property(ts => ts.ActTitle)
+			.HasMaxLength(120);
+
+		builder.Entity<TalentShowSignup>()
+			.Property(ts => ts.ContactEmail)
+			.HasMaxLength(254);
+
+		builder.Entity<TalentShowSignup>()
+			.Property(ts => ts.Status)
+			.HasMaxLength(40);
+
+		builder.Entity<TalentShowSignup>()
+			.HasIndex(ts => new { ts.EventId, ts.Status, ts.CreatedAtUtc });
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.HasOne(te => te.Event)
+			.WithMany(e => e.TalentShowTryOutEntries)
+			.HasForeignKey(te => te.EventId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.HasOne(te => te.Signup)
+			.WithMany()
+			.HasForeignKey(te => te.SignupId)
+			.OnDelete(DeleteBehavior.NoAction);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.Property(te => te.PerformerNames)
+			.HasMaxLength(240);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.Property(te => te.ActTitle)
+			.HasMaxLength(120);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.Property(te => te.Status)
+			.HasMaxLength(40);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.HasIndex(te => new { te.EventId, te.SlotTime });
 
 		builder.Entity<TalentShowVote>()
 			.HasOne(tv => tv.Event)

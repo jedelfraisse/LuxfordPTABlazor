@@ -48,7 +48,7 @@
     private readonly string[] nonDirectorControlTypes =
     [
         "SponsorDisplayControl",
-        "MeetingAgendaControl",
+        "MeetingTrackerControl",
         "NoteTakerControl",
         "SlideshowControl",
         "FeedBackFormControl"
@@ -841,12 +841,12 @@
 
         return control.ControlType switch
         {
-            "TalentShowDirectorControl" => $"/admin/eventcontrols/talent-show/{eventModel.Id}",
+            "TalentShowDirectorControl" => $"/admin/eventcontrols/talent-show-director/{eventModel.Id}",
             "BingoDirectorControl" => $"/admin/eventcontrols/bingo/{eventModel.Id}",
             "ElectionDirectorControl" => $"/admin/eventcontrols/election/{eventModel.Id}",
             "BingoControl" => $"/admin/eventcontrols/bingo/{eventModel.Id}",
             "ElectionControl" => $"/admin/eventcontrols/election/{eventModel.Id}",
-            "SponsorDisplayControl" => $"/events/{eventModel.Slug}/control/sponsors",
+            "SponsorDisplayControl" => $"/admin/eventcontrols/sponsors/{eventModel.Id}",
             "NoteTakerControl" => $"/events/{eventModel.Slug}/control/notes",
             _ => $"/admin/events/edit/{eventModel.Id}?tab=controls"
         };
@@ -861,8 +861,8 @@
             "ElectionDirectorControl" => "Election Director",
             "BingoControl" => "Bingo Helper",
             "ElectionControl" => "Election Helper",
-            "SponsorDisplayControl" => "Sponsor Display",
-            "MeetingAgendaControl" => "Meeting Agenda",
+            "SponsorDisplayControl" => "Event Sponsors",
+            "MeetingTrackerControl" => "Meeting Tracker",
             "NoteTakerControl" => "Note Taker",
             "SlideshowControl" => "Slideshow",
             "FeedBackFormControl" => "Feedback Form",
@@ -1571,11 +1571,11 @@ else if (eventModel != null)
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Signup Opens</label>
-                                            <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowStart" @bind:format="yyyy-MM-ddTHH:mm" />
+                                            <input type="datetime-local" class="form-control" @bind-value="eventModel.SignupWindowStart" @bind-value:format="yyyy-MM-ddTHH:mm" />
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Signup Closes</label>
-                                            <input type="datetime-local" class="form-control" @bind="eventModel.SignupWindowEnd" @bind:format="yyyy-MM-ddTHH:mm" />
+                                            <input type="datetime-local" class="form-control" @bind-value="eventModel.SignupWindowEnd" @bind-value:format="yyyy-MM-ddTHH:mm" />
                                         </div>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(eventModel.ExcelImportId))

@@ -1,16 +1,14 @@
+@page "/admin/eventcontrols/talent-show-director/{eventId:int}"
 @page "/admin/eventcontrols/talent-show-stages/{eventId:int}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
-@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Models
-@using LuxfordPTAWeb.Client.Components.TalentShow
 @inject HttpClient Http
-@inject NavigationManager Navigation
 
-<PageTitle>Talent Show Stages - @(eventItem?.Title ?? "Event")</PageTitle>
+<PageTitle>Talent Show Director - @(eventItem?.Title ?? "Event")</PageTitle>
 
 @if (isLoading)
 {
-    <div class="alert alert-info"><em>Loading event and stage data...</em></div>
+    <div class="alert alert-info"><em>Loading director hub...</em></div>
 }
 else if (eventItem == null)
 {
@@ -20,8 +18,8 @@ else
 {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="mb-0">@eventItem.Title — Talent Show Stages</h1>
-            <div class="text-muted">Configure show details for each stage</div>
+            <h1 class="mb-0">@eventItem.Title — Talent Show Director Hub</h1>
+            <div class="text-muted">Navigate each module in the talent show lifecycle.</div>
         </div>
         <a href="@($"/admin/events/edit/{eventItem.Id}?tab=controls")" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back
@@ -33,70 +31,24 @@ else
         <div class="alert alert-danger">@errorMessage</div>
     }
 
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="alert alert-info">@statusMessage</div>
-    }
-
     <div class="row">
-        <div class="col-md-3">
-            <div class="list-group sticky-top" style="top: 1rem;">
-                @foreach (var stageVal in TalentShowLifecycleState.All)
-                {
-                    var isActive = currentStage == stageVal;
-                    var stageIndex = System.Array.IndexOf(TalentShowLifecycleState.All, stageVal);
-                    <button class="list-group-item list-group-item-action @(isActive ? "active" : "")"
-                            @onclick="() => SelectStage(stageVal)">
-                        <span class="badge bg-secondary me-2">@(stageIndex + 1)</span>
-                        @stageVal
-                    </button>
-                }
-            </div>
-        </div>
-
-        <div class="col-md-9">
-            <div class="card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">@currentStage Configuration</h5>
-                </div>
-                <div class="card-body">
-                    @switch (currentStage)
-                    {
-                        case TalentShowLifecycleState.Planning:
-                            <PlanningStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.TryOuts:
-                            <TryOutsStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.Rehearsal:
-                            <RehearsalStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.PreShow:
-                            <PreShowStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.HostTalk:
-                            <HostTalkStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.ActShow:
-                            <ActShowStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.Intermission:
-                            <IntermissionStagePanel EventId="@eventItem.Id" />
-                            break;
-
-                        case TalentShowLifecycleState.PostShow:
-                            <PostShowStagePanel EventId="@eventItem.Id" />
-                            break;
-                    }
+        @foreach (var hub in sections)
+        {
+            <div class="col-lg-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-1">@hub.Title</h5>
+                        <p class="text-muted mb-3">@hub.Description</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            @foreach (var action in GetActions(hub))
+                            {
+                                <a class="@action.ButtonClass" href="@action.Href">@action.Label</a>
+                            }
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        }
     </div>
 }
 
@@ -104,10 +56,16 @@ else
     [Parameter] public int eventId { get; set; }
 
     private Event? eventItem;
-    private string currentStage = TalentShowLifecycleState.Planning;
     private bool isLoading = true;
     private string errorMessage = string.Empty;
-    private string statusMessage = string.Empty;
+    private readonly HubSection[] sections =
+    [
+        new("Global Setup", "Configure defaults and global rules shared across modules.", "global-setup", true),
+        new("Sign-Ups", "Configure intake and review submissions.", "signups", true),
+        new("Try-Outs", "Configure try-out sessions and run queue decisions.", "tryouts", false),
+        new("Rehearsals", "Prepare segment order, timing, media, and cues.", "rehearsals", false),
+        new("The Show", "Run the finalized timeline during the live event.", "show", false)
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -136,10 +94,50 @@ else
         }
     }
 
-    private void SelectStage(string stage)
+    private IEnumerable<HubAction> GetActions(HubSection hub)
     {
-        currentStage = stage;
-        errorMessage = string.Empty;
-        statusMessage = string.Empty;
+        var basePath = $"/admin/eventcontrols/talent-show-director/{eventItem!.Id}";
+
+        if (hub.IsTool)
+        {
+            if (hub.RouteKey == "global-setup")
+            {
+                yield return new HubAction("Configure", $"{basePath}/tools/{hub.RouteKey}/configure", "btn btn-outline-primary btn-sm");
+                yield break;
+            }
+
+            if (hub.RouteKey == "signups")
+            {
+                yield return new HubAction("Configure", $"{basePath}/tools/signups/configure", "btn btn-outline-primary btn-sm");
+                yield return new HubAction("Review", $"{basePath}/tools/signups/review", "btn btn-outline-secondary btn-sm");
+                yield return new HubAction("Preview", $"/talent-show/signups/{eventItem!.Id}", "btn btn-outline-dark btn-sm");
+            }
+
+            yield break;
+        }
+
+        yield return new HubAction("Configure", $"{basePath}/subevents/{hub.RouteKey}/configure", "btn btn-outline-primary btn-sm");
+
+        if (hub.RouteKey == "show")
+        {
+            yield return new HubAction("Live", $"{basePath}/subevents/show/live", "btn btn-outline-secondary btn-sm");
+            yield return new HubAction("Public", GetPublicEventHref(), "btn btn-outline-dark btn-sm");
+            yield break;
+        }
+
+        yield return new HubAction("Sessions", $"{basePath}/subevents/{hub.RouteKey}/sessions", "btn btn-outline-secondary btn-sm");
     }
+
+    private string GetPublicEventHref()
+    {
+        if (eventItem == null || string.IsNullOrWhiteSpace(eventItem.Slug))
+        {
+            return "/events";
+        }
+
+        return $"/events/{Uri.EscapeDataString(eventItem.Slug)}";
+    }
+
+    private sealed record HubSection(string Title, string Description, string RouteKey, bool IsTool);
+    private sealed record HubAction(string Label, string Href, string ButtonClass);
 }

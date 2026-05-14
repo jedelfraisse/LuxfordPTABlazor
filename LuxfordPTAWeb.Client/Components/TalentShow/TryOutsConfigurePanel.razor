@@ -1,0 +1,200 @@
+@using LuxfordPTAWeb.Shared.DTOs
+@inject HttpClient Http
+
+<div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="text-warning mb-0"><i class="bi bi-people"></i> Try-Outs Configuration</h6>
+        <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/subevents/tryouts/sessions")">Go to Sessions</a>
+    </div>
+    <p class="text-muted">Configure session slot defaults and required review details.</p>
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading try-outs configuration...</em></div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Slot Length (minutes)</label>
+                <input type="number" class="form-control" min="1" @bind="settings.SlotLengthMinutes" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Break Length (minutes)</label>
+                <input type="number" class="form-control" min="0" @bind="settings.BreakMinutes" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Max Performers / Session</label>
+                <input type="number" class="form-control" min="1" @bind="settings.MaxPerformersPerSession" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Try-Out Sessions (labels)</label>
+                <textarea class="form-control" rows="4" @bind="sessionLabelsText" placeholder="Session A&#10;Session B"></textarea>
+                <small class="text-muted">One session label per line.</small>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Assigned Helpers</label>
+                <textarea class="form-control" rows="4" @bind="assignedHelpersText" placeholder="Helper name or user ID per line"></textarea>
+                <small class="text-muted">One helper per line.</small>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.AutoSchedule" id="tryoutsAutoSchedule" />
+                    <label class="form-check-label" for="tryoutsAutoSchedule">Auto-schedule invited sign-ups</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.RequireMedia" id="tryoutsRequireMedia" />
+                    <label class="form-check-label" for="tryoutsRequireMedia">Require media before try-out</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.RequireGuardian" id="tryoutsRequireGuardian" />
+                    <label class="form-check-label" for="tryoutsRequireGuardian">Require parent/guardian presence</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.RequireEquipmentList" id="tryoutsRequireEquipment" />
+                    <label class="form-check-label" for="tryoutsRequireEquipment">Require equipment list</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.RequireCategory" id="tryoutsRequireCategory" />
+                    <label class="form-check-label" for="tryoutsRequireCategory">Require category selection</label>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Scoring Scale Max</label>
+                <input type="number" class="form-control" min="1" @bind="settings.ScoringScaleMax" />
+            </div>
+
+            <div class="col-md-8">
+                <label class="form-label">Scoring Fields</label>
+                <textarea class="form-control" rows="4" @bind="scoringFieldsText" placeholder="Stage presence&#10;Preparedness&#10;Creativity&#10;Overall impression"></textarea>
+                <small class="text-muted">One scoring field label per line.</small>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="settings.EnableCommentBox" id="tryoutsCommentsEnabled" />
+                    <label class="form-check-label" for="tryoutsCommentsEnabled">Enable comment box during sessions</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-check-circle"></i> Save Try-Outs Configuration</span>
+                }
+            </button>
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <span class="ms-2 text-success">@successMessage</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private TalentShowTryOutsConfigDTO settings = new();
+    private string sessionLabelsText = string.Empty;
+    private string assignedHelpersText = string.Empty;
+    private string scoringFieldsText = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            settings = await Http.GetFromJsonAsync<TalentShowTryOutsConfigDTO>($"/api/talentshow/{EventId}/tryouts/configure")
+                ?? new TalentShowTryOutsConfigDTO();
+            sessionLabelsText = settings.SessionLabels.Any() ? string.Join('\n', settings.SessionLabels) : string.Empty;
+            assignedHelpersText = settings.AssignedHelpers.Any() ? string.Join('\n', settings.AssignedHelpers) : string.Empty;
+            scoringFieldsText = settings.ScoringFields.Any()
+                ? string.Join('\n', settings.ScoringFields.OrderBy(f => f.OrderIndex).Select(f => f.Label))
+                : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading try-outs configuration: {ex.Message}";
+            settings = new TalentShowTryOutsConfigDTO();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            settings.SessionLabels = sessionLabelsText
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            settings.AssignedHelpers = assignedHelpersText
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            settings.ScoringFields = scoringFieldsText
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select((label, index) => new TalentShowTryOutScoringFieldDTO
+                {
+                    FieldId = $"score-{index + 1}",
+                    Label = label,
+                    MaxScore = settings.ScoringScaleMax <= 0 ? 5 : settings.ScoringScaleMax,
+                    OrderIndex = index + 1
+                })
+                .ToList();
+
+            var response = await Http.PutAsJsonAsync($"/api/talentshow/{EventId}/tryouts/configure", settings);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to save try-outs configuration." : body;
+                return;
+            }
+
+            successMessage = "Try-outs configuration saved.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving try-outs configuration: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

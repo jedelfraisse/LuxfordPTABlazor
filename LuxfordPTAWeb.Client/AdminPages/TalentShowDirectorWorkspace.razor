@@ -1,0 +1,212 @@
+@page "/admin/eventcontrols/talent-show-director/{eventId:int}/subevents/{subEventType}/{mode}"
+@page "/admin/eventcontrols/talent-show-director/{eventId:int}/tools/{toolName}/{mode}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@using LuxfordPTAWeb.Client.Components.TalentShow
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>@(eventItem?.Title ?? "Talent Show") Workspace</PageTitle>
+
+@if (isLoading)
+{
+    <div class="alert alert-info"><em>Loading workspace...</em></div>
+}
+else if (eventItem == null)
+{
+    <div class="alert alert-warning"><em>Event not found.</em></div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">@eventItem.Title — @GetWorkspaceTitle()</h1>
+            <div class="text-muted">@GetWorkspaceSubtitle()</div>
+        </div>
+        <a href="@($"/admin/eventcontrols/talent-show-director/{eventItem.Id}")" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Director Hub
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isInvalidRoute)
+    {
+        <div class="alert alert-warning">
+            That workspace route is not valid yet.
+        </div>
+    }
+    else if (!isToolRoute && normalizedSubEventType == "planning" && normalizedMode is "configure" or "meetings" or "run")
+    {
+        <PlanningStagePanel EventId="@eventItem.Id" />
+    }
+    else if (!isToolRoute && normalizedMode == "configure" && normalizedSubEventType == "tryouts")
+    {
+        <TryOutsConfigurePanel EventId="@eventItem.Id" />
+    }
+    else if (!isToolRoute && normalizedSubEventType == "tryouts" && normalizedMode is "sessions" or "run")
+    {
+        <TryOutsRunPanel EventId="@eventItem.Id" />
+    }
+    else if (!isToolRoute && normalizedMode == "configure" && normalizedSubEventType == "rehearsals")
+    {
+        <RehearsalStagePanel EventId="@eventItem.Id" />
+    }
+    else if (isToolRoute && normalizedToolName == "signups" && normalizedMode == "configure")
+    {
+        <SignUpsConfigurePanel EventId="@eventItem.Id" />
+    }
+    else if (!isToolRoute && normalizedSubEventType == "rehearsals" && normalizedMode is "sessions" or "run")
+    {
+        <RehearsalStagePanel EventId="@eventItem.Id" />
+    }
+    else if (isToolRoute && normalizedToolName == "signups" && normalizedMode is "review" or "run" or "preview")
+    {
+        <SignUpsRunPanel EventId="@eventItem.Id" />
+    }
+    else if (isToolRoute && (normalizedToolName is "global-setup" or "display-setup") && normalizedMode == "configure")
+    {
+        <GlobalSetupConfigurePanel EventId="@eventItem.Id" />
+    }
+    else if (!isToolRoute && normalizedSubEventType == "show" && normalizedMode is "configure" or "live" or "run")
+    {
+        <div class="alert alert-info mb-0">
+            The Show workspace is scaffolded and ready for implementation.
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            @GetWorkspacePlaceholderText()
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int eventId { get; set; }
+    [Parameter] public string? subEventType { get; set; }
+    [Parameter] public string? toolName { get; set; }
+    [Parameter] public string mode { get; set; } = string.Empty;
+
+    private Event? eventItem;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string normalizedSubEventType = string.Empty;
+    private string normalizedToolName = string.Empty;
+    private string normalizedMode = string.Empty;
+    private bool isToolRoute;
+    private bool isInvalidRoute;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        normalizedSubEventType = (subEventType ?? string.Empty).Trim().ToLowerInvariant();
+        normalizedToolName = (toolName ?? string.Empty).Trim().ToLowerInvariant();
+        normalizedMode = (mode ?? string.Empty).Trim().ToLowerInvariant();
+        isToolRoute = !string.IsNullOrWhiteSpace(normalizedToolName);
+
+        isInvalidRoute = !IsRouteSupported();
+
+        try
+        {
+            eventItem = await Http.GetFromJsonAsync<Event>($"/api/events/{eventId}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading event: {ex.Message}";
+            eventItem = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool IsRouteSupported()
+    {
+        if (string.IsNullOrWhiteSpace(normalizedMode))
+        {
+            return false;
+        }
+
+        if (isToolRoute)
+        {
+            if (normalizedToolName is not ("signups" or "global-setup" or "display-setup"))
+            {
+                return false;
+            }
+
+            return normalizedToolName switch
+            {
+                "signups" => normalizedMode is "configure" or "review" or "run" or "preview",
+                "global-setup" or "display-setup" => normalizedMode == "configure",
+                _ => false
+            };
+        }
+
+        if (normalizedSubEventType is not ("planning" or "tryouts" or "rehearsals" or "show"))
+        {
+            return false;
+        }
+
+        return normalizedSubEventType switch
+        {
+            "planning" => normalizedMode is "configure" or "meetings" or "run",
+            "show" => normalizedMode is "configure" or "live" or "run",
+            "tryouts" or "rehearsals" => normalizedMode is "configure" or "sessions" or "run",
+            _ => false
+        };
+    }
+
+    private string GetWorkspaceTitle()
+    {
+        var typeName = isToolRoute
+            ? normalizedToolName switch
+            {
+                "signups" => "Sign-Ups",
+                "global-setup" => "Global Setup",
+                "display-setup" => "Global Setup",
+                _ => "Tool"
+            }
+            : normalizedSubEventType switch
+            {
+                "planning" => "Planning Meetings",
+                "tryouts" => "Try-Outs",
+                "rehearsals" => "Rehearsals",
+                "show" => "The Show",
+                _ => "Sub-Event"
+            };
+
+        var modeName = normalizedMode switch
+        {
+            "configure" => "Configure",
+            "meetings" => "Meetings",
+            "review" => "Review",
+            "sessions" => "Sessions",
+            "live" => "Live",
+            "run" => "Run",
+            "preview" => "Preview",
+            _ => normalizedMode
+        };
+
+        return $"{typeName} — {modeName}";
+    }
+
+    private string GetWorkspaceSubtitle()
+    {
+        return isToolRoute
+            ? "Global module workspace"
+            : "Sub-event module workspace";
+    }
+
+    private string GetWorkspacePlaceholderText()
+    {
+        return isToolRoute
+            ? "This module workspace is scaffolded and ready for implementation."
+            : "This sub-event module workspace is scaffolded and ready for implementation.";
+    }
+}

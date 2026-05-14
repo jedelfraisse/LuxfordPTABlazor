@@ -1,0 +1,367 @@
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="text-primary mb-0"><i class="bi bi-people"></i> Sign-Up Review Queue</h6>
+        <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/tools/signups/configure")">Go to Configure</a>
+    </div>
+    <p class="text-muted">Review each submission case-by-case: approve directly to rehearsals, invite to try-outs, request more info, or reject.</p>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading sign-up submissions...</em></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-end gap-2 mb-3">
+            <div>
+                <label class="form-label mb-1">Filter</label>
+                <select class="form-select form-select-sm" value="@statusFilter" @onchange="OnFilterChanged">
+                    <option value="">All</option>
+                    @foreach (var status in TalentShowSignupStatus.All)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label mb-1">Per Page</label>
+                <select class="form-select form-select-sm" @onchange="OnPageSizeChanged" style="width: auto;">
+                    <option value="10" selected="@(pageSize == 10)">10</option>
+                    <option value="25" selected="@(pageSize == 25)">25</option>
+                    <option value="50" selected="@(pageSize == 50)">50</option>
+                    <option value="100" selected="@(pageSize == 100)">100</option>
+                </select>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadSubmissionsAsync">Refresh</button>
+        </div>
+
+        @if (!submissions.Any())
+        {
+            <div class="alert alert-light border">No submissions yet.</div>
+        }
+        else
+        {
+            @if (selectedSignupId.HasValue)
+            {
+                var selectedSignup = submissions.FirstOrDefault(s => s.Id == selectedSignupId.Value);
+                @if (selectedSignup != null)
+                {
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                            <h6 class="mb-0">Submission Details</h6>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => selectedSignupId = null">
+                                <i class="bi bi-x-circle"></i> Close
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <div><strong>Performer(s):</strong></div>
+                                    <div>@selectedSignup.PerformerNames</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div><strong>Grade:</strong></div>
+                                    <div>@(string.IsNullOrWhiteSpace(selectedSignup.Grade) ? "Not provided" : selectedSignup.Grade)</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div><strong>Teacher:</strong></div>
+                                    <div>@(string.IsNullOrWhiteSpace(selectedSignup.Teacher) ? "Not provided" : selectedSignup.Teacher)</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div><strong>Submitted:</strong></div>
+                                    <div>@selectedSignup.CreatedAtUtc.ToLocalTime().ToString("g")</div>
+                                </div>
+                                <div class="col-12">
+                                    <div><strong>Act Title:</strong></div>
+                                    <div>@selectedSignup.ActTitle</div>
+                                </div>
+                                <div class="col-12">
+                                    <div><strong>Act Description:</strong></div>
+                                    <div>@(string.IsNullOrWhiteSpace(selectedSignup.ActDescription) ? "Not provided" : selectedSignup.ActDescription)</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div><strong>Contact Email:</strong></div>
+                                    <div>@(string.IsNullOrWhiteSpace(selectedSignup.ContactEmail) ? "Not provided" : selectedSignup.ContactEmail)</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div><strong>Contact Phone:</strong></div>
+                                    <div>@(string.IsNullOrWhiteSpace(selectedSignup.ContactPhone) ? "Not provided" : selectedSignup.ContactPhone)</div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(selectedSignup.SpecialRequirements))
+                                {
+                                    <div class="col-12">
+                                        <div><strong>Special Requirements:</strong></div>
+                                        <div>@selectedSignup.SpecialRequirements</div>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(selectedSignup.MediaUpload))
+                                {
+                                    <div class="col-12">
+                                        <div><strong>Media Upload:</strong></div>
+                                        <div><a href="@selectedSignup.MediaUpload" target="_blank" rel="noopener noreferrer">@selectedSignup.MediaUpload</a></div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-success btn-sm" @onclick="@(() => ReviewAsync(selectedSignup.Id, TalentShowSignupStatus.ApprovedDirect))">Approve to Rehearsals</button>
+                                <button class="btn btn-primary btn-sm" @onclick="@(() => ReviewAsync(selectedSignup.Id, TalentShowSignupStatus.InvitedToTryOuts))">Invite Try-Outs</button>
+                                <button class="btn btn-warning btn-sm" @onclick="@(() => ReviewAsync(selectedSignup.Id, TalentShowSignupStatus.NeedsMoreInfo))">Needs Info</button>
+                                <button class="btn btn-danger btn-sm" @onclick="@(() => ReviewAsync(selectedSignup.Id, TalentShowSignupStatus.Rejected))">Reject</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Performer(s)</th>
+                            <th>Act</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th style="width: 280px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var signup in GetCurrentPage())
+                        {
+                            <tr>
+                                <td>@signup.PerformerNames</td>
+                                <td>
+                                    <div>@signup.ActTitle</div>
+                                    @if (!string.IsNullOrWhiteSpace(signup.ActDescription))
+                                    {
+                                        <small class="text-muted">@signup.ActDescription</small>
+                                    }
+                                </td>
+                                <td><span class="badge bg-secondary">@signup.Status</span></td>
+                                <td>@signup.CreatedAtUtc.ToLocalTime().ToString("g")</td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <button class="btn btn-info btn-sm" @onclick="@(() => selectedSignupId = signup.Id)" title="View full details">
+                                            <i class="bi bi-eye"></i> Details
+                                        </button>
+                                        <button class="btn btn-success btn-sm" @onclick="@(() => ReviewAsync(signup.Id, TalentShowSignupStatus.ApprovedDirect))">Approve</button>
+                                        <button class="btn btn-primary btn-sm" @onclick="@(() => ReviewAsync(signup.Id, TalentShowSignupStatus.InvitedToTryOuts))">Try-Outs</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (totalPages > 1)
+            {
+                <nav class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="text-muted small">
+                        Showing @((currentPage - 1) * pageSize + 1) to @Math.Min(currentPage * pageSize, submissions.Count) of @submissions.Count
+                    </div>
+                    <ul class="pagination mb-0">
+                        <li class="page-item" style="display: @(currentPage > 1 ? "block" : "none")">
+                            <button class="page-link" @onclick="() => currentPage = 1">First</button>
+                        </li>
+                        <li class="page-item" style="display: @(currentPage > 1 ? "block" : "none")">
+                            <button class="page-link" @onclick="() => currentPage--">Previous</button>
+                        </li>
+                        @for (int i = 1; i <= totalPages; i++)
+                        {
+                            int pageNum = i;
+                            <li class="page-item @(currentPage == pageNum ? "active" : "")">
+                                <button class="page-link" @onclick="() => currentPage = pageNum">@pageNum</button>
+                            </li>
+                        }
+                        <li class="page-item" style="display: @(currentPage < totalPages ? "block" : "none")">
+                            <button class="page-link" @onclick="() => currentPage++">Next</button>
+                        </li>
+                        <li class="page-item" style="display: @(currentPage < totalPages ? "block" : "none")">
+                            <button class="page-link" @onclick="() => currentPage = totalPages">Last</button>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        }
+
+        <hr />
+
+        <h6>Add Submission</h6>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Performer name(s)" @bind="newSignup.PerformerNames" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Act title" @bind="newSignup.ActTitle" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Grade" @bind="newSignup.Grade" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Teacher" @bind="newSignup.Teacher" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Contact email" @bind="newSignup.ContactEmail" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Contact phone" @bind="newSignup.ContactPhone" />
+            </div>
+            <div class="col-12">
+                <textarea class="form-control form-control-sm" rows="2" placeholder="Act description" @bind="newSignup.ActDescription"></textarea>
+            </div>
+            <div class="col-12">
+                <textarea class="form-control form-control-sm" rows="2" placeholder="Special requirements" @bind="newSignup.SpecialRequirements"></textarea>
+            </div>
+            <div class="col-12">
+                <input class="form-control form-control-sm" placeholder="Media upload link or path (optional)" @bind="newSignup.MediaUpload" />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-outline-primary btn-sm" @onclick="CreateSubmissionAsync" disabled="@isSaving">
+                    Add Submission
+                </button>
+                @if (!string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <span class="ms-2 text-success">@successMessage</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private List<TalentShowSignup> submissions = [];
+    private TalentShowSignupUpsertDTO newSignup = new();
+    private string statusFilter = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private int pageSize = 10;
+    private int currentPage = 1;
+    private int totalPages => (int)Math.Ceiling((decimal)submissions.Count / pageSize);
+    private int? selectedSignupId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadSubmissionsAsync();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? string.Empty;
+        currentPage = 1;
+        await LoadSubmissionsAsync();
+    }
+
+    private Task OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+        {
+            pageSize = size;
+            currentPage = 1;
+        }
+        return Task.CompletedTask;
+    }
+
+    private List<TalentShowSignup> GetCurrentPage()
+    {
+        var startIndex = (currentPage - 1) * pageSize;
+        return submissions.Skip(startIndex).Take(pageSize).ToList();
+    }
+
+    private async Task LoadSubmissionsAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        selectedSignupId = null;
+        try
+        {
+            var statusQuery = string.IsNullOrWhiteSpace(statusFilter)
+                ? string.Empty
+                : $"?status={Uri.EscapeDataString(statusFilter)}";
+
+            submissions = await Http.GetFromJsonAsync<List<TalentShowSignup>>($"/api/talentshow/{EventId}/signups/submissions{statusQuery}")
+                ?? [];
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading submissions: {ex.Message}";
+            submissions = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateSubmissionAsync()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/signups/submissions", newSignup);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to create submission." : body;
+                return;
+            }
+
+            newSignup = new TalentShowSignupUpsertDTO();
+            successMessage = "Submission added.";
+            await LoadSubmissionsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating submission: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ReviewAsync(int signupId, string action)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            var decision = new TalentShowSignupReviewDecisionDTO
+            {
+                Action = action
+            };
+
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/signups/submissions/{signupId}/review", decision);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to update sign-up status." : body;
+                return;
+            }
+
+            successMessage = $"Sign-up moved to {action}.";
+            selectedSignupId = null;
+            await LoadSubmissionsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reviewing sign-up: {ex.Message}";
+        }
+    }
+}

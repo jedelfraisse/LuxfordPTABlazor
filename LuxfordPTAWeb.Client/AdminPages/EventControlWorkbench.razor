@@ -1,9 +1,8 @@
 @page "/admin/eventcontrols/{controlName}/{eventId:int}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
-@using LuxfordPTAWeb.Client.Components.TalentShow
-@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Models
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>@(eventItem?.Title ?? "Event Director")</PageTitle>
 
@@ -34,44 +33,7 @@ else
 
     <div class="card">
         <div class="card-body">
-            @if (normalizedControlName == "talent-show")
-            {
-                <h5 class="mb-3">@talentShowCurrentStage Stage</h5>
-                @switch (talentShowCurrentStage)
-                {
-                    case TalentShowLifecycleState.Planning:
-                        <PlanningStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.TryOuts:
-                        <TryOutsStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.Rehearsal:
-                        <RehearsalStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.PreShow:
-                        <PreShowStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.HostTalk:
-                        <HostTalkStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.ActShow:
-                        <ActShowStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.Intermission:
-                        <IntermissionStagePanel EventId="@eventItem.Id" />
-                        break;
-                    case TalentShowLifecycleState.PostShow:
-                        <PostShowStagePanel EventId="@eventItem.Id" />
-                        break;
-                }
-
-                <div class="mt-3">
-                    <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-stages/{eventItem.Id}")">
-                        Open All Stage Panels
-                    </a>
-                </div>
-            }
-            else if (normalizedControlName == "bingo")
+            @if (normalizedControlName == "bingo")
             {
                 <p>Bingo director workspace is coming next.</p>
             }
@@ -94,7 +56,6 @@ else
     private Event? eventItem;
     private bool isLoading = true;
     private string normalizedControlName = string.Empty;
-    private string talentShowCurrentStage = TalentShowLifecycleState.PreShow;
     private string errorMessage = string.Empty;
 
     protected override async Task OnParametersSetAsync()
@@ -102,6 +63,13 @@ else
         isLoading = true;
         errorMessage = string.Empty;
         normalizedControlName = (ControlName ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (normalizedControlName == "talent-show")
+        {
+            Navigation.NavigateTo($"/admin/eventcontrols/talent-show-director/{EventId}");
+            isLoading = false;
+            return;
+        }
 
         try
         {
@@ -119,19 +87,6 @@ else
         {
             isLoading = false;
             return;
-        }
-
-        if (normalizedControlName == "talent-show")
-        {
-            try
-            {
-                var state = await Http.GetFromJsonAsync<TalentShowRealtimeState>($"api/talentshow/{EventId}/state");
-                talentShowCurrentStage = NormalizeTalentShowStage(state?.CurrentState);
-            }
-            catch (Exception ex)
-            {
-                errorMessage = $"Unable to load current talent show stage: {ex.Message}";
-            }
         }
 
         isLoading = false;
@@ -152,28 +107,10 @@ else
     {
         return normalizedControlName switch
         {
-            "talent-show" => $"Current stage: {talentShowCurrentStage}",
+            "talent-show" => "Director hub",
             "bingo" => "Generic event workspace",
             "election" => "Generic event workspace",
             _ => "Generic event workspace"
         };
-    }
-
-    private static string NormalizeTalentShowStage(string? currentState)
-    {
-        if (string.IsNullOrWhiteSpace(currentState))
-        {
-            return TalentShowLifecycleState.PreShow;
-        }
-
-        var matchedState = TalentShowLifecycleState.All
-            .FirstOrDefault(s => s.Equals(currentState, StringComparison.OrdinalIgnoreCase));
-
-        if (string.IsNullOrWhiteSpace(matchedState))
-        {
-            return TalentShowLifecycleState.PreShow;
-        }
-
-        return matchedState;
     }
 }

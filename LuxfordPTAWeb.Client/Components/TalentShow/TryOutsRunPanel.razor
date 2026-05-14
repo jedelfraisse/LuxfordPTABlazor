@@ -1,0 +1,258 @@
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="text-warning mb-0"><i class="bi bi-list-check"></i> Try-Out Queue</h6>
+        <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/subevents/tryouts/configure")">Go to Configure</a>
+    </div>
+    <p class="text-muted">Manage invited performers, update try-out status, and mark selections for the show.</p>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading try-out entries...</em></div>
+    }
+    else
+    {
+        @if (!entries.Any())
+        {
+            <div class="alert alert-light border">No try-out entries yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Performer(s)</th>
+                            <th>Act</th>
+                            <th>Slot</th>
+                            <th>Session</th>
+                            <th>Status</th>
+                            <th>Selected</th>
+                            <th style="width: 360px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in entries)
+                        {
+                            <tr>
+                                <td>@entry.PerformerNames</td>
+                                <td>@entry.ActTitle</td>
+                                <td>@FormatSlot(entry.SlotTime)</td>
+                                <td>
+                                    <input class="form-control form-control-sm" @bind="entry.SessionLabel" placeholder="Session label" />
+                                    <textarea class="form-control form-control-sm mt-1" rows="2" @bind="entry.Notes" placeholder="Notes"></textarea>
+                                </td>
+                                <td><span class="badge bg-secondary">@entry.Status</span></td>
+                                <td>
+                                    @if (entry.Selected)
+                                    {
+                                        <span class="badge bg-success">Yes</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border">No</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Arrived))">Arrived</button>
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Performing))">Performing</button>
+                                        <button class="btn btn-outline-success btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Completed))">Completed</button>
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.NoShow))">No-Show</button>
+                                        <button class="btn btn-outline-dark btn-sm" @onclick="@(() => SaveDetailsAsync(entry))">Save Details</button>
+                                        @if (!entry.Selected)
+                                        {
+                                            <button class="btn btn-success btn-sm" @onclick="@(() => SelectForShowAsync(entry))">Select for Show</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="mt-3 d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadEntriesAsync">Refresh</button>
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <span class="text-success">@successMessage</span>
+            }
+        </div>
+
+        <hr />
+        <h6>Add Try-Out Entry (Walk-In or Manual)</h6>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Performer name(s)" @bind="newEntry.PerformerNames" />
+            </div>
+            <div class="col-md-6">
+                <input class="form-control form-control-sm" placeholder="Act title" @bind="newEntry.ActTitle" />
+            </div>
+            <div class="col-md-4">
+                <input class="form-control form-control-sm" placeholder="Session label" @bind="newEntry.SessionLabel" />
+            </div>
+            <div class="col-md-4">
+                <input type="datetime-local" class="form-control form-control-sm" @bind-value="newEntrySlotDateTime" @bind-value:format="yyyy-MM-ddTHH:mm" />
+            </div>
+            <div class="col-md-4">
+                <select class="form-select form-select-sm" @bind="newEntry.Status">
+                    @foreach (var status in TalentShowTryOutEntryStatus.All)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12">
+                <textarea class="form-control form-control-sm" rows="2" placeholder="Notes" @bind="newEntry.Notes"></textarea>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-outline-primary btn-sm" @onclick="CreateEntryAsync" disabled="@isSaving">
+                    Add Try-Out Entry
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+
+    private List<TalentShowTryOutEntry> entries = [];
+    private TalentShowTryOutEntryUpsertDTO newEntry = new()
+    {
+        Status = TalentShowTryOutEntryStatus.Scheduled
+    };
+    private DateTime? newEntrySlotDateTime;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadEntriesAsync();
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            entries = await Http.GetFromJsonAsync<List<TalentShowTryOutEntry>>($"/api/talentshow/{EventId}/tryouts/entries")
+                ?? [];
+        }
+        catch (Exception ex)
+        {
+            entries = [];
+            errorMessage = $"Error loading try-out entries: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SetStatusAsync(TalentShowTryOutEntry entry, string status)
+    {
+        await UpdateEntryAsync(entry, status, entry.Selected);
+    }
+
+    private async Task SaveDetailsAsync(TalentShowTryOutEntry entry)
+    {
+        await UpdateEntryAsync(entry, entry.Status, entry.Selected);
+    }
+
+    private async Task SelectForShowAsync(TalentShowTryOutEntry entry)
+    {
+        await UpdateEntryAsync(entry, TalentShowTryOutEntryStatus.Completed, true);
+    }
+
+    private async Task UpdateEntryAsync(TalentShowTryOutEntry entry, string status, bool selected)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var update = new TalentShowTryOutEntryUpsertDTO
+            {
+                SignupId = entry.SignupId,
+                PerformerNames = entry.PerformerNames,
+                ActTitle = entry.ActTitle,
+                SlotTime = entry.SlotTime,
+                SessionLabel = entry.SessionLabel,
+                Notes = entry.Notes,
+                Status = status,
+                Selected = selected
+            };
+
+            var response = await Http.PutAsJsonAsync($"/api/talentshow/{EventId}/tryouts/entries/{entry.Id}", update);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to update try-out entry." : body;
+                return;
+            }
+
+            successMessage = selected
+                ? "Performer selected for show."
+                : $"Entry moved to {status}.";
+            await LoadEntriesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating try-out entry: {ex.Message}";
+        }
+    }
+
+    private async Task CreateEntryAsync()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            newEntry.SlotTime = newEntrySlotDateTime;
+            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/tryouts/entries", newEntry);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to add try-out entry." : body;
+                return;
+            }
+
+            newEntry = new TalentShowTryOutEntryUpsertDTO
+            {
+                Status = TalentShowTryOutEntryStatus.Scheduled
+            };
+            newEntrySlotDateTime = null;
+            successMessage = "Try-out entry added.";
+            await LoadEntriesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding try-out entry: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static string FormatSlot(DateTime? value)
+    {
+        return value?.ToLocalTime().ToString("g") ?? "Unscheduled";
+    }
+}
