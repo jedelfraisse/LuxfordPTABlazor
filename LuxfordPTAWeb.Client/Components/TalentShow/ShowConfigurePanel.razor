@@ -616,8 +616,8 @@
                                                 <code>@device.PairingCode</code>
                                             </td>
                                             <td>
-                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => PreviewDisplay(device.PairingCode)" title="Preview this display">
-                                                    Preview
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => SaveConnectedDisplayAsync(device.PairingCode)" title="Save this display">
+                                                    Save
                                                 </button>
                                             </td>
                                         </tr>
@@ -1387,6 +1387,40 @@
 
         existing.PairingCode = device.PairingCode;
         existing.DisplayName = device.DisplayName;
+    }
+
+    private async Task SaveConnectedDisplayAsync(string pairingCode)
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        if (hubConnection == null)
+        {
+            errorMessage = "Display hub is not connected.";
+            return;
+        }
+
+        var device = connectedDevices.FirstOrDefault(d => d.PairingCode.Equals(pairingCode, StringComparison.OrdinalIgnoreCase));
+        if (device == null)
+        {
+            errorMessage = "Display not found.";
+            return;
+        }
+
+        var assignment = GetDisplayAssignmentByPairingCode(pairingCode);
+        var role = assignment?.Role ?? string.Empty;
+
+        try
+        {
+            await hubConnection.InvokeAsync("UpdateDeviceDisplayName", pairingCode, device.DisplayName);
+            await hubConnection.InvokeAsync("UpdateDeviceDisplayRole", pairingCode, role);
+            SetDisplayAssignment(role, pairingCode);
+            successMessage = $"Saved {device.DisplayName}.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving display: {ex.Message}";
+        }
     }
 
     private async Task EnsureHubConnectionAsync()
