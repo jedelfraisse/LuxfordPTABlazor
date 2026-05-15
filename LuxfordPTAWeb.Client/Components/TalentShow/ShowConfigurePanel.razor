@@ -32,6 +32,7 @@
             <li class="nav-item"><button class="nav-link @(activeTab == "acts" ? "active" : string.Empty)" @onclick='() => activeTab = "acts"'>Acts</button></li>
             <li class="nav-item"><button class="nav-link @(activeTab == "timeline" ? "active" : string.Empty)" @onclick='() => activeTab = "timeline"'>Script / Timeline</button></li>
             <li class="nav-item"><button class="nav-link @(activeTab == "displays" ? "active" : string.Empty)" @onclick='() => activeTab = "displays"'>Displays</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "sponsors" ? "active" : string.Empty)" @onclick='() => activeTab = "sponsors"'>Sponsors</button></li>
         </ul>
 
         @if (activeTab == "status")
@@ -105,17 +106,16 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Show Background Image URL</label>
-                            <input class="form-control" @bind="showConfig.ShowSettings.ShowBackgroundImageUrl" placeholder="https://..." />
+                            <div class="input-group">
+                                <input class="form-control" @bind="showConfig.ShowSettings.ShowBackgroundImageUrl" placeholder="https://..." />
+                                <a class="btn btn-outline-secondary" href="/admin/fileupload" target="_blank" title="Upload image and copy URL">
+                                    <i class="bi bi-upload"></i> Upload
+                                </a>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Default Segment Duration (mm:ss)</label>
                             <input class="form-control" @bind="defaultSegmentDurationText" placeholder="mm:ss" />
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" @bind="showConfig.ShowSettings.EnableSponsorRotation" />
-                                <label class="form-check-label">Enable Sponsor Rotation</label>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -642,6 +642,19 @@
             </div>
         }
 
+        @if (activeTab == "sponsors")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Event Sponsors</div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Manage event sponsors and their rotation during the show.</p>
+                    <a href="@($"/admin/eventcontrols/talent-show-director/{EventId}/tools/sponsors")" class="btn btn-primary">
+                        <i class="bi bi-star"></i> Open Event Sponsor Helper
+                    </a>
+                </div>
+            </div>
+        }
+
         <div class="mt-3">
             <button class="btn btn-primary" @onclick="SaveShowConfigAsync" disabled="@isSaving">
                 @if (isSaving) { <span>Saving...</span> } else { <span>Save Show Config</span> }
@@ -802,12 +815,31 @@
                      device.AssignedSessionCode.Equals(showSessionCode, StringComparison.OrdinalIgnoreCase) &&
                      !assignedPairingCodes.Contains(device.PairingCode)))
         {
-            await hubConnection.InvokeAsync("RemoveDeviceAssignment", connected.PairingCode);
+            try
+            {
+                await hubConnection.InvokeAsync("RemoveDeviceAssignment", connected.PairingCode);
+            }
+            catch
+            {
+                // Device may have disconnected, ignore
+            }
         }
 
         foreach (var assignment in showConfig.DisplayAssignments.Where(assignment => !string.IsNullOrWhiteSpace(assignment.PairingCode)))
         {
-            await hubConnection.InvokeAsync("AssignDeviceToSession", assignment.PairingCode, showSessionCode, assignment.Role);
+            try
+            {
+                // Only attempt assignment if device is currently connected
+                var deviceExists = connectedDevices.Any(d => d.PairingCode.Equals(assignment.PairingCode, StringComparison.OrdinalIgnoreCase));
+                if (deviceExists)
+                {
+                    await hubConnection.InvokeAsync("AssignDeviceToSession", assignment.PairingCode, showSessionCode, assignment.Role);
+                }
+            }
+            catch
+            {
+                // Device may not be connected yet or may have disconnected, continue with others
+            }
         }
     }
 
