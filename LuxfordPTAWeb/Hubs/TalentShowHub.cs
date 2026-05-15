@@ -25,6 +25,25 @@ public class TalentShowHub : Hub
         }
     }
 
+    public static void UpsertServerState(TalentShowRealtimeState state)
+    {
+        if (state == null)
+        {
+            return;
+        }
+
+        var normalizedCode = NormalizeSessionCodeStatic(state.SessionCode);
+        state.SessionCode = normalizedCode;
+        state.UpdatedAtUtc = DateTime.UtcNow;
+        SessionStates[normalizedCode] = state;
+    }
+
+    public static void RemoveServerState(string sessionCode)
+    {
+        var normalizedCode = NormalizeSessionCodeStatic(sessionCode);
+        SessionStates.TryRemove(normalizedCode, out _);
+    }
+
     public async Task PublishState(TalentShowRealtimeState state)
     {
         var normalizedCode = NormalizeSessionCode(state.SessionCode);
@@ -70,6 +89,21 @@ public class TalentShowHub : Hub
         var normalizedCode = NormalizeSessionCode(sessionCode);
         SessionStates.TryRemove(normalizedCode, out _);
         await Clients.Group(normalizedCode).SendAsync("SessionCleared");
+    }
+
+    public Task SendDisplayCommand(string sessionCode, string targetRole, string command, string value)
+    {
+        var normalizedCode = NormalizeSessionCode(sessionCode);
+        var payload = new TalentShowDisplayCommand
+        {
+            SessionCode = normalizedCode,
+            TargetRole = NormalizeDisplayRole(targetRole),
+            Command = string.IsNullOrWhiteSpace(command) ? string.Empty : command.Trim(),
+            Value = value ?? string.Empty,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        return Clients.Group(normalizedCode).SendAsync("DisplayCommandReceived", payload);
     }
 
     public async Task SubscribeController()
@@ -155,6 +189,28 @@ public class TalentShowHub : Hub
         DevicesByConnection[device.ConnectionId] = device;
         DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
+        await Clients.Client(device.ConnectionId).SendAsync("DeviceDisplayNameUpdated", device.DisplayName);
+        await BroadcastDeviceRegistryAsync();
+    }
+
+    public async Task UpdateDeviceDisplayRole(string pairingCode, string? displayRole)
+    {
+        var normalizedPairingCode = NormalizePairingCode(pairingCode);
+        var normalizedRole = NormalizeDisplayRoleOrEmpty(displayRole);
+        var device = DevicesByConnection.Values.FirstOrDefault(d =>
+            d.PairingCode.Equals(normalizedPairingCode, StringComparison.OrdinalIgnoreCase));
+
+        if (device == null)
+        {
+            throw new HubException("Device not found.");
+        }
+
+        device.AssignedDisplayRole = normalizedRole;
+        device.LastSeenUtc = DateTime.UtcNow;
+        DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
+
+        await Clients.Client(device.ConnectionId).SendAsync("DeviceRoleUpdated", device.AssignedDisplayRole);
         await BroadcastDeviceRegistryAsync();
     }
 
@@ -234,6 +290,31 @@ public class TalentShowHub : Hub
         await BroadcastDeviceRegistryAsync();
     }
 
+    public async Task ClearDeviceSessionAssignment(string pairingCode)
+    {
+        var normalizedPairingCode = NormalizePairingCode(pairingCode);
+        var device = DevicesByConnection.Values.FirstOrDefault(d =>
+            d.PairingCode.Equals(normalizedPairingCode, StringComparison.OrdinalIgnoreCase));
+
+        if (device == null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(device.AssignedSessionCode))
+        {
+            await Groups.RemoveFromGroupAsync(device.ConnectionId, device.AssignedSessionCode);
+        }
+
+        device.AssignedSessionCode = string.Empty;
+        device.LastSeenUtc = DateTime.UtcNow;
+        DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
+
+        await Clients.Client(device.ConnectionId).SendAsync("DeviceSessionCleared");
+        await BroadcastDeviceRegistryAsync();
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (DevicesByConnection.TryRemove(Context.ConnectionId, out _))
@@ -245,6 +326,16 @@ public class TalentShowHub : Hub
     }
 
     private static string NormalizeSessionCode(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return "DEFAULT";
+        }
+
+        return new string(code.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+    }
+
+    private static string NormalizeSessionCodeStatic(string code)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -281,6 +372,18 @@ public class TalentShowHub : Hub
         var match = TalentShowDisplayRole.All
             .FirstOrDefault(r => r.Equals(role?.Trim(), StringComparison.OrdinalIgnoreCase));
         return match ?? TalentShowDisplayRole.MainBoard;
+    }
+
+    private static string NormalizeDisplayRoleOrEmpty(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return string.Empty;
+        }
+
+        var match = TalentShowDisplayRole.All
+            .FirstOrDefault(r => r.Equals(role.Trim(), StringComparison.OrdinalIgnoreCase));
+        return match ?? string.Empty;
     }
 
     private static string NormalizeOverallState(string state)

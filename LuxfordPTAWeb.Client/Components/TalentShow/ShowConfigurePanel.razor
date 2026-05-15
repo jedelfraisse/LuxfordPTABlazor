@@ -1,177 +1,651 @@
 @using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
 @inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="text-primary mb-0"><i class="bi bi-gear"></i> Show Configuration</h6>
+        <h6 class="text-primary mb-0"><i class="bi bi-sliders"></i> Show Config Workspace</h6>
         <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/tools/show/live")">Go to Live</a>
     </div>
-    <p class="text-muted">Load and prepare the final segment timeline. Verify all media and cues are ready before the show begins.</p>
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <div class="alert alert-danger">@errorMessage</div>
     }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
 
     @if (isLoading)
     {
-        <div class="alert alert-info"><em>Loading show configuration...</em></div>
-    }
-    else if (showConfig == null)
-    {
-        <div class="alert alert-warning">No show configuration found. Please create one.</div>
+        <div class="alert alert-info"><em>Loading show config...</em></div>
     }
     else
     {
-        <div class="card mb-3">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">Show Settings</h6>
-            </div>
-            <div class="card-body">
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Enable Judges Voting</label>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" @bind="showConfig.EnableJudgesVoting" />
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><button class="nav-link @(activeTab == "status" ? "active" : string.Empty)" @onclick='() => activeTab = "status"'>Status</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "settings" ? "active" : string.Empty)" @onclick='() => activeTab = "settings"'>Show Settings</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "acts" ? "active" : string.Empty)" @onclick='() => activeTab = "acts"'>Acts</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "timeline" ? "active" : string.Empty)" @onclick='() => activeTab = "timeline"'>Script / Timeline</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "displays" ? "active" : string.Empty)" @onclick='() => activeTab = "displays"'>Displays</button></li>
+        </ul>
+
+        @if (activeTab == "status")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Config Status</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Config Status (editable)</label>
+                            <select class="form-select" @bind="showConfig.ConfigStatus">
+                                @foreach (var status in TalentShowConfigStatus.All)
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Enable Audience Voting</label>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" @bind="showConfig.EnableAudienceVoting" />
+                        <div class="col-md-6">
+                            <label class="form-label">Live Status (read-only)</label>
+                            <input class="form-control" value="@showConfig.LiveStatus" readonly />
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-primary btn-sm" @onclick="SaveSettingsAsync">Save Settings</button>
             </div>
-        </div>
 
-        <div class="card">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Segment Timeline (@showConfig.Segments.Count segments)</h6>
-                <span class="badge bg-info">@GetReadySegmentCount() / @showConfig.Segments.Count ready</span>
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Readiness Validation</div>
+                <div class="card-body">
+                    @if (showConfig.ReadinessValidation.IsReadySuggested)
+                    {
+                        <div class="text-success fw-semibold">Validation passed. Ready is suggested.</div>
+                    }
+                    else
+                    {
+                        <div class="text-warning fw-semibold mb-2">Validation items to review:</div>
+                        <ul class="mb-0">
+                            @foreach (var error in showConfig.ReadinessValidation.Errors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    }
+                </div>
             </div>
-            <div class="card-body">
-                @if (!showConfig.Segments.Any())
-                {
-                    <div class="alert alert-light border">No segments in timeline.</div>
-                }
-                else
-                {
+
+            <div class="card">
+                <div class="card-header fw-semibold">Status Summary</div>
+                <div class="card-body">
+                    <div><strong>Judges Voting:</strong> @(showConfig.ShowSettings.JudgesVotingEnabled ? "Enabled" : "Disabled")</div>
+                    <div><strong>Audience Voting:</strong> @(showConfig.ShowSettings.AudienceVotingEnabled ? "Enabled" : "Disabled")</div>
+                    <div><strong>Host Names:</strong> @string.Join(", ", showConfig.ShowSettings.HostNames)</div>
+                    <div><strong>Scoring Categories:</strong> @string.Join(", ", showConfig.ShowSettings.ScoringCategories)</div>
+                    <div><strong>Scoring Scale:</strong> @showConfig.ShowSettings.ScoringScale</div>
+                </div>
+            </div>
+        }
+        else if (activeTab == "settings")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Global Settings</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Show Start Time Override</label>
+                            <input type="datetime-local" class="form-control" @bind="showConfig.ShowStartTimeOverride" />
+                            <small class="text-muted">Optional. Overrides the Event Schedule start time for countdowns and messaging.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Show Theme</label>
+                            <input class="form-control" @bind="showConfig.ShowSettings.ShowTheme" placeholder="e.g., 'Dark', 'Rainbow', 'Neon'" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Show Background Image URL</label>
+                            <input class="form-control" @bind="showConfig.ShowSettings.ShowBackgroundImageUrl" placeholder="https://..." />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Default Segment Duration (mm:ss)</label>
+                            <input class="form-control" @bind="defaultSegmentDurationText" placeholder="mm:ss" />
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" @bind="showConfig.ShowSettings.EnableSponsorRotation" />
+                                <label class="form-check-label">Enable Sponsor Rotation</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Host Names</div>
+                <div class="card-body">
+                    <label class="form-label">Host Name(s) (one per line) — Required</label>
+                    <textarea class="form-control" rows="3" @bind="hostNamesText"></textarea>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Voting Options</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" @bind="showConfig.ShowSettings.JudgesVotingEnabled" />
+                                <label class="form-check-label">Judges Voting</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" @bind="showConfig.ShowSettings.AudienceVotingEnabled" />
+                                <label class="form-check-label">Audience Voting</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (showConfig.ShowSettings.JudgesVotingEnabled || showConfig.ShowSettings.AudienceVotingEnabled)
+            {
+                <div class="card mb-3">
+                    <div class="card-header fw-semibold">Scoring Scale</div>
+                    <div class="card-body">
+                        <label class="form-label">Maximum Score</label>
+                        <input type="number" min="1" max="100" class="form-control" @bind="showConfig.ShowSettings.ScoringScale" />
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header fw-semibold">Scoring Categories</div>
+                    <div class="card-body">
+                        <label class="form-label">Categories (one per line)</label>
+                        <textarea class="form-control" rows="5" @bind="scoringCategoriesText"></textarea>
+                        <small class="text-muted d-block mt-2">
+                            If empty, will auto-populate with defaults:<br/>
+                            • Stage Presence<br/>
+                            • Creativity<br/>
+                            • Technical Skill<br/>
+                            • Entertainment Value<br/>
+                            • Overall Impression
+                        </small>
+                    </div>
+                </div>
+            }
+        }
+        else if (activeTab == "acts")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Add/Edit Act</div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Performer Name</label>
+                            <input class="form-control" @bind="editingAct.PerformerName" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Act Title</label>
+                            <input class="form-control" @bind="editingAct.Title" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Category</label>
+                            <input class="form-control" @bind="editingAct.Category" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Duration (mm:ss)</label>
+                            <input class="form-control" @bind="actDurationText" placeholder="mm:ss" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Order</label>
+                            <input type="number" min="1" class="form-control" @bind="editingAct.OrderIndex" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Music URL</label>
+                            <input class="form-control" @bind="editingAct.MusicUrl" placeholder="https://..." />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Music Start Offset (mm:ss)</label>
+                            <input class="form-control" @bind="musicOffsetText" placeholder="mm:ss" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Host Intro (for scripts)</label>
+                            <input class="form-control" @bind="editingAct.HostIntro" placeholder="e.g., 'Please welcome...'" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Performer Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.PerformerNotes"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Stage Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.StageNotes"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Lighting Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.LightingNotes"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sound Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.SoundNotes"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Props Required</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.PropsRequired"></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">General Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingAct.Notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="SaveActAsync">@(editingAct.Id == 0 ? "Add Act" : "Update Act")</button>
+                        @if (editingAct.Id != 0)
+                        {
+                            <button class="btn btn-secondary" @onclick="ResetActForm">Cancel</button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle">
+                        <table class="table table-sm align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">Order</th>
-                                    <th>Type</th>
-                                    <th>Title</th>
-                                    <th>Duration</th>
-                                    <th>Media</th>
-                                    <th>Cues</th>
-                                    <th>Hidden</th>
+                                    <th>Order</th><th>Performer</th><th>Act</th><th>Duration</th><th>Music</th><th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var segment in showConfig.Segments)
+                                @foreach (var act in acts.OrderBy(a => a.OrderIndex))
                                 {
                                     <tr>
-                                        <td>@segment.OrderIndex</td>
-                                        <td><span class="badge bg-secondary">@segment.SegmentType</span></td>
+                                        <td>@act.OrderIndex</td>
+                                        <td>@act.PerformerName</td>
+                                        <td>@act.Title</td>
+                                        <td>@SecondsToMmSs(act.DurationSeconds)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(act.MusicUrl) ? "—" : "✓")</td>
                                         <td>
-                                            <div>@segment.Title</div>
-                                            @if (!string.IsNullOrWhiteSpace(segment.DisplayInstructions?.HostTeleprompter))
-                                            {
-                                                <small class="text-muted">📝 Host: @segment.DisplayInstructions.HostTeleprompter</small>
-                                            }
-                                        </td>
-                                        <td>@segment.ExpectedDurationSeconds s</td>
-                                        <td>
-                                            @if (!string.IsNullOrWhiteSpace(segment.MediaFile))
-                                            {
-                                                <span class="badge bg-success"><i class="bi bi-check"></i> Media</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-light text-dark">-</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (segment.CueList?.Any() == true)
-                                            {
-                                                <span class="badge bg-success">@segment.CueList.Count cues</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-light text-dark">-</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (segment.IsHidden)
-                                            {
-                                                <span class="badge bg-warning">Hidden</span>
-                                            }
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditAct(act)">Edit</button>
+                                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteActAsync(act.Id)">Delete</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
                     </div>
-                }
+                </div>
             </div>
-        </div>
+        }
+        else if (activeTab == "timeline")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">@(editingSegment.SegmentId == 0 ? "Add Segment" : "Edit Segment")</div>
+                <div class="card-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-2">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" @bind="editingSegment.SegmentType">
+                                @foreach (var type in TalentShowSegmentType.All)
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
+                            {
+                                <label class="form-label">Select Act</label>
+                                <select class="form-select" @bind="editingSegment.ActId">
+                                    <option value="">-- Select Act --</option>
+                                    @foreach (var act in GetUnusedActs())
+                                    {
+                                        var selected = editingSegment.ActId == act.Id;
+                                        <option value="@act.Id" selected="@selected">@act.PerformerName - @act.Title</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <label class="form-label">Segment Name</label>
+                                <input class="form-control" @bind="editingSegment.Title" />
+                            }
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Duration (mm:ss)</label>
+                            <input class="form-control" @bind="segmentDurationText" placeholder="mm:ss" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Order</label>
+                            <input type="number" min="1" class="form-control" @bind="editingSegment.OrderIndex" />
+                        </div>
+                    </div>
+                    
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Intro Text</label>
+                            <div class="d-flex gap-2 align-items-end">
+                                <div class="flex-grow-1">
+                                    <textarea class="form-control" rows="3" @bind="editingSegment.IntroText"></textarea>
+                                </div>
+                                <div>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="ShowHostNameInsertMenu" title="Insert host name as literal text">
+                                        Insert Host
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Host Text / Script</label>
+                            <div class="d-flex gap-2 align-items-end">
+                                <div class="flex-grow-1">
+                                    <textarea class="form-control" rows="3" @bind="editingSegment.HostText"></textarea>
+                                </div>
+                                <div class="d-flex flex-column gap-1">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="ShowHostNameInsertMenu" title="Insert host name as literal text">
+                                        Host
+                                    </button>
+                                    @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
+                                    {
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="ShowPerformerInsertMenu" title="Insert performer name as literal text">
+                                            Performer
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="card mt-3">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">Display Instructions Preview</h6>
-            </div>
-            <div class="card-body">
-                @if (selectedSegmentForPreview != null)
-                {
-                    <div class="mb-3">
-                        <h6>@selectedSegmentForPreview.Title (@selectedSegmentForPreview.SegmentType)</h6>
-                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.HostTeleprompter))
+                    @if (showHostInsertMenu)
+                    {
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-12">
+                                <div class="border p-2 rounded bg-light">
+                                    <strong>Select Host Name to Insert:</strong>
+                                    <div class="d-flex gap-2 flex-wrap mt-2">
+                                        @foreach (var hostName in showConfig.ShowSettings.HostNames)
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => InsertHostName(hostName)">
+                                                @hostName:
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (showPerformerInsertMenu && editingSegment.SegmentType == TalentShowSegmentType.Act && editingSegment.ActId.HasValue)
+                    {
+                        var selectedAct = acts.FirstOrDefault(a => a.Id == editingSegment.ActId);
+                        @if (selectedAct != null)
                         {
-                            <div class="mb-2">
-                                <strong>📝 Host Teleprompter:</strong>
-                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.HostTeleprompter</div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-12">
+                                    <div class="border p-2 rounded bg-light">
+                                        <strong>Selected performers:</strong>
+                                        <div class="d-flex gap-2 flex-wrap mt-2">
+                                            <button class="btn btn-sm btn-outline-info" @onclick="() => InsertPerformerName(selectedAct.PerformerName)">
+                                                @selectedAct.PerformerName
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         }
-                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.Backstage))
+                    }
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="2" @bind="editingSegment.Notes"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="SaveSegmentAsync">@(editingSegment.SegmentId == 0 ? "Add Segment" : "Update Segment")</button>
+                        @if (editingSegment.SegmentId != 0)
                         {
-                            <div class="mb-2">
-                                <strong>🎭 Backstage:</strong>
-                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.Backstage</div>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(selectedSegmentForPreview.DisplayInstructions?.MainBoard))
-                        {
-                            <div class="mb-2">
-                                <strong>🎬 MainBoard:</strong>
-                                <div class="border-start ps-2">@selectedSegmentForPreview.DisplayInstructions.MainBoard</div>
-                            </div>
-                        }
-                        @if (selectedSegmentForPreview.DisplayInstructions?.TimerPresetSeconds > 0)
-                        {
-                            <div>
-                                <strong>⏱️ Timer Preset:</strong> @selectedSegmentForPreview.DisplayInstructions.TimerPresetSeconds seconds
-                            </div>
+                            <button class="btn btn-secondary" @onclick="ResetSegmentForm">Cancel</button>
                         }
                     </div>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => selectedSegmentForPreview = null">Clear Preview</button>
-                }
-                else
-                {
-                    <p class="text-muted mb-0">Click a segment above to preview its display instructions.</p>
-                }
+                </div>
             </div>
-        </div>
+
+            <div class="card">
+                <div class="card-header fw-semibold">Timeline</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th><th>Type</th><th>Name</th><th>Performers</th><th>Duration</th><th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var segment in showConfig.Segments.OrderBy(s => s.OrderIndex))
+                                {
+                                    var segmentAct = segment.ActId.HasValue ? acts.FirstOrDefault(a => a.Id == segment.ActId.Value) : null;
+                                    <tr>
+                                        <td>@segment.OrderIndex</td>
+                                        <td>
+                                            @if (segment.SegmentType == TalentShowSegmentType.Act) { <span title="Act">🎭</span> }
+                                            else if (segment.SegmentType == TalentShowSegmentType.HostTalk) { <span title="Host Talk">🎤</span> }
+                                            else if (segment.SegmentType == TalentShowSegmentType.Intermission) { <span title="Intermission">⏸</span> }
+                                            else if (segment.SegmentType == TalentShowSegmentType.Awards) { <span title="Awards">🏆</span> }
+                                            else { <text>@segment.SegmentType</text> }
+                                        </td>
+                                        <td>@(segmentAct?.Title ?? segment.Title)</td>
+                                        <td>@(segmentAct?.PerformerName ?? "—")</td>
+                                        <td>@SecondsToMmSs(segment.ExpectedDurationSeconds)</td>
+                                        <td>
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditSegment(segment)">Edit</button>
+                                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteSegmentAsync(segment.SegmentId)">Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Display Roles</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div>
+                                <strong>📺 MainDisplay</strong>
+                                <p class="text-muted small">Audience-facing main screen. Shows welcome, sponsors, act cards, timing, scoring results.</p>
+                            </div>
+                            <div>
+                                <strong>🎭 BackstagePrompt</strong>
+                                <p class="text-muted small">Backstage cue display. Shows current performer, timing, next up, and stage notes.</p>
+                            </div>
+                            <div>
+                                <strong>🎬 FrontstagePrompt</strong>
+                                <p class="text-muted small">Frontstage cue display. Shows performer name, duration, and audience-facing prompts.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div>
+                                <strong>🎤 HostPrompt</strong>
+                                <p class="text-muted small">Host teleprompter. Scrollable script with timing, ad-libs, and introductions.</p>
+                            </div>
+                            <div>
+                                <strong>⭐ Judges</strong>
+                                <p class="text-muted small">Judge scoring interface. Shows scoring form (during Act segments only) when voting enabled.</p>
+                            </div>
+                            <div>
+                                <strong>👥 Voters</strong>
+                                <p class="text-muted small">Audience voting interface. Shows voting cards when audience voting enabled during Acts.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Connected Displays</span>
+                    <span class="badge @(isHubConnected ? "bg-success" : "bg-secondary")">@(isHubConnected ? "Hub Connected" : "Hub Disconnected")</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (connectedDevices.Count == 0)
+                    {
+                        <div class="p-3 text-muted">No displays currently connected. Open /display on devices to pair.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Display Name</th><th>Role</th><th>Status</th><th>Pairing Code</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var device in connectedDevices.OrderBy(d => d.DisplayName))
+                                    {
+                                        var assignment = GetDisplayAssignmentByPairingCode(device.PairingCode);
+                                        <tr>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm" @bind="device.DisplayName" placeholder="Display name" />
+                                            </td>
+                                            <td>
+                                                <select class="form-select form-select-sm" @onchange="e => SetDisplayAssignment(e.Value?.ToString() ?? string.Empty, device.PairingCode)">
+                                                    <option value="">-- Unassigned --</option>
+                                                    @foreach (var role in TalentShowShowDisplayRole.All)
+                                                    {
+                                                        var selected = assignment?.Role == role;
+                                                        <option value="@role" selected="@selected">@role</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">Connected</span>
+                                            </td>
+                                            <td>
+                                                <code>@device.PairingCode</code>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => PreviewDisplay(device.PairingCode)" title="Preview this display">
+                                                    Preview
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header fw-semibold">Example Display Layouts (Setup Mode)</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">📺 MainDisplay</h6>
+                                <div style="background: #222; color: white; padding: 15px; text-align: center; margin: 10px 0;">
+                                    <div style="font-size: 24px; font-weight: bold;">Welcome to the Talent Show!</div>
+                                    <div style="margin-top: 20px; font-size: 14px;">
+                                        <div>🎭 Act 1: Sarah - Contemporary Dance</div>
+                                        <div style="margin-top: 10px; color: #888;">Sponsor Rotation Placeholder</div>
+                                    </div>
+                                </div>
+                                <small class="text-muted d-block mt-2">Shows welcome, sponsors, and current act info</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">🎭 BackstagePrompt</h6>
+                                <div style="background: #1a1a1a; color: #0f0; padding: 15px; font-family: monospace; margin: 10px 0;">
+                                    <div><strong>NOW:</strong> Sarah - Contemporary Dance</div>
+                                    <div style="margin-top: 10px; color: #888;">Duration: 2:30</div>
+                                    <div style="margin-top: 15px;"><strong>NEXT:</strong> Marcus - Comedy Skit</div>
+                                    <div style="margin-top: 10px; color: #888;">Notes: Ready on mark</div>
+                                </div>
+                                <small class="text-muted d-block mt-2">Stage cues and timing</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">🎬 FrontstagePrompt</h6>
+                                <div style="background: #333; color: #fff; padding: 15px; margin: 10px 0;">
+                                    <div style="font-size: 18px; font-weight: bold;">Sarah</div>
+                                    <div style="margin-top: 10px; font-size: 14px;">Contemporary Dance</div>
+                                    <div style="margin-top: 15px; color: #aaa; font-size: 12px;">Duration: 2:30</div>
+                                </div>
+                                <small class="text-muted d-block mt-2">Performer and timing info</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">🎤 HostPrompt (Teleprompter)</h6>
+                                <div style="background: #000; color: #fff; padding: 15px; font-family: Georgia; margin: 10px 0; height: 200px; overflow-y: auto;">
+                                    <div style="line-height: 1.6; font-size: 18px;">
+                                        Welcome to our talent show! Let me introduce our first performer... Sarah is a talented dancer bringing contemporary flair to our stage.
+                                    </div>
+                                </div>
+                                <small class="text-muted d-block mt-2">Scrollable host script</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">⭐ Judges (Voting)</h6>
+                                <div style="background: #fff; padding: 15px; margin: 10px 0; border: 1px solid #ddd;">
+                                    <div style="font-weight: bold; margin-bottom: 10px;">Rate: Contemporary Dance</div>
+                                    <div style="margin: 8px 0; font-size: 12px;">
+                                        <label><input type="radio" disabled /> Stage Presence: 1 ☆☆☆☆☆ 5</label>
+                                    </div>
+                                    <div style="margin: 8px 0; font-size: 12px;">
+                                        <label><input type="radio" disabled /> Creativity: 1 ☆☆☆☆☆ 5</label>
+                                    </div>
+                                </div>
+                                <small class="text-muted d-block mt-2">Active only during Acts</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 bg-light" style="min-height: 300px;">
+                                <h6 class="mb-2">👥 Voters (Audience Voting)</h6>
+                                <div style="background: #eee; padding: 15px; text-align: center; margin: 10px 0;">
+                                    <div style="font-weight: bold; margin-bottom: 15px;">Vote for Your Favorite!</div>
+                                    <button style="background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px;">
+                                        🌟 Contestant 1
+                                    </button>
+                                    <button style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px;">
+                                        🌟 Contestant 2
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-2">Active when voting enabled</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <div class="mt-3">
-            <button class="btn btn-success btn-sm" @onclick="StartShowAsync" disabled="@(GetReadySegmentCount() == 0)">
-                Start Show
+            <button class="btn btn-primary" @onclick="SaveShowConfigAsync" disabled="@isSaving">
+                @if (isSaving) { <span>Saving...</span> } else { <span>Save Show Config</span> }
             </button>
-            <span class="ms-2 text-muted small">@GetReadySegmentCount() of @showConfig.Segments.Count segments ready</span>
         </div>
     }
 </div>
@@ -179,29 +653,60 @@
 @code {
     [Parameter] public int EventId { get; set; }
 
-    private TalentShowShowConfigDTO? showConfig;
-    private TalentShowSegmentDTO? selectedSegmentForPreview;
+    private TalentShowShowConfigDTO showConfig = new();
+    private List<TalentShowAct> acts = [];
+    private TalentShowAct editingAct = new() { DurationSeconds = 180, OrderIndex = 1, SelectedForShow = true };
+    private TalentShowSegmentDTO editingSegment = new() { SegmentType = TalentShowSegmentType.HostTalk, ExpectedDurationSeconds = 180 };
+    private TalentShowSegmentDTO newSegment = new() { SegmentType = TalentShowSegmentType.HostTalk, ExpectedDurationSeconds = 180 };
+    private List<TalentShowConnectedDevice> connectedDevices = [];
+    private HubConnection? hubConnection;
+    private bool isHubConnected;
     private bool isLoading = true;
+    private bool isSaving;
+    private string activeTab = "status";
+    private string hostNamesText = string.Empty;
+    private string scoringCategoriesText = string.Empty;
+    private string defaultSegmentDurationText = string.Empty;
+    private string actDurationText = string.Empty;
+    private string musicOffsetText = string.Empty;
+    private string segmentDurationText = string.Empty;
+    private bool showHostInsertMenu;
+    private bool showPerformerInsertMenu;
     private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private static readonly List<string> DefaultScoringCategories = new()
+    {
+        "Stage Presence",
+        "Creativity",
+        "Technical Skill",
+        "Entertainment Value",
+        "Overall Impression"
+    };
 
     protected override async Task OnParametersSetAsync()
     {
-        await LoadConfigurationAsync();
+        await LoadAsync();
+        await EnsureHubConnectionAsync();
     }
 
-    private async Task LoadConfigurationAsync()
+    private async Task LoadAsync()
     {
         isLoading = true;
         errorMessage = string.Empty;
         try
         {
-            showConfig = await Http.GetFromJsonAsync<TalentShowShowConfigDTO>($"/api/talentshow/{EventId}/show/configure")
-                ?? new TalentShowShowConfigDTO();
+            showConfig = await Http.GetFromJsonAsync<TalentShowShowConfigDTO>($"/api/talentshow/{EventId}/show/configure") ?? new TalentShowShowConfigDTO();
+            acts = await Http.GetFromJsonAsync<List<TalentShowAct>>($"/api/talentshow/{EventId}/acts") ?? [];
+            hostNamesText = string.Join('\n', showConfig.ShowSettings.HostNames);
+            scoringCategoriesText = string.Join('\n', showConfig.ShowSettings.ScoringCategories);
+            defaultSegmentDurationText = SecondsToMmSs(showConfig.ShowSettings.DefaultSegmentDurationSeconds);
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error loading configuration: {ex.Message}";
+            errorMessage = $"Error loading show configuration: {ex.Message}";
             showConfig = new TalentShowShowConfigDTO();
+            acts = [];
         }
         finally
         {
@@ -209,58 +714,440 @@
         }
     }
 
-    private async Task SaveSettingsAsync()
+    private async Task SaveShowConfigAsync()
     {
-        if (showConfig == null) return;
-
+        isSaving = true;
         errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        showConfig.ShowSettings.HostNames = hostNamesText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var scoringCategories = scoringCategoriesText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (scoringCategories.Count == 0 && (showConfig.ShowSettings.JudgesVotingEnabled || showConfig.ShowSettings.AudienceVotingEnabled))
+        {
+            scoringCategories = DefaultScoringCategories;
+        }
+
+        showConfig.ShowSettings.ScoringCategories = scoringCategories;
+        showConfig.ShowSettings.DefaultSegmentDurationSeconds = MmSsToSeconds(defaultSegmentDurationText);
+
         try
         {
             var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/show/configure", showConfig);
             if (!response.IsSuccessStatusCode)
             {
-                errorMessage = "Failed to save settings.";
+                errorMessage = "Failed to save show config.";
                 return;
             }
 
-            errorMessage = string.Empty;
+            await SyncDisplayAssignmentsAsync();
+
+            showConfig.ReadinessValidation = await Http.GetFromJsonAsync<TalentShowReadinessValidationDTO>($"/api/talentshow/{EventId}/show/configure/validation")
+                ?? showConfig.ReadinessValidation;
+            successMessage = "Show config saved.";
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error saving settings: {ex.Message}";
+            errorMessage = $"Error saving show config: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 
-    private async Task StartShowAsync()
+    private string SecondsToMmSs(int seconds)
     {
-        if (showConfig == null || !showConfig.Segments.Any()) return;
+        if (seconds <= 0) return "01:00";
+        var minutes = seconds / 60;
+        var secs = seconds % 60;
+        return $"{minutes:D2}:{secs:D2}";
+    }
 
+    private int MmSsToSeconds(string mmSs)
+    {
+        if (string.IsNullOrWhiteSpace(mmSs)) return 60;
+        var parts = mmSs.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2 && int.TryParse(parts[0], out var minutes) && int.TryParse(parts[1], out var secs))
+        {
+            return (minutes * 60) + secs;
+        }
+        return 60;
+    }
+
+    private async Task SyncDisplayAssignmentsAsync()
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var showSessionCode = BuildShowSessionCode();
+        var assignedPairingCodes = new HashSet<string>(
+            showConfig.DisplayAssignments
+                .Where(assignment => !string.IsNullOrWhiteSpace(assignment.PairingCode))
+                .Select(assignment => assignment.PairingCode),
+            StringComparer.OrdinalIgnoreCase);
+
+        var showRoles = new HashSet<string>(TalentShowShowDisplayRole.All, StringComparer.OrdinalIgnoreCase);
+        foreach (var connected in connectedDevices.Where(device =>
+                     showRoles.Contains(device.AssignedDisplayRole) &&
+                     device.AssignedSessionCode.Equals(showSessionCode, StringComparison.OrdinalIgnoreCase) &&
+                     !assignedPairingCodes.Contains(device.PairingCode)))
+        {
+            await hubConnection.InvokeAsync("RemoveDeviceAssignment", connected.PairingCode);
+        }
+
+        foreach (var assignment in showConfig.DisplayAssignments.Where(assignment => !string.IsNullOrWhiteSpace(assignment.PairingCode)))
+        {
+            await hubConnection.InvokeAsync("AssignDeviceToSession", assignment.PairingCode, showSessionCode, assignment.Role);
+        }
+    }
+
+    private string BuildShowSessionCode()
+    {
+        var raw = $"SHOW-{EventId}";
+        var normalized = new string(raw.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+        return string.IsNullOrWhiteSpace(normalized) ? $"SHOW{EventId}" : normalized;
+    }
+
+    private async Task SaveActAsync()
+    {
         errorMessage = string.Empty;
-        try
+        var payload = new TalentShowActUpsertDTO
         {
-            var firstSegment = showConfig.Segments.First();
-            var advanceDto = new TalentShowSegmentAdvanceDTO { SegmentId = firstSegment.SegmentId };
-            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/show/advance", advanceDto);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                errorMessage = "Failed to start show.";
-                return;
-            }
+            PerformerName = editingAct.PerformerName,
+            Title = editingAct.Title,
+            Category = editingAct.Category,
+            DurationSeconds = string.IsNullOrWhiteSpace(actDurationText) ? 180 : MmSsToSeconds(actDurationText),
+            OrderIndex = editingAct.OrderIndex <= 0 ? acts.Count + 1 : editingAct.OrderIndex,
+            IntroLine = editingAct.IntroLine,
+            OutroLine = editingAct.OutroLine,
+            MediaFilePath = editingAct.MediaFilePath,
+            Notes = editingAct.Notes,
+            SelectedForShow = true,
+            MusicUrl = editingAct.MusicUrl,
+            MusicStartOffsetSeconds = string.IsNullOrWhiteSpace(musicOffsetText) ? 0 : MmSsToSeconds(musicOffsetText),
+            PerformerNotes = editingAct.PerformerNotes,
+            StageNotes = editingAct.StageNotes,
+            LightingNotes = editingAct.LightingNotes,
+            SoundNotes = editingAct.SoundNotes,
+            PropsRequired = editingAct.PropsRequired,
+            HostIntro = editingAct.HostIntro
+        };
 
-            await LoadConfigurationAsync();
-        }
-        catch (Exception ex)
+        HttpResponseMessage response;
+        if (editingAct.Id == 0)
         {
-            errorMessage = $"Error starting show: {ex.Message}";
+            response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/acts", payload);
+        }
+        else
+        {
+            response = await Http.PutAsJsonAsync($"/api/talentshow/{EventId}/acts/{editingAct.Id}", payload);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            errorMessage = "Failed to save act.";
+            return;
+        }
+
+        ResetActForm();
+        await LoadAsync();
+    }
+
+    private void EditAct(TalentShowAct act)
+    {
+        editingAct = new TalentShowAct
+        {
+            Id = act.Id,
+            PerformerName = act.PerformerName,
+            Title = act.Title,
+            Category = act.Category,
+            DurationSeconds = act.DurationSeconds,
+            OrderIndex = act.OrderIndex,
+            IntroLine = act.IntroLine,
+            OutroLine = act.OutroLine,
+            MediaFilePath = act.MediaFilePath,
+            Notes = act.Notes,
+            SelectedForShow = act.SelectedForShow,
+            MusicUrl = act.MusicUrl,
+            MusicStartOffsetSeconds = act.MusicStartOffsetSeconds,
+            PerformerNotes = act.PerformerNotes,
+            StageNotes = act.StageNotes,
+            LightingNotes = act.LightingNotes,
+            SoundNotes = act.SoundNotes,
+            PropsRequired = act.PropsRequired,
+            HostIntro = act.HostIntro
+        };
+        actDurationText = SecondsToMmSs(act.DurationSeconds);
+        musicOffsetText = SecondsToMmSs(act.MusicStartOffsetSeconds);
+    }
+
+    private void ResetActForm()
+    {
+        editingAct = new TalentShowAct { DurationSeconds = 180, OrderIndex = acts.Count + 1, SelectedForShow = true };
+        actDurationText = string.Empty;
+        musicOffsetText = string.Empty;
+    }
+
+    private async Task DeleteActAsync(int actId)
+    {
+        var response = await Http.DeleteAsync($"/api/talentshow/{EventId}/acts/{actId}");
+        if (!response.IsSuccessStatusCode)
+        {
+            errorMessage = "Failed to delete act.";
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private void AddSegment()
+    {
+        var segmentId = showConfig.Segments.Select(s => s.SegmentId).DefaultIfEmpty(0).Max() + 1;
+        showConfig.Segments.Add(new TalentShowSegmentDTO
+        {
+            SegmentId = segmentId,
+            SegmentType = string.IsNullOrWhiteSpace(newSegment.SegmentType) ? TalentShowSegmentType.HostTalk : newSegment.SegmentType,
+            Title = string.IsNullOrWhiteSpace(newSegment.Title) ? "New Segment" : newSegment.Title.Trim(),
+            HostText = newSegment.HostText?.Trim() ?? string.Empty,
+            IntroText = newSegment.IntroText?.Trim() ?? string.Empty,
+            Notes = newSegment.Notes?.Trim() ?? string.Empty,
+            ExpectedDurationSeconds = newSegment.ExpectedDurationSeconds <= 0 ? 180 : newSegment.ExpectedDurationSeconds,
+            OrderIndex = showConfig.Segments.Count + 1,
+            Status = TalentShowSegmentStatus.Waiting
+        });
+        newSegment = new TalentShowSegmentDTO { SegmentType = TalentShowSegmentType.HostTalk, ExpectedDurationSeconds = 180 };
+    }
+
+    private void RemoveSegment(int segmentId)
+    {
+        showConfig.Segments = showConfig.Segments.Where(segment => segment.SegmentId != segmentId).ToList();
+        for (var i = 0; i < showConfig.Segments.Count; i++)
+        {
+            showConfig.Segments[i].OrderIndex = i + 1;
         }
     }
 
-    private int GetReadySegmentCount()
+    private List<TalentShowAct> GetUnusedActs()
     {
-        if (showConfig?.Segments == null) return 0;
-        return showConfig.Segments.Count(s => 
-            !string.IsNullOrWhiteSpace(s.Title) && 
-            s.ExpectedDurationSeconds > 0);
+        var usedActIds = new HashSet<int>(
+            showConfig.Segments
+                .Where(s => s.SegmentType == TalentShowSegmentType.Act && s.ActId.HasValue)
+                .Select(s => s.ActId.Value)
+        );
+
+        if (editingSegment.SegmentId != 0 && editingSegment.ActId.HasValue)
+        {
+            usedActIds.Remove(editingSegment.ActId.Value);
+        }
+
+        return acts.Where(a => !usedActIds.Contains(a.Id)).OrderBy(a => a.OrderIndex).ToList();
+    }
+
+    private async Task SaveSegmentAsync()
+    {
+        errorMessage = string.Empty;
+        
+        var duration = string.IsNullOrWhiteSpace(segmentDurationText) ? 180 : MmSsToSeconds(segmentDurationText);
+
+        if (editingSegment.SegmentId == 0)
+        {
+            var segmentId = showConfig.Segments.Select(s => s.SegmentId).DefaultIfEmpty(0).Max() + 1;
+            var newSegmentObj = new TalentShowSegmentDTO
+            {
+                SegmentId = segmentId,
+                SegmentType = editingSegment.SegmentType,
+                ActId = editingSegment.SegmentType == TalentShowSegmentType.Act ? editingSegment.ActId : null,
+                Title = editingSegment.SegmentType == TalentShowSegmentType.Act 
+                    ? (acts.FirstOrDefault(a => a.Id == editingSegment.ActId)?.Title ?? "Act")
+                    : editingSegment.Title,
+                IntroText = editingSegment.IntroText?.Trim() ?? string.Empty,
+                HostText = editingSegment.HostText?.Trim() ?? string.Empty,
+                Notes = editingSegment.Notes?.Trim() ?? string.Empty,
+                ExpectedDurationSeconds = duration > 0 ? duration : 180,
+                OrderIndex = showConfig.Segments.Count + 1,
+                Status = TalentShowSegmentStatus.Waiting
+            };
+            showConfig.Segments.Add(newSegmentObj);
+        }
+        else
+        {
+            var existing = showConfig.Segments.FirstOrDefault(s => s.SegmentId == editingSegment.SegmentId);
+            if (existing != null)
+            {
+                existing.SegmentType = editingSegment.SegmentType;
+                existing.ActId = editingSegment.SegmentType == TalentShowSegmentType.Act ? editingSegment.ActId : null;
+                existing.Title = editingSegment.SegmentType == TalentShowSegmentType.Act
+                    ? (acts.FirstOrDefault(a => a.Id == editingSegment.ActId)?.Title ?? "Act")
+                    : editingSegment.Title;
+                existing.IntroText = editingSegment.IntroText?.Trim() ?? string.Empty;
+                existing.HostText = editingSegment.HostText?.Trim() ?? string.Empty;
+                existing.Notes = editingSegment.Notes?.Trim() ?? string.Empty;
+                existing.ExpectedDurationSeconds = duration > 0 ? duration : 180;
+                existing.OrderIndex = editingSegment.OrderIndex;
+            }
+        }
+
+        ResetSegmentForm();
+        await Task.CompletedTask;
+    }
+
+    private void EditSegment(TalentShowSegmentDTO segment)
+    {
+        editingSegment = new TalentShowSegmentDTO
+        {
+            SegmentId = segment.SegmentId,
+            SegmentType = segment.SegmentType,
+            ActId = segment.ActId,
+            Title = segment.Title,
+            IntroText = segment.IntroText,
+            HostText = segment.HostText,
+            Notes = segment.Notes,
+            ExpectedDurationSeconds = segment.ExpectedDurationSeconds,
+            OrderIndex = segment.OrderIndex,
+            Status = segment.Status
+        };
+        segmentDurationText = SecondsToMmSs(segment.ExpectedDurationSeconds);
+        showHostInsertMenu = false;
+        showPerformerInsertMenu = false;
+    }
+
+    private void ResetSegmentForm()
+    {
+        editingSegment = new TalentShowSegmentDTO { SegmentType = TalentShowSegmentType.HostTalk, ExpectedDurationSeconds = 180 };
+        segmentDurationText = string.Empty;
+        showHostInsertMenu = false;
+        showPerformerInsertMenu = false;
+    }
+
+    private async Task DeleteSegmentAsync(int segmentId)
+    {
+        RemoveSegment(segmentId);
+        await Task.CompletedTask;
+    }
+
+    private void ShowHostNameInsertMenu()
+    {
+        showHostInsertMenu = !showHostInsertMenu;
+    }
+
+    private void ShowPerformerInsertMenu()
+    {
+        showPerformerInsertMenu = !showPerformerInsertMenu;
+    }
+
+    private void InsertHostName(string hostName)
+    {
+        var currentFocus = "hostText";
+        if (editingSegment.HostText == null)
+        {
+            editingSegment.HostText = $"{hostName}: ";
+        }
+        else
+        {
+            editingSegment.HostText += $"{hostName}: ";
+        }
+        showHostInsertMenu = false;
+    }
+
+    private void InsertPerformerName(string performerName)
+    {
+        if (editingSegment.HostText == null)
+        {
+            editingSegment.HostText = performerName;
+        }
+        else
+        {
+            editingSegment.HostText += performerName;
+        }
+        showPerformerInsertMenu = false;
+    }
+
+    private TalentShowDisplayRoleAssignmentDTO? GetDisplayAssignment(string role)
+        => showConfig.DisplayAssignments.FirstOrDefault(assignment => assignment.Role.Equals(role, StringComparison.OrdinalIgnoreCase));
+
+    private TalentShowDisplayRoleAssignmentDTO? GetDisplayAssignmentByPairingCode(string pairingCode)
+        => showConfig.DisplayAssignments.FirstOrDefault(assignment => assignment.PairingCode.Equals(pairingCode, StringComparison.OrdinalIgnoreCase));
+
+    private void PreviewDisplay(string pairingCode)
+    {
+        var assignment = GetDisplayAssignmentByPairingCode(pairingCode);
+        if (assignment != null)
+        {
+            Navigation.NavigateTo($"/display?code={pairingCode}");
+        }
+    }
+
+    private void SetDisplayAssignment(string role, string? pairingCode)
+    {
+        var existing = GetDisplayAssignment(role);
+        if (string.IsNullOrWhiteSpace(pairingCode))
+        {
+            if (existing != null)
+            {
+                showConfig.DisplayAssignments.Remove(existing);
+            }
+            return;
+        }
+
+        var device = connectedDevices.FirstOrDefault(d => d.PairingCode.Equals(pairingCode, StringComparison.OrdinalIgnoreCase));
+        if (device == null)
+        {
+            return;
+        }
+
+        if (existing == null)
+        {
+            showConfig.DisplayAssignments.Add(new TalentShowDisplayRoleAssignmentDTO
+            {
+                Role = role,
+                PairingCode = device.PairingCode,
+                DisplayName = device.DisplayName
+            });
+            return;
+        }
+
+        existing.PairingCode = device.PairingCode;
+        existing.DisplayName = device.DisplayName;
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<List<TalentShowConnectedDevice>>("DeviceRegistryUpdated", devices =>
+        {
+            connectedDevices = devices ?? [];
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isHubConnected = hubConnection.State == HubConnectionState.Connected;
+        await hubConnection.InvokeAsync("SubscribeController");
+        connectedDevices = await hubConnection.InvokeAsync<List<TalentShowConnectedDevice>>("GetDeviceRegistry") ?? [];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 }

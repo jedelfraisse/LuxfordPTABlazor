@@ -1,12 +1,20 @@
 @using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
 @inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="text-warning mb-0"><i class="bi bi-people"></i> Try-Outs Configuration</h6>
+        <h6 class="text-warning mb-0"><i class="bi bi-sliders"></i> Try-Outs Configuration</h6>
         <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/subevents/tryouts/sessions")">Go to Sessions</a>
     </div>
-    <p class="text-muted">Configure session slot defaults and required review details.</p>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
 
     @if (isLoading)
     {
@@ -14,80 +22,247 @@
     }
     else
     {
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "general" ? "active" : string.Empty)" @onclick='() => activeTab = "general"'>General Settings</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "sessions" ? "active" : string.Empty)" @onclick='() => activeTab = "sessions"'>Sessions</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "signups" ? "active" : string.Empty)" @onclick='() => activeTab = "signups"'>List of Sign-Ups</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "displays" ? "active" : string.Empty)" @onclick='() => activeTab = "displays"'>Displays</button>
+            </li>
+        </ul>
+
+        @if (activeTab == "general")
         {
-            <div class="alert alert-danger">@errorMessage</div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Slot Length (minutes)</label>
+                    <input type="number" class="form-control" min="1" @bind="settings.SlotLengthMinutes" />
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Parent Sign-Out Required</label>
+                    <select class="form-select" @bind="settings.ParentSignOutRequired">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">Scoring Scale Max</label>
+                    <input type="number" class="form-control" min="1" @bind="settings.ScoringScaleMax" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Scoring Fields (one per line)</label>
+                    <textarea class="form-control" rows="5" @bind="scoringFieldsText"></textarea>
+                </div>
+            </div>
         }
-
-        <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Slot Length (minutes)</label>
-                <input type="number" class="form-control" min="1" @bind="settings.SlotLengthMinutes" />
+        else if (activeTab == "sessions")
+        {
+            <div class="d-flex justify-content-end mb-2">
+                <button class="btn btn-outline-primary btn-sm" @onclick="AddSession">Add Session</button>
             </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Break Length (minutes)</label>
-                <input type="number" class="form-control" min="0" @bind="settings.BreakMinutes" />
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>SessionId</th>
+                            <th>Date</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Location</th>
+                            <th>Show Live Site</th>
+                            <th>Parent Sign-Out</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var session in settings.Sessions)
+                        {
+                            <tr>
+                                <td><input class="form-control form-control-sm" @bind="session.SessionId" /></td>
+                                <td>
+                                    <input type="date" class="form-control form-control-sm"
+                                        value="@(session.Date?.ToString("yyyy-MM-dd"))"
+                                        @onchange="@(e => session.Date = string.IsNullOrEmpty(e.Value?.ToString()) ? null : DateOnly.Parse(e.Value!.ToString()!))" />
+                                </td>
+                                <td>
+                                    <input type="time" class="form-control form-control-sm"
+                                        value="@(session.StartTime?.ToString("HH:mm"))"
+                                        @onchange="@(e => session.StartTime = string.IsNullOrEmpty(e.Value?.ToString()) ? null : TimeOnly.Parse(e.Value!.ToString()!))" />
+                                </td>
+                                <td>
+                                    <input type="time" class="form-control form-control-sm"
+                                        value="@(session.EndTime?.ToString("HH:mm"))"
+                                        @onchange="@(e => session.EndTime = string.IsNullOrEmpty(e.Value?.ToString()) ? null : TimeOnly.Parse(e.Value!.ToString()!))" />
+                                </td>
+                                <td><input class="form-control form-control-sm" @bind="session.Location" /></td>
+                                <td><input type="checkbox" class="form-check-input" @bind="session.PublicVisible" /></td>
+                                <td><input type="checkbox" class="form-check-input" @bind="session.ParentSignOutRequired" /></td>
+                                <td>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="@(() => RemoveSession(session))">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Max Performers / Session</label>
-                <input type="number" class="form-control" min="1" @bind="settings.MaxPerformersPerSession" />
-            </div>
-
-            <div class="col-md-6">
-                <label class="form-label">Try-Out Sessions (labels)</label>
-                <textarea class="form-control" rows="4" @bind="sessionLabelsText" placeholder="Session A&#10;Session B"></textarea>
-                <small class="text-muted">One session label per line.</small>
-            </div>
-
-            <div class="col-md-6">
-                <label class="form-label">Assigned Helpers</label>
-                <textarea class="form-control" rows="4" @bind="assignedHelpersText" placeholder="Helper name or user ID per line"></textarea>
-                <small class="text-muted">One helper per line.</small>
-            </div>
-
-            <div class="col-12">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.AutoSchedule" id="tryoutsAutoSchedule" />
-                    <label class="form-check-label" for="tryoutsAutoSchedule">Auto-schedule invited sign-ups</label>
+        }
+        else if (activeTab == "signups")
+        {
+            <div class="row g-2 mb-2">
+                <div class="col-md-4">
+                    <select class="form-select form-select-sm" @bind="statusFilter">
+                        <option value="">All statuses</option>
+                        @foreach (var status in statusFilters)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
                 </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.RequireMedia" id="tryoutsRequireMedia" />
-                    <label class="form-check-label" for="tryoutsRequireMedia">Require media before try-out</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.RequireGuardian" id="tryoutsRequireGuardian" />
-                    <label class="form-check-label" for="tryoutsRequireGuardian">Require parent/guardian presence</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.RequireEquipmentList" id="tryoutsRequireEquipment" />
-                    <label class="form-check-label" for="tryoutsRequireEquipment">Require equipment list</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.RequireCategory" id="tryoutsRequireCategory" />
-                    <label class="form-check-label" for="tryoutsRequireCategory">Require category selection</label>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <label class="form-label">Scoring Scale Max</label>
-                <input type="number" class="form-control" min="1" @bind="settings.ScoringScaleMax" />
-            </div>
-
-            <div class="col-md-8">
-                <label class="form-label">Scoring Fields</label>
-                <textarea class="form-control" rows="4" @bind="scoringFieldsText" placeholder="Stage presence&#10;Preparedness&#10;Creativity&#10;Overall impression"></textarea>
-                <small class="text-muted">One scoring field label per line.</small>
-            </div>
-
-            <div class="col-12">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" @bind="settings.EnableCommentBox" id="tryoutsCommentsEnabled" />
-                    <label class="form-check-label" for="tryoutsCommentsEnabled">Enable comment box during sessions</label>
+                <div class="col-md-8 text-md-end">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadEntriesAsync">Refresh</button>
                 </div>
             </div>
-        </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Performer(s)</th>
+                            <th>Act</th>
+                            <th>Status</th>
+                            <th>Session</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in FilteredEntries())
+                        {
+                            <tr>
+                                <td>@entry.PerformerNames</td>
+                                <td>@entry.ActTitle</td>
+                                <td><span class="badge bg-secondary">@entry.Status</span></td>
+                                <td>@entry.SessionLabel</td>
+                                <td>@entry.Notes</td>
+                                <td class="d-flex flex-wrap gap-1">
+                                    <button class="btn btn-outline-success btn-sm" @onclick="@(() => SetEntryStatusAsync(entry, TalentShowTryOutEntryStatus.Approved))">Approve</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="@(() => SetEntryStatusAsync(entry, TalentShowTryOutEntryStatus.Rejected))">Reject</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Try-Outs Displays</span>
+                    <span class="badge @(isHubConnected ? "bg-success" : "bg-secondary")">@(isHubConnected ? "Hub Connected" : "Hub Disconnected")</span>
+                </div>
+                <div class="card-body">
+                    <div class="form-text">Activate a session in the sessions. Go to <code>/display</code> page to generate a code and it will be shown below.</div>
+                    @if (ActiveDisplaySessionConfig() is { } activeSession)
+                    {
+                        <div class="mt-3 border rounded p-2 bg-light">
+                            <div class="fw-semibold">Active Session</div>
+                            <div>@FormatDateOnly(activeSession.Date) @FormatTimeOnly(activeSession.StartTime) - @FormatTimeOnly(activeSession.EndTime)</div>
+                            <div class="text-muted">@(string.IsNullOrWhiteSpace(activeSession.Location) ? "-" : activeSession.Location)</div>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <a class="btn btn-outline-primary btn-sm" href="@GetDisplayPreviewHref(TalentShowDisplayRole.TryOutsMainBoard)" target="_blank" rel="noopener noreferrer">Preview MainBoard</a>
+                                <a class="btn btn-outline-secondary btn-sm" href="@GetDisplayPreviewHref(TalentShowDisplayRole.TryOutsActDisplay)" target="_blank" rel="noopener noreferrer">Preview Act Display</a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Display Roles</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 220px;">Role</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var roleInfo in tryOutDisplayRoleDescriptions)
+                                {
+                                    <tr>
+                                        <td><code>@roleInfo.Role</code></td>
+                                        <td>@roleInfo.Description</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header fw-semibold">Connected Displays</div>
+                <div class="card-body p-0">
+                    @if (!connectedDevices.Any())
+                    {
+                        <div class="p-3 text-muted"><em>No displays connected yet.</em></div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Display Code</th>
+                                        <th>Display Name</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th style="width: 280px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var device in connectedDevices.OrderBy(d => d.DisplayName))
+                                    {
+                                        <tr>
+                                            <td><code>@device.PairingCode</code></td>
+                                            <td style="min-width:220px;">
+                                                <input class="form-control form-control-sm" value="@GetDisplayNameEdit(device)" @onchange="e => SetDisplayNameEdit(device.PairingCode, e.Value?.ToString())" />
+                                            </td>
+                                            <td>
+                                                <select class="form-select form-select-sm" value="@GetSelectedRole(device.PairingCode)" @onchange="e => SetSelectedRole(device.PairingCode, e.Value?.ToString())">
+                                                    <option value="">-- No role assigned --</option>
+                                                    <option value="@TalentShowDisplayRole.TryOutsMainBoard">TryOuts.MainBoard</option>
+                                                    <option value="@TalentShowDisplayRole.TryOutsActDisplay">TryOuts.ActDisplay</option>
+                                                    <option value="@TalentShowDisplayRole.TryOutsJudgePage">TryOuts.JudgePage</option>
+                                                </select>
+                                            </td>
+                                            <td>@GetDeviceStatusText(device)</td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => SaveAndAssignDeviceAsync(device.PairingCode)">Save/Assign</button>
+                                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => UnassignDeviceAsync(device.PairingCode)">Clear</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
 
         <div class="mt-3">
             <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">
@@ -113,17 +288,40 @@
     [Parameter] public int EventId { get; set; }
 
     private TalentShowTryOutsConfigDTO settings = new();
-    private string sessionLabelsText = string.Empty;
-    private string assignedHelpersText = string.Empty;
     private string scoringFieldsText = string.Empty;
+    private List<TalentShowTryOutEntry> entries = [];
     private bool isLoading = true;
     private bool isSaving;
+    private string activeTab = "general";
+    private string statusFilter = string.Empty;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
+    private HubConnection? hubConnection;
+    private bool isHubConnected;
+    private List<TalentShowConnectedDevice> connectedDevices = [];
+    private readonly Dictionary<string, string> deviceRoleSelections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> deviceNameEdits = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly (string Role, string Description)[] tryOutDisplayRoleDescriptions =
+    [
+        (TalentShowDisplayRole.TryOutsMainBoard, "Main audience board for try-outs. Shows currently performing, on deck, and queue visibility."),
+        (TalentShowDisplayRole.TryOutsActDisplay, "Performer-facing display with active act details, timer/progress, and media playback."),
+        (TalentShowDisplayRole.TryOutsJudgePage, "Judge scoring display for live rubric entry during try-outs.")
+    ];
+
+    private static readonly string[] statusFilters =
+    [
+        TalentShowTryOutEntryStatus.StandBy,
+        TalentShowTryOutEntryStatus.OnDeck,
+        TalentShowTryOutEntryStatus.Performing,
+        TalentShowTryOutEntryStatus.Completed,
+        TalentShowTryOutEntryStatus.Approved,
+        TalentShowTryOutEntryStatus.Rejected
+    ];
 
     protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
+        await EnsureHubConnectionAsync();
     }
 
     private async Task LoadAsync()
@@ -135,11 +333,11 @@
         {
             settings = await Http.GetFromJsonAsync<TalentShowTryOutsConfigDTO>($"/api/talentshow/{EventId}/tryouts/configure")
                 ?? new TalentShowTryOutsConfigDTO();
-            sessionLabelsText = settings.SessionLabels.Any() ? string.Join('\n', settings.SessionLabels) : string.Empty;
-            assignedHelpersText = settings.AssignedHelpers.Any() ? string.Join('\n', settings.AssignedHelpers) : string.Empty;
             scoringFieldsText = settings.ScoringFields.Any()
-                ? string.Join('\n', settings.ScoringFields.OrderBy(f => f.OrderIndex).Select(f => f.Label))
+                ? string.Join('\n', settings.ScoringFields.OrderBy(field => field.OrderIndex).Select(field => field.Label))
                 : string.Empty;
+
+            await LoadEntriesAsync();
         }
         catch (Exception ex)
         {
@@ -152,6 +350,76 @@
         }
     }
 
+    private async Task LoadEntriesAsync()
+    {
+        entries = await Http.GetFromJsonAsync<List<TalentShowTryOutEntry>>($"/api/talentshow/{EventId}/tryouts/entries") ?? [];
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> FilteredEntries()
+    {
+        return entries
+            .Where(entry => string.IsNullOrWhiteSpace(statusFilter) || entry.Status == statusFilter)
+            .OrderBy(entry => entry.PerformerNames);
+    }
+
+    private IEnumerable<string> AvailableSessionIds()
+    {
+        var configSessions = settings.Sessions
+            .Select(session => session.SessionId?.Trim() ?? string.Empty)
+            .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId));
+        var entrySessions = entries
+            .Select(entry => entry.SessionLabel?.Trim() ?? string.Empty)
+            .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId));
+
+        return configSessions.Concat(entrySessions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(sessionId => sessionId);
+    }
+
+    private async Task SetEntryStatusAsync(TalentShowTryOutEntry entry, string targetStatus)
+    {
+        var payload = new TalentShowTryOutEntryUpsertDTO
+        {
+            SignupId = entry.SignupId,
+            PerformerNames = entry.PerformerNames,
+            ActTitle = entry.ActTitle,
+            MusicUrl = entry.MusicUrl,
+            PickupAdult = entry.PickupAdult,
+            SlotTime = entry.SlotTime,
+            CheckInTimestamp = targetStatus == TalentShowTryOutEntryStatus.StandBy
+                ? entry.CheckInTimestamp ?? DateTime.UtcNow
+                : entry.CheckInTimestamp,
+            SessionLabel = entry.SessionLabel,
+            Notes = entry.Notes,
+            Status = targetStatus,
+            Selected = targetStatus == TalentShowTryOutEntryStatus.Approved
+        };
+
+        var response = await Http.PutAsJsonAsync($"/api/talentshow/{EventId}/tryouts/entries/{entry.Id}", payload);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to update status." : body;
+            return;
+        }
+
+        await LoadEntriesAsync();
+    }
+
+    private void AddSession()
+    {
+        settings.Sessions.Add(new TalentShowTryOutSessionDTO
+        {
+            SessionId = $"Session-{settings.Sessions.Count + 1}",
+            ParentSignOutRequired = settings.ParentSignOutRequired
+        });
+    }
+
+    private void RemoveSession(TalentShowTryOutSessionDTO session)
+    {
+        settings.Sessions.Remove(session);
+    }
+
     private async Task SaveAsync()
     {
         isSaving = true;
@@ -159,14 +427,6 @@
         successMessage = string.Empty;
         try
         {
-            settings.SessionLabels = sessionLabelsText
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList();
-
-            settings.AssignedHelpers = assignedHelpersText
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList();
-
             settings.ScoringFields = scoringFieldsText
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select((label, index) => new TalentShowTryOutScoringFieldDTO
@@ -195,6 +455,220 @@
         finally
         {
             isSaving = false;
+        }
+    }
+
+    private string BuildTryOutSessionCode()
+    {
+        var activeSessionId = ActiveDisplaySessionId();
+        if (string.IsNullOrWhiteSpace(activeSessionId))
+        {
+            return string.Empty;
+        }
+
+        var raw = $"TRYOUT-{EventId}-{activeSessionId.Trim()}";
+        var normalized = new string(raw.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+        return string.IsNullOrWhiteSpace(normalized) ? $"TRYOUT{EventId}" : normalized;
+    }
+
+    private string GetDisplayPreviewHref(string role)
+    {
+        var sessionCode = BuildTryOutSessionCode();
+        return string.IsNullOrWhiteSpace(sessionCode)
+            ? "#"
+            : $"/display/talent-show?sessionCode={Uri.EscapeDataString(sessionCode)}&role={Uri.EscapeDataString(role)}";
+    }
+
+    private string GetSelectedRole(string pairingCode)
+    {
+        return deviceRoleSelections.TryGetValue(pairingCode, out var selected)
+            ? selected
+            : string.Empty;
+    }
+
+    private string GetDisplayNameEdit(TalentShowConnectedDevice device)
+    {
+        if (deviceNameEdits.TryGetValue(device.PairingCode, out var edited))
+        {
+            return edited;
+        }
+
+        return device.DisplayName;
+    }
+
+    private void SetSelectedRole(string pairingCode, string? role)
+    {
+        if (string.IsNullOrWhiteSpace(pairingCode))
+        {
+            return;
+        }
+
+        var normalizedRole = string.IsNullOrWhiteSpace(role)
+            ? string.Empty
+            : TalentShowDisplayRole.All.FirstOrDefault(r =>
+                r.Equals(role.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? string.Empty;
+        deviceRoleSelections[pairingCode] = normalizedRole;
+    }
+
+    private void SetDisplayNameEdit(string pairingCode, string? displayName)
+    {
+        if (string.IsNullOrWhiteSpace(pairingCode))
+        {
+            return;
+        }
+
+        deviceNameEdits[pairingCode] = string.IsNullOrWhiteSpace(displayName)
+            ? string.Empty
+            : displayName.Trim();
+    }
+
+    private string? ActiveDisplaySessionId()
+    {
+        var sessionId = settings.ActiveSessionId?.Trim();
+        return string.IsNullOrWhiteSpace(sessionId) ? null : sessionId;
+    }
+
+    private TalentShowTryOutSessionDTO? ActiveDisplaySessionConfig()
+    {
+        var activeSessionId = ActiveDisplaySessionId();
+        if (string.IsNullOrWhiteSpace(activeSessionId))
+        {
+            return null;
+        }
+
+        return settings.Sessions.FirstOrDefault(session =>
+            string.Equals(session.SessionId?.Trim(), activeSessionId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FormatDateOnly(DateOnly? value)
+    {
+        return value?.ToString("MMM d, yyyy") ?? "-";
+    }
+
+    private static string FormatTimeOnly(TimeOnly? value)
+    {
+        return value?.ToString("h:mm tt") ?? "-";
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<List<TalentShowConnectedDevice>>("DeviceRegistryUpdated", devices =>
+        {
+            connectedDevices = devices ?? [];
+            foreach (var device in connectedDevices)
+            {
+                SetSelectedRole(device.PairingCode, device.AssignedDisplayRole);
+                if (!deviceNameEdits.ContainsKey(device.PairingCode))
+                {
+                    deviceNameEdits[device.PairingCode] = device.DisplayName;
+                }
+            }
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isHubConnected = hubConnection.State == HubConnectionState.Connected;
+        await hubConnection.InvokeAsync("SubscribeController");
+        connectedDevices = await hubConnection.InvokeAsync<List<TalentShowConnectedDevice>>("GetDeviceRegistry") ?? [];
+        foreach (var device in connectedDevices)
+        {
+            SetSelectedRole(device.PairingCode, device.AssignedDisplayRole);
+            if (!deviceNameEdits.ContainsKey(device.PairingCode))
+            {
+                deviceNameEdits[device.PairingCode] = device.DisplayName;
+            }
+        }
+    }
+
+    private async Task SaveAndAssignDeviceAsync(string pairingCode)
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(pairingCode))
+        {
+            return;
+        }
+
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        var displayName = deviceNameEdits.TryGetValue(pairingCode, out var edited)
+            ? edited
+            : connectedDevices.FirstOrDefault(device => device.PairingCode.Equals(pairingCode, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? string.Empty;
+        var selectedRole = GetSelectedRole(pairingCode);
+
+        try
+        {
+            await hubConnection.InvokeAsync("UpdateDeviceDisplayName", pairingCode, displayName);
+            await hubConnection.InvokeAsync("UpdateDeviceDisplayRole", pairingCode, selectedRole);
+
+            var activeSessionId = ActiveDisplaySessionId();
+            if (string.IsNullOrWhiteSpace(selectedRole))
+            {
+                await hubConnection.InvokeAsync("RemoveDeviceAssignment", pairingCode);
+                successMessage = "Display cleared.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(activeSessionId))
+            {
+                await hubConnection.InvokeAsync("ClearDeviceSessionAssignment", pairingCode);
+                successMessage = "Role assigned, waiting on session start.";
+                return;
+            }
+
+            var sessionCode = BuildTryOutSessionCode();
+            if (string.IsNullOrWhiteSpace(sessionCode))
+            {
+                successMessage = "Role assigned, waiting on session start.";
+                return;
+            }
+
+            await hubConnection.InvokeAsync("AssignDeviceToSession", pairingCode, sessionCode, selectedRole);
+            successMessage = "Display saved and assigned.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save display settings: {ex.Message}";
+        }
+    }
+
+    private async Task UnassignDeviceAsync(string pairingCode)
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("RemoveDeviceAssignment", pairingCode);
+    }
+
+    private string GetDeviceStatusText(TalentShowConnectedDevice device)
+    {
+        if (string.IsNullOrWhiteSpace(device.AssignedDisplayRole))
+        {
+            return "No role assigned";
+        }
+
+        return string.IsNullOrWhiteSpace(device.AssignedSessionCode)
+            ? "Role assigned, waiting on session start"
+            : $"Assigned to {device.AssignedSessionCode}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
         }
     }
 }

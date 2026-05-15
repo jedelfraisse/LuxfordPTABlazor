@@ -33,6 +33,8 @@ public class TalentShowSignup
     public string ContactPhone { get; set; } = string.Empty;
     public string SpecialRequirements { get; set; } = string.Empty;
     public string MediaUpload { get; set; } = string.Empty;
+    public string PickupAdult { get; set; } = string.Empty;
+    public string MusicUrl { get; set; } = string.Empty;
 
     public string Status { get; set; } = TalentShowSignupStatus.Pending;
     public string ReviewReason { get; set; } = string.Empty;

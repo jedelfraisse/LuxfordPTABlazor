@@ -131,6 +131,49 @@ else
         </div>
     }
 
+    @if (GetPublicTryOutSessions(eventItem).Any())
+    {
+        <div class="card mb-4 border-success-subtle">
+            <div class="card-header">
+                <strong><i class="bi bi-mic"></i> Try-Out Sessions</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var tryOutDay in GetPublicTryOutSessions(eventItem))
+                    {
+                        <div class="col-md-6">
+                            <div class="border rounded p-3 h-100">
+                                @if (!string.IsNullOrWhiteSpace(tryOutDay.DayTitle))
+                                {
+                                    <div class="fw-semibold mb-1">@tryOutDay.DayTitle</div>
+                                }
+                                <div class="text-muted">
+                                    <i class="bi bi-calendar"></i> @tryOutDay.Date.ToString("ddd, MMM d, yyyy")
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(GetEventDayTimeText(tryOutDay)))
+                                {
+                                    <div class="text-muted">
+                                        <i class="bi bi-clock"></i> @GetEventDayTimeText(tryOutDay)
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(tryOutDay.Location))
+                                {
+                                    <div class="text-muted">
+                                        <i class="bi bi-geo-alt"></i> @tryOutDay.Location
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(tryOutDay.Description))
+                                {
+                                    <div class="small mt-2">@tryOutDay.Description</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
     @if (GetFlyerUrls(eventItem).Any())
     {
         <div class="card mb-4">
@@ -284,6 +327,40 @@ else
             .Where(c => c.IsActive && c.PublicInformation && !string.IsNullOrWhiteSpace(c.NotesHtml))
             .OrderBy(c => c.SequenceOrder)
             ?? Enumerable.Empty<EventControl>();
+    }
+
+    private static IEnumerable<EventDay> GetPublicTryOutSessions(Event evt)
+    {
+        return evt.EventDays?
+            .Where(d => d.IsActive && d.IsFromTryOuts && d.PublicVisibleFromTryOuts)
+            .OrderBy(d => d.Date)
+            .ThenBy(d => d.StartTime ?? d.Date)
+            ?? Enumerable.Empty<EventDay>();
+    }
+
+    private static string GetEventDayTimeText(EventDay day)
+    {
+        if (!day.StartTime.HasValue && !day.EndTime.HasValue)
+        {
+            return string.Empty;
+        }
+
+        if (day.StartTime.HasValue && day.EndTime.HasValue)
+        {
+            if (day.StartTime.Value.TimeOfDay == day.EndTime.Value.TimeOfDay)
+            {
+                return day.StartTime.Value.ToString("h:mm tt");
+            }
+
+            return $"{day.StartTime:h:mm tt} - {day.EndTime:h:mm tt}";
+        }
+
+        if (day.StartTime.HasValue)
+        {
+            return $"Starts {day.StartTime:h:mm tt}";
+        }
+
+        return $"Ends {day.EndTime:h:mm tt}";
     }
 
     private static IReadOnlyList<string> GetFlyerUrls(Event evt)

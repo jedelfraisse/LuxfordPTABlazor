@@ -4,7 +4,9 @@
 @page "/talent-show/vote/{SessionCodeParam}"
 @layout LuxfordPTAWeb.Client.Layout.DeviceDisplayLayout
 @using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.WebUtilities
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @implements IAsyncDisposable
@@ -27,9 +29,10 @@
             @if (!isAssigned)
             {
                 <div class="waiting-display-panel">
-                    <div class="waiting-title">Waiting for content...</div>
+                    <div class="waiting-title">Display Code: @pairingCode</div>
                     <div class="waiting-device-name">Device Name: @deviceNameInput</div>
-                    <div class="waiting-code">@pairingCode</div>
+                    <div class="waiting-status">Status: @GetWaitingStatusText()</div>
+                    <button class="btn btn-light btn-lg" @onclick="EnableMediaAsync" disabled="@mediaEnabled">Tap to Enable Audio/Video</button>
                     <div class="waiting-connection">
                         <span class="waiting-dot @(isConnected ? "connected" : string.Empty)"></span>
                         <span>@(isConnected ? "Connected" : "Disconnected")</span>
@@ -40,6 +43,161 @@
             {
                 @switch (assignedRole)
                 {
+                    case TalentShowDisplayRole.MainDisplay:
+                        <div class="card bg-dark text-light border-success mb-3 @state.Presentation.ThemeClass">
+                            <div class="card-body">
+                                @if (IsSetupMode())
+                                {
+                                    <h2>Display Connected — Setup Mode</h2>
+                                    <p>Font size test text — The quick brown fox jumps over the lazy dog.</p>
+                                }
+                                else if (IsDoneStatus())
+                                {
+                                    <h2>Show Complete</h2>
+                                    <p>This display session has ended.</p>
+                                }
+                                else if (IsWrapUpStatus())
+                                {
+                                    <h2>Wrap-Up</h2>
+                                    <p>Thank you for attending!</p>
+                                }
+                                else if (IsStandByStatus())
+                                {
+                                    <h2>Show starting soon</h2>
+                                    <p>@state.Presentation.WelcomeMessage</p>
+                                    @if (GetReadySegment() is { } readySegment)
+                                    {
+                                        <p><strong>First Segment:</strong> @readySegment.ActTitle</p>
+                                    }
+                                    @if (TryGetOnDeckText() is { } onDeckText)
+                                    {
+                                        <p><strong>On Deck:</strong> @onDeckText</p>
+                                    }
+                                    @if (GetCountdownText() is { } countdownText)
+                                    {
+                                        <p><strong>Going Live In:</strong> @countdownText</p>
+                                    }
+                                }
+                                else if (state.CurrentState == TalentShowLifecycleState.PreShow)
+                                {
+                                    <h2>Welcome to the Talent Show!</h2>
+                                    <p>@state.Presentation.WelcomeMessage</p>
+                                }
+                                else if (state.CurrentState == TalentShowLifecycleState.HostTalk)
+                                {
+                                    <h2>@(GetCurrentItem()?.ActTitle ?? "Host Segment")</h2>
+                                    <p>@(GetCurrentItem()?.IntroLine ?? "Host text")</p>
+                                }
+                                else if (state.CurrentState == TalentShowLifecycleState.ActShow && GetCurrentItem() is { } liveAct)
+                                {
+                                    <h2>@liveAct.ActTitle</h2>
+                                    <h4>@liveAct.PerformerName</h4>
+                                    @if (GetNextItem() is { } onDeckAct)
+                                    {
+                                        <p><strong>On Deck:</strong> @onDeckAct.PerformerName — @onDeckAct.ActTitle</p>
+                                    }
+                                }
+                                else if (state.CurrentState == TalentShowLifecycleState.Intermission)
+                                {
+                                    <h2>Intermission</h2>
+                                    <p>@state.Presentation.IntermissionMessage</p>
+                                }
+                                else
+                                {
+                                    <h2>@(GetCurrentItem()?.ActTitle ?? "Segment")</h2>
+                                    <p>@(GetCurrentItem()?.IntroLine ?? "Live segment")</p>
+                                }
+                            </div>
+                        </div>
+                        break;
+                    case TalentShowDisplayRole.BackstagePrompt:
+                    case TalentShowDisplayRole.FrontstagePrompt:
+                        <div class="card bg-dark text-light border-warning mb-3">
+                            <div class="card-body">
+                                <h3 class="text-warning">@(assignedRole == TalentShowDisplayRole.BackstagePrompt ? "Backstage Prompt" : "Frontstage Prompt")</h3>
+                                @if (IsSetupMode())
+                                {
+                                    <p>@(assignedRole == TalentShowDisplayRole.BackstagePrompt ? "Backstage Display Connected — Setup Mode" : "Frontstage Display Connected — Setup Mode")</p>
+                                    <p>Font size test text — 12345 ABCDE</p>
+                                }
+                                else if (IsDoneStatus())
+                                {
+                                    <p>Show complete. Display session expired.</p>
+                                }
+                                else if (IsWrapUpStatus())
+                                {
+                                    <p>Wrap-up in progress.</p>
+                                }
+                                else if (IsReadyMode() || IsStandByStatus())
+                                {
+                                    <p><strong>Ready Mode — Please prepare</strong></p>
+                                    <p><strong>First Segment:</strong> @(GetReadySegment()?.ActTitle ?? "Waiting for script")</p>
+                                    <p><strong>On Deck:</strong> @(TryGetOnDeckText() ?? "Waiting")</p>
+                                    @if (assignedRole != TalentShowDisplayRole.BackstagePrompt && GetCountdownText() is { } standbyCountdown)
+                                    {
+                                        <p><strong>Countdown:</strong> @standbyCountdown</p>
+                                    }
+                                }
+                                else
+                                {
+                                    @if (state.CurrentState == TalentShowLifecycleState.Intermission)
+                                    {
+                                        <p><strong>Intermission Timing:</strong> @GetRemainingTimerText()</p>
+                                    }
+                                    else
+                                    {
+                                        <p><strong>Current:</strong> @(GetCurrentItem()?.PerformerName ?? "Waiting") — @(GetCurrentItem()?.ActTitle ?? "Waiting")</p>
+                                        <p><strong>On Deck:</strong> @(TryGetOnDeckText() ?? "Waiting")</p>
+                                        <p><strong>Timing:</strong> @GetRemainingTimerText()</p>
+                                        @if (assignedRole == TalentShowDisplayRole.BackstagePrompt && !string.IsNullOrWhiteSpace(GetCurrentItem()?.OutroLine))
+                                        {
+                                            <p><strong>Cues/Notes:</strong> @GetCurrentItem()!.OutroLine</p>
+                                        }
+                                    }
+                                }
+                            </div>
+                        </div>
+                        break;
+                    case TalentShowDisplayRole.HostPrompt:
+                        <div class="card bg-dark text-light border-info mb-3">
+                            <div class="card-body">
+                                <h3 class="text-info">Host Prompt</h3>
+                                @if (IsSetupMode())
+                                {
+                                    <p>Teleprompter Connected — Setup Mode</p>
+                                    <p>Font size test text — Scroll check.</p>
+                                }
+                                else if (IsDoneStatus())
+                                {
+                                    <p>Show complete.</p>
+                                }
+                                else if (IsWrapUpStatus())
+                                {
+                                    <p>Closing script: Thank you all for attending tonight's talent show!</p>
+                                }
+                                else if (IsReadyMode() || IsStandByStatus())
+                                {
+                                    <p>@(GetOpeningHostText() ?? "Opening host segment is ready.")</p>
+                                    @if (state.HostNames.Any())
+                                    {
+                                        <p><strong>Hosts:</strong> @string.Join(", ", state.HostNames)</p>
+                                    }
+                                    @if (GetCountdownText() is { } hostCountdown)
+                                    {
+                                        <p><strong>Going Live In:</strong> @hostCountdown</p>
+                                    }
+                                }
+                                else
+                                {
+                                    <p>@(GetCurrentItem()?.IntroLine ?? state.Presentation.WelcomeMessage)</p>
+                                    @if (GetNextItem() is { } nextHost)
+                                    {
+                                        <p><strong>Next:</strong> @nextHost.ActTitle</p>
+                                    }
+                                }
+                            </div>
+                        </div>
+                        break;
                     case TalentShowDisplayRole.BackstageDirector:
                         <div class="card bg-dark text-light border-warning mb-3">
                             <div class="card-body">
@@ -61,11 +219,23 @@
                             </div>
                         </div>
                         break;
+                    case TalentShowDisplayRole.Judges:
                     case TalentShowDisplayRole.JudgesVote:
+                    case TalentShowDisplayRole.TryOutsJudgePage:
                         <div class="card bg-dark text-light border-info mb-3">
                             <div class="card-body">
-                                <h3 class="text-info">Main Judge Voting</h3>
-                                @if (GetCurrentItem() is { } currentJudge)
+                                <h3 class="text-info">Judges</h3>
+                                @if (IsSetupMode())
+                                {
+                                    <p>Judging System Connected — Setup Mode</p>
+                                    <p>Prepare for show</p>
+                                    <p>Font size test text — 12345</p>
+                                }
+                                else if (IsReadyMode() || IsStandByStatus())
+                                {
+                                    <p>Prepare for the show.</p>
+                                }
+                                else if (CanShowJudgeVoting() && GetCurrentItem() is { } currentJudge)
                                 {
                                     <p class="mb-1"><strong>Act:</strong> @currentJudge.ActTitle</p>
                                     <p class="mb-1"><strong>Performer:</strong> @currentJudge.PerformerName</p>
@@ -73,18 +243,61 @@
                                 }
                                 else
                                 {
-                                    <em>Waiting for current act.</em>
+                                    <em>Judging is currently inactive.</em>
                                 }
                             </div>
                         </div>
                         break;
+                    case TalentShowDisplayRole.TryOutsActDisplay:
+                        var currentTryOutAct = state.Items.FirstOrDefault(item =>
+                            item.Category.Equals(TalentShowTryOutEntryStatus.Performing, StringComparison.OrdinalIgnoreCase))
+                            ?? state.Items.FirstOrDefault(item =>
+                                item.Category.Equals(TalentShowTryOutEntryStatus.OnDeck, StringComparison.OrdinalIgnoreCase));
+                        <div class="card bg-dark text-light border-primary mb-3">
+                            <div class="card-body">
+                                <h3 class="text-primary">Try-Outs Act Display</h3>
+                                @if (currentTryOutAct != null)
+                                {
+                                    <p class="mb-1"><strong>Performer:</strong> @currentTryOutAct.PerformerName</p>
+                                    <p class="mb-1"><strong>Act:</strong> @currentTryOutAct.ActTitle</p>
+                                    <p class="mb-2"><strong>Status:</strong> @currentTryOutAct.Category</p>
+                                    <div class="progress mb-2" role="progressbar">
+                                        <div class="progress-bar bg-info" style="width: @GetActProgressPercent()%"></div>
+                                    </div>
+                                    <p class="mb-2"><strong>Timer:</strong> @GetActTimerText()</p>
+                                    @if (!string.IsNullOrWhiteSpace(currentAudioUrl))
+                                    {
+                                        <audio id="tryout-act-audio" controls class="w-100 mb-2" src="@currentAudioUrl"></audio>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(currentVideoUrl))
+                                    {
+                                        <video id="tryout-act-video" controls class="w-100" src="@currentVideoUrl"></video>
+                                    }
+                                }
+                                else
+                                {
+                                    <em>Waiting for next act.</em>
+                                }
+                            </div>
+                        </div>
+                        break;
+                    case TalentShowDisplayRole.Voters:
                     case TalentShowDisplayRole.AudienceVote:
                         <div class="card bg-dark text-light border-primary mb-3">
                             <div class="card-body">
                                 <h3 class="text-primary">Audience Voting</h3>
                                 <p class="mb-2">Share this link with audience:</p>
                                 <p class="mb-3"><code>@GetAudienceVoteUrl()</code></p>
-                                @if (GetCurrentItem() is { } currentAudience)
+                                @if (IsSetupMode() || IsReadyMode() || IsStandByStatus())
+                                {
+                                    <p>Welcome to the Talent Show!</p>
+                                    <p>Voting will open soon.</p>
+                                    @if (GetCountdownText() is { } voterCountdown)
+                                    {
+                                        <p><strong>Voting opens in:</strong> @voterCountdown</p>
+                                    }
+                                }
+                                else if (CanShowAudienceVoting() && GetCurrentItem() is { } currentAudience)
                                 {
                                     <p class="mb-1"><strong>Act:</strong> @currentAudience.ActTitle</p>
                                     <p class="mb-1"><strong>Performer:</strong> @currentAudience.PerformerName</p>
@@ -92,7 +305,7 @@
                                 }
                                 else
                                 {
-                                    <em>Waiting for current act.</em>
+                                    <em>Audience voting is currently closed.</em>
                                 }
                             </div>
                         </div>
@@ -151,7 +364,50 @@
                                         <p class="mb-0"><strong>Up Next:</strong> @nextMain.ActTitle (@nextMain.PerformerName)</p>
                                     }
                                 }
-                                else if (state.CurrentState is TalentShowLifecycleState.Planning or TalentShowLifecycleState.TryOuts or TalentShowLifecycleState.Rehearsal)
+                                else if (state.CurrentState == TalentShowLifecycleState.TryOuts)
+                                {
+                                    var currentTryOut = state.Items.FirstOrDefault(item =>
+                                        item.Category.Equals(TalentShowTryOutEntryStatus.Performing, StringComparison.OrdinalIgnoreCase))
+                                        ?? state.Items.FirstOrDefault();
+                                    var onDeckTryOut = state.Items.FirstOrDefault(item =>
+                                        item.Category.Equals(TalentShowTryOutEntryStatus.OnDeck, StringComparison.OrdinalIgnoreCase));
+                                    var queuePreview = state.Items
+                                        .Where(item => item != currentTryOut && item != onDeckTryOut)
+                                        .Take(5)
+                                        .ToList();
+
+                                    <h1 class="display-5">Try-Outs</h1>
+                                    @if (currentTryOut != null)
+                                    {
+                                        <p class="mb-1"><strong>Current Performer:</strong> @currentTryOut.PerformerName — @currentTryOut.ActTitle</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="mb-1"><strong>Current Performer:</strong> Waiting</p>
+                                    }
+
+                                    @if (onDeckTryOut != null)
+                                    {
+                                        <p class="mb-1"><strong>On Deck:</strong> @onDeckTryOut.PerformerName — @onDeckTryOut.ActTitle</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="mb-1"><strong>On Deck:</strong> Waiting</p>
+                                    }
+
+                                    @if (queuePreview.Any())
+                                    {
+                                        <hr />
+                                        <p class="mb-2"><strong>Queue Preview</strong></p>
+                                        <ol class="mb-0">
+                                            @foreach (var queueItem in queuePreview)
+                                            {
+                                                <li>@queueItem.PerformerName — @queueItem.ActTitle</li>
+                                            }
+                                        </ol>
+                                    }
+                                }
+                                else if (state.CurrentState is TalentShowLifecycleState.Planning or TalentShowLifecycleState.Rehearsal)
                                 {
                                     <h1 class="display-5">@state.CurrentState</h1>
                                     <p>The show is in @state.CurrentState phase.</p>
@@ -229,15 +485,26 @@
     private string deviceId = string.Empty;
     private string deviceNameInput = $"Display-{DateTime.Now:HHmm}";
     private string statusMessage = "Connecting to event hub...";
-    private string assignedRole = TalentShowDisplayRole.MainBoard;
+    private string assignedRole = string.Empty;
     private string assignedSessionCode = string.Empty;
     private string sessionCodeInput = string.Empty;
     private bool isConnected;
     private bool isAssigned;
     private bool isDirectAudienceVoteMode;
     private bool startupCompleted;
+    private bool isPreviewMode;
+    private bool mediaEnabled;
+    private string currentAudioUrl = string.Empty;
+    private string currentVideoUrl = string.Empty;
+    private DateTime? actTimerStartedAtUtc;
+    private DateTime? lastStateUpdateUtc;
+    private DateTime? sessionEndUtc;
+    private System.Threading.Timer? heartbeatTimer;
 
     private const string DisplayRegistrationStorageKey = "talentShowDisplayRegistration";
+    private const string VoteDraftStorageKey = "talentShowVoteDraft";
+    private const string DisplayCodeStorageKey = "displayCode";
+    private const string AssignedRoleStorageKey = "assignedRole";
 
     private string voterName = string.Empty;
     private int talentScore = 3;
@@ -245,6 +512,9 @@
     private int creativityScore = 3;
     private int crowdEngagementScore = 3;
     private string voteMessage = string.Empty;
+    private string voteErrorMessage = string.Empty;
+    private bool isSubmittingVote;
+    private TalentShowVoteSubmission? cachedFailedVote;
 
     protected override Task OnInitializedAsync()
     {
@@ -256,6 +526,26 @@
             assignedSessionCode = NormalizeSessionCode(SessionCodeParam!);
             sessionCodeInput = assignedSessionCode;
             isAssigned = true;
+        }
+        else
+        {
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            var query = QueryHelpers.ParseQuery(uri.Query);
+            if (query.TryGetValue("sessionCode", out var sessionCodeValue))
+            {
+                var normalizedSessionCode = NormalizeSessionCode(sessionCodeValue.ToString());
+                if (!string.IsNullOrWhiteSpace(normalizedSessionCode))
+                {
+                    assignedSessionCode = normalizedSessionCode;
+                    sessionCodeInput = normalizedSessionCode;
+                    assignedRole = NormalizeDisplayRole(query.TryGetValue("role", out var roleValue)
+                        ? roleValue.ToString()
+                        : TalentShowDisplayRole.MainBoard);
+                    isAssigned = true;
+                    isPreviewMode = true;
+                    statusMessage = $"Preview mode: {assignedRole} for {assignedSessionCode}.";
+                }
+            }
         }
 
         return Task.CompletedTask;
@@ -270,17 +560,29 @@
 
         startupCompleted = true;
         await EnsureHubConnectionAsync();
+        heartbeatTimer ??= new System.Threading.Timer(
+            async _ => await InvokeAsync(HeartbeatAsync),
+            null,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
 
         if (isDirectAudienceVoteMode)
         {
             await JoinSessionAsync(assignedSessionCode);
             statusMessage = $"Joined audience voting for {assignedSessionCode}.";
         }
+        else if (isPreviewMode)
+        {
+            await JoinSessionAsync(assignedSessionCode);
+            statusMessage = $"Preview mode active for {assignedSessionCode}.";
+        }
         else
         {
             await RestoreDeviceRegistrationAsync();
             await RegisterDeviceAsync();
         }
+
+        await RestoreVoteDraftAsync();
 
         await InvokeAsync(StateHasChanged);
     }
@@ -299,8 +601,16 @@
 
         hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", incomingState =>
         {
+            var previousActOrder = GetCurrentItem()?.Order ?? -1;
             state = incomingState;
+            lastStateUpdateUtc = incomingState.UpdatedAtUtc;
+            sessionEndUtc = incomingState.TryOutSessionEndUtc;
             statusMessage = $"Assigned to {assignedRole} • Updated {incomingState.UpdatedAtUtc.ToLocalTime():T}";
+            var currentActOrder = GetCurrentItem()?.Order ?? -1;
+            if (currentActOrder != previousActOrder)
+            {
+                _ = RestoreVoteDraftAsync();
+            }
             InvokeAsync(StateHasChanged);
         });
 
@@ -311,15 +621,30 @@
             isAssigned = true;
             statusMessage = $"Assigned to session {assignment.SessionCode} as {assignment.DisplayRole}.";
             await JoinSessionAsync(assignedSessionCode);
+            await PersistDeviceRegistrationAsync();
             await InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On("DeviceAssignmentCleared", () =>
         {
             assignedSessionCode = string.Empty;
+            assignedRole = string.Empty;
             isAssigned = false;
             state = new TalentShowRealtimeState();
             statusMessage = "Assignment cleared. Waiting for reassignment.";
+            _ = PersistDeviceRegistrationAsync();
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On("DeviceSessionCleared", () =>
+        {
+            assignedSessionCode = string.Empty;
+            isAssigned = false;
+            state = new TalentShowRealtimeState();
+            statusMessage = string.IsNullOrWhiteSpace(assignedRole)
+                ? "Waiting for assignment..."
+                : $"Role {assignedRole} assigned. Waiting on session start.";
+            _ = PersistDeviceRegistrationAsync();
             InvokeAsync(StateHasChanged);
         });
 
@@ -328,6 +653,42 @@
             state = new TalentShowRealtimeState();
             statusMessage = "Session cleared by controller.";
             InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("DeviceDisplayNameUpdated", async updatedDisplayName =>
+        {
+            if (!string.IsNullOrWhiteSpace(updatedDisplayName))
+            {
+                deviceNameInput = updatedDisplayName.Trim();
+                statusMessage = $"Display name updated to {deviceNameInput}.";
+            }
+            await PersistDeviceRegistrationAsync();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("DeviceRoleUpdated", async updatedRole =>
+        {
+            assignedRole = string.IsNullOrWhiteSpace(updatedRole) ? string.Empty : updatedRole.Trim();
+            if (!isAssigned)
+            {
+                statusMessage = string.IsNullOrWhiteSpace(assignedRole)
+                    ? "Waiting for assignment..."
+                    : $"Role {assignedRole} assigned. Waiting on session start.";
+            }
+            await PersistDeviceRegistrationAsync();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<TalentShowDisplayCommand>("DisplayCommandReceived", async command =>
+        {
+            if (!isAssigned ||
+                !assignedSessionCode.Equals(command.SessionCode, StringComparison.OrdinalIgnoreCase) ||
+                !assignedRole.Equals(command.TargetRole, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            await ApplyDisplayCommandAsync(command);
         });
 
         await hubConnection.StartAsync();
@@ -365,7 +726,7 @@
         deviceNameInput = registration.DisplayName;
         assignedSessionCode = registration.AssignedSessionCode;
         assignedRole = string.IsNullOrWhiteSpace(registration.AssignedDisplayRole)
-            ? TalentShowDisplayRole.MainBoard
+            ? string.Empty
             : registration.AssignedDisplayRole;
         isAssigned = registration.IsAssigned;
         if (isAssigned)
@@ -375,7 +736,9 @@
         await PersistDeviceRegistrationAsync();
         statusMessage = isAssigned
             ? $"Device reconnected as {assignedRole} for session {assignedSessionCode}."
-            : $"Device registered. Pairing code: {pairingCode}";
+            : string.IsNullOrWhiteSpace(assignedRole)
+                ? $"Device registered. Pairing code: {pairingCode}"
+                : $"Role {assignedRole} assigned. Waiting on session start.";
     }
 
     private async Task RestoreDeviceRegistrationAsync()
@@ -401,10 +764,24 @@
         {
             pairingCode = cache.PairingCode;
         }
+        else
+        {
+            var displayCodeFromStorage = await JS.InvokeAsync<string?>("localStorage.getItem", DisplayCodeStorageKey);
+            if (!string.IsNullOrWhiteSpace(displayCodeFromStorage))
+            {
+                pairingCode = displayCodeFromStorage;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(cache.DisplayName))
         {
             deviceNameInput = cache.DisplayName;
+        }
+
+        var assignedRoleFromStorage = await JS.InvokeAsync<string?>("localStorage.getItem", AssignedRoleStorageKey);
+        if (!string.IsNullOrWhiteSpace(assignedRoleFromStorage))
+        {
+            assignedRole = assignedRoleFromStorage;
         }
     }
 
@@ -419,28 +796,45 @@
 
         var json = System.Text.Json.JsonSerializer.Serialize(cache);
         await JS.InvokeVoidAsync("localStorage.setItem", DisplayRegistrationStorageKey, json);
+        await JS.InvokeVoidAsync("localStorage.setItem", DisplayCodeStorageKey, pairingCode);
+        if (string.IsNullOrWhiteSpace(assignedRole))
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", AssignedRoleStorageKey);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", AssignedRoleStorageKey, assignedRole);
+        }
     }
 
     private RenderFragment RenderVoteForm(bool isJudge, string nameLabel) => @<div class="mt-3">
         <label class="form-label">@nameLabel</label>
-        <InputText class="form-control mb-2" @bind-Value="voterName" />
+        <InputText class="form-control mb-2" @bind-Value="voterName" @bind-Value:after="PersistVoteDraftAsync" />
 
         <label class="form-label mb-1 mt-2">Talent (1-5)</label>
-        <InputNumber class="form-control" @bind-Value="talentScore" />
+        <InputNumber class="form-control" @bind-Value="talentScore" @bind-Value:after="PersistVoteDraftAsync" />
 
         <label class="form-label mb-1 mt-2">Stage Presence (1-5)</label>
-        <InputNumber class="form-control" @bind-Value="stagePresenceScore" />
+        <InputNumber class="form-control" @bind-Value="stagePresenceScore" @bind-Value:after="PersistVoteDraftAsync" />
 
         <label class="form-label mb-1 mt-2">Creativity (1-5)</label>
-        <InputNumber class="form-control" @bind-Value="creativityScore" />
+        <InputNumber class="form-control" @bind-Value="creativityScore" @bind-Value:after="PersistVoteDraftAsync" />
 
         <label class="form-label mb-1 mt-2">Crowd Engagement (1-5)</label>
-        <InputNumber class="form-control" @bind-Value="crowdEngagementScore" />
+        <InputNumber class="form-control" @bind-Value="crowdEngagementScore" @bind-Value:after="PersistVoteDraftAsync" />
 
-        <button class="btn btn-primary mt-2" @onclick="() => SubmitVoteAsync(isJudge)">Submit Vote</button>
+        <button class="btn btn-primary mt-2 me-2" @onclick="() => SubmitVoteAsync(isJudge)" disabled="@isSubmittingVote">Submit Vote</button>
+        @if (cachedFailedVote != null)
+        {
+            <button class="btn btn-outline-warning mt-2" @onclick="RetryCachedVoteAsync" disabled="@isSubmittingVote">Retry Last Submit</button>
+        }
         @if (!string.IsNullOrWhiteSpace(voteMessage))
         {
             <div class="mt-2 text-success">@voteMessage</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(voteErrorMessage))
+        {
+            <div class="mt-2 text-warning">@voteErrorMessage</div>
         }
     </div>;
 
@@ -469,8 +863,212 @@
             CrowdEngagementScore = Math.Clamp(crowdEngagementScore, 1, 5)
         };
 
-        await hubConnection.InvokeAsync("SubmitVote", state.SessionCode, payload);
-        voteMessage = $"Vote submitted (Total: {payload.TotalScore}).";
+        isSubmittingVote = true;
+        voteMessage = string.Empty;
+        voteErrorMessage = string.Empty;
+        await PersistVoteDraftAsync();
+        try
+        {
+            await hubConnection.InvokeAsync("SubmitVote", state.SessionCode, payload);
+            voteMessage = $"Vote submitted (Total: {payload.TotalScore}).";
+            cachedFailedVote = null;
+            await ClearVoteDraftAsync();
+        }
+        catch (Exception ex)
+        {
+            cachedFailedVote = payload;
+            voteErrorMessage = $"Submit failed. Your current form is cached and ready to retry. ({ex.Message})";
+        }
+        finally
+        {
+            isSubmittingVote = false;
+        }
+    }
+
+    private async Task RetryCachedVoteAsync()
+    {
+        if (cachedFailedVote == null || hubConnection == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        isSubmittingVote = true;
+        voteErrorMessage = string.Empty;
+        try
+        {
+            await hubConnection.InvokeAsync("SubmitVote", state.SessionCode, cachedFailedVote);
+            voteMessage = $"Vote submitted (Total: {cachedFailedVote.TotalScore}).";
+            cachedFailedVote = null;
+            await ClearVoteDraftAsync();
+        }
+        catch (Exception ex)
+        {
+            voteErrorMessage = $"Retry failed. Form remains cached. ({ex.Message})";
+        }
+        finally
+        {
+            isSubmittingVote = false;
+        }
+    }
+
+    private async Task PersistVoteDraftAsync()
+    {
+        var current = GetCurrentItem();
+        if (current == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        var draft = new VoteDraftCache
+        {
+            SessionCode = state.SessionCode,
+            ActOrder = current.Order,
+            AssignedRole = assignedRole,
+            VoterName = voterName,
+            TalentScore = Math.Clamp(talentScore, 1, 5),
+            StagePresenceScore = Math.Clamp(stagePresenceScore, 1, 5),
+            CreativityScore = Math.Clamp(creativityScore, 1, 5),
+            CrowdEngagementScore = Math.Clamp(crowdEngagementScore, 1, 5)
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(draft);
+        await JS.InvokeVoidAsync("localStorage.setItem", VoteDraftStorageKey, json);
+    }
+
+    private async Task RestoreVoteDraftAsync()
+    {
+        var current = GetCurrentItem();
+        if (current == null || string.IsNullOrWhiteSpace(state.SessionCode))
+        {
+            return;
+        }
+
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", VoteDraftStorageKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        var draft = System.Text.Json.JsonSerializer.Deserialize<VoteDraftCache>(json);
+        if (draft == null ||
+            !draft.SessionCode.Equals(state.SessionCode, StringComparison.OrdinalIgnoreCase) ||
+            draft.ActOrder != current.Order ||
+            !draft.AssignedRole.Equals(assignedRole, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        voterName = draft.VoterName;
+        talentScore = Math.Clamp(draft.TalentScore, 1, 5);
+        stagePresenceScore = Math.Clamp(draft.StagePresenceScore, 1, 5);
+        creativityScore = Math.Clamp(draft.CreativityScore, 1, 5);
+        crowdEngagementScore = Math.Clamp(draft.CrowdEngagementScore, 1, 5);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearVoteDraftAsync()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", VoteDraftStorageKey);
+    }
+
+    private Task EnableMediaAsync()
+    {
+        mediaEnabled = true;
+        statusMessage = "Audio/Video unlocked for this device.";
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HeartbeatAsync()
+    {
+        if (!isAssigned || isPreviewMode || isDirectAudienceVoteMode)
+        {
+            return;
+        }
+
+        if (ComputeAssignmentExpiryUtc() is { } expiryUtc && DateTime.UtcNow > expiryUtc)
+        {
+            await ClearExpiredAssignmentAsync();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private DateTime? ComputeAssignmentExpiryUtc()
+    {
+        var scheduledCutoff = sessionEndUtc?.AddHours(1);
+        var activityCutoff = lastStateUpdateUtc?.AddHours(1);
+        if (scheduledCutoff == null)
+        {
+            return activityCutoff;
+        }
+
+        if (activityCutoff == null)
+        {
+            return scheduledCutoff;
+        }
+
+        return scheduledCutoff.Value > activityCutoff.Value ? scheduledCutoff : activityCutoff;
+    }
+
+    private async Task ClearExpiredAssignmentAsync()
+    {
+        if (hubConnection != null && !string.IsNullOrWhiteSpace(pairingCode))
+        {
+            await hubConnection.InvokeAsync("RemoveDeviceAssignment", pairingCode);
+        }
+
+        assignedSessionCode = string.Empty;
+        assignedRole = string.Empty;
+        isAssigned = false;
+        state = new TalentShowRealtimeState();
+        sessionEndUtc = null;
+        lastStateUpdateUtc = null;
+        currentAudioUrl = string.Empty;
+        currentVideoUrl = string.Empty;
+        actTimerStartedAtUtc = null;
+        statusMessage = "Assignment expired for this try-out session. Waiting for assignment...";
+        await PersistDeviceRegistrationAsync();
+    }
+
+    private async Task ApplyDisplayCommandAsync(TalentShowDisplayCommand command)
+    {
+        if (!mediaEnabled &&
+            command.Command is "play-song" or "play-video" or "start-timer")
+        {
+            statusMessage = "Tap to Enable Audio/Video before running remote media commands.";
+            return;
+        }
+
+        switch (command.Command)
+        {
+            case "start-timer":
+                actTimerStartedAtUtc = DateTime.UtcNow;
+                break;
+            case "reset-timer":
+                actTimerStartedAtUtc = null;
+                break;
+            case "play-song":
+                currentAudioUrl = command.Value;
+                await JS.InvokeVoidAsync("eval", "var a=document.getElementById('tryout-act-audio'); if(a){ a.play().catch(()=>{});} ");
+                break;
+            case "stop-song":
+                await JS.InvokeVoidAsync("eval", "var a=document.getElementById('tryout-act-audio'); if(a){ a.pause(); a.currentTime=0;} ");
+                break;
+            case "play-video":
+                currentVideoUrl = command.Value;
+                await JS.InvokeVoidAsync("eval", "var v=document.getElementById('tryout-act-video'); if(v){ v.play().catch(()=>{});} ");
+                break;
+            case "stop-video":
+                await JS.InvokeVoidAsync("eval", "var v=document.getElementById('tryout-act-video'); if(v){ v.pause(); v.currentTime=0;} ");
+                break;
+            case "set-volume":
+                if (double.TryParse(command.Value, out var volume))
+                {
+                    var normalized = Math.Clamp(volume, 0d, 1d);
+                    await JS.InvokeVoidAsync("eval", $"var a=document.getElementById('tryout-act-audio'); if(a){{ a.volume={normalized.ToString(System.Globalization.CultureInfo.InvariantCulture)}; }}");
+                }
+                break;
+        }
     }
 
     private TalentShowScheduleItem? GetCurrentItem()
@@ -494,6 +1092,89 @@
         return state.Items[nextIndex];
     }
 
+    private bool IsSetupMode()
+    {
+        return state.Presentation.FooterMessage.Equals("Setup Mode", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsReadyMode()
+    {
+        return state.Presentation.FooterMessage.Equals("Ready Mode", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsStandByStatus()
+    {
+        return state.LiveStatus.Equals(TalentShowLiveStatus.StandBy, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsWrapUpStatus()
+    {
+        return state.LiveStatus.Equals(TalentShowLiveStatus.WrapUp, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsDoneStatus()
+    {
+        return state.LiveStatus.Equals(TalentShowLiveStatus.Done, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsActLiveSegment()
+    {
+        return state.LiveStatus.Equals(TalentShowLiveStatus.Live, StringComparison.OrdinalIgnoreCase) &&
+               state.CurrentSegmentType.Equals(TalentShowSegmentType.Act, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CanShowJudgeVoting()
+    {
+        return IsActLiveSegment() && state.JudgesVotingEnabled;
+    }
+
+    private bool CanShowAudienceVoting()
+    {
+        return IsActLiveSegment() && state.AudienceVotingEnabled;
+    }
+
+    private TalentShowScheduleItem? GetReadySegment()
+    {
+        return state.Items.OrderBy(item => item.Order).FirstOrDefault();
+    }
+
+    private string? TryGetOnDeckText()
+    {
+        if (GetNextItem() is { } next)
+        {
+            return $"{next.PerformerName} — {next.ActTitle}";
+        }
+
+        var firstAct = state.Items
+            .OrderBy(item => item.Order)
+            .FirstOrDefault(item => item.Category.Equals(TalentShowSegmentType.Act, StringComparison.OrdinalIgnoreCase));
+        return firstAct == null ? null : $"{firstAct.PerformerName} — {firstAct.ActTitle}";
+    }
+
+    private string? GetOpeningHostText()
+    {
+        return state.Items
+            .OrderBy(item => item.Order)
+            .FirstOrDefault(item => item.Category.Equals(TalentShowSegmentType.HostTalk, StringComparison.OrdinalIgnoreCase))
+            ?.IntroLine;
+    }
+
+    private string? GetCountdownText()
+    {
+        if (!state.LiveCountdownTargetUtc.HasValue)
+        {
+            return null;
+        }
+
+        var remaining = state.LiveCountdownTargetUtc.Value - DateTime.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return "00:00";
+        }
+
+        return $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
+    }
+
     private string GetAudienceVoteUrl()
     {
         var uri = Navigation.ToAbsoluteUri($"/talent-show/vote/{state.SessionCode}");
@@ -512,9 +1193,54 @@
         return $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
     }
 
+    private string GetActTimerText()
+    {
+        if (!actTimerStartedAtUtc.HasValue)
+        {
+            return "00:00";
+        }
+
+        var elapsed = DateTime.UtcNow - actTimerStartedAtUtc.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        return $"{(int)elapsed.TotalMinutes:00}:{elapsed.Seconds:00}";
+    }
+
+    private int GetActProgressPercent()
+    {
+        if (!actTimerStartedAtUtc.HasValue || state.EstimatedSegmentMinutes <= 0)
+        {
+            return 0;
+        }
+
+        var elapsed = DateTime.UtcNow - actTimerStartedAtUtc.Value;
+        var ratio = elapsed.TotalMinutes / state.EstimatedSegmentMinutes;
+        return (int)Math.Clamp(Math.Round(ratio * 100), 0, 100);
+    }
+
     private static string NormalizeSessionCode(string code)
     {
         return new string(code.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+    }
+
+    private static string NormalizeDisplayRole(string role)
+    {
+        var match = TalentShowDisplayRole.All
+            .FirstOrDefault(r => r.Equals(role?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return match ?? TalentShowDisplayRole.MainBoard;
+    }
+
+    private string GetWaitingStatusText()
+    {
+        if (!string.IsNullOrWhiteSpace(assignedRole))
+        {
+            return "Role assigned, waiting on session start.";
+        }
+
+        return "Waiting for assignment...";
     }
 
     private sealed class DisplayRegistrationCache
@@ -524,8 +1250,21 @@
         public string DisplayName { get; set; } = string.Empty;
     }
 
+    private sealed class VoteDraftCache
+    {
+        public string SessionCode { get; set; } = string.Empty;
+        public int ActOrder { get; set; }
+        public string AssignedRole { get; set; } = string.Empty;
+        public string VoterName { get; set; } = string.Empty;
+        public int TalentScore { get; set; } = 3;
+        public int StagePresenceScore { get; set; } = 3;
+        public int CreativityScore { get; set; } = 3;
+        public int CrowdEngagementScore { get; set; } = 3;
+    }
+
     public async ValueTask DisposeAsync()
     {
+        heartbeatTimer?.Dispose();
         if (hubConnection != null)
         {
             await hubConnection.DisposeAsync();
@@ -559,6 +1298,12 @@
         font-weight: 700;
         letter-spacing: 0.14em;
         text-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    .waiting-status {
+        font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+        font-weight: 600;
+        letter-spacing: 0.03em;
     }
 
     .waiting-device-name {

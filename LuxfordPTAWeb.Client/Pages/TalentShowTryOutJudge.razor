@@ -1,0 +1,703 @@
+@page "/talent-show/tryouts/judge/{eventId:int}"
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.WebUtilities
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Try-Out Judge</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Try-Out Judge Page</h3>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAllAsync">Refresh</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <label class="form-label form-label-sm">Session</label>
+            <select class="form-select" @bind="selectedSessionId" @bind:after="OnSessionChangedAsync">
+                <option value="">Select a session...</option>
+                @foreach (var sessionId in AvailableSessionIds())
+                {
+                    <option value="@sessionId">@sessionId</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label form-label-sm">Judge ID</label>
+            <input class="form-control" @bind="judgeId" @bind:after="PersistJudgeIdAsync" />
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+            <div class="text-muted small">Live sync: <span class="badge @(isHubConnected ? "bg-success" : "bg-secondary")">@(isHubConnected ? "Connected" : "Disconnected")</span></div>
+        </div>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(selectedSessionId))
+    {
+        <div class="alert alert-warning">Select a session to start judging.</div>
+    }
+    else if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading try-out judging data...</em></div>
+    }
+    else
+    {
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><button class="nav-link @(activeTab == "current" ? "active" : "")" @onclick='() => activeTab = "current"'>Current Performer</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "ondeck" ? "active" : "")" @onclick='() => activeTab = "ondeck"'>On Deck</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "queue" ? "active" : "")" @onclick='() => activeTab = "queue"'>Queue</button></li>
+            <li class="nav-item"><button class="nav-link @(activeTab == "past" ? "active" : "")" @onclick='() => activeTab = "past"'>Past Performers</button></li>
+        </ul>
+
+        @if (activeTab == "current")
+        {
+            @if (CurrentPerformer() is { } current)
+            {
+                <div class="card">
+                    <div class="card-header fw-semibold">@current.PerformerNames — @current.ActTitle</div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrWhiteSpace(current.MusicUrl))
+                        {
+                            <div class="mb-2"><a href="@current.MusicUrl" target="_blank" rel="noopener noreferrer">Music URL</a></div>
+                        }
+
+                        @foreach (var field in ScoringFieldLabels())
+                        {
+                            <label class="form-label form-label-sm">@field (1-@Math.Max(1, settings.ScoringScaleMax))</label>
+                            <input type="number" class="form-control mb-2" min="1" max="@Math.Max(1, settings.ScoringScaleMax)" value="@GetDraftScore(field)" @onchange="e => OnScoreChanged(field, e.Value?.ToString())" />
+                        }
+
+                        <label class="form-label form-label-sm">Comment</label>
+                        <textarea class="form-control mb-2" rows="3" value="@commentDraft" @onchange="OnCommentChanged"></textarea>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="judgeDone" checked="@doneDraft" @onchange="OnDoneChanged" />
+                            <label class="form-check-label" for="judgeDone">I'm Done</label>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveCurrentAsync" disabled="@isSaving">Save Scores</button>
+                            <button class="btn btn-outline-success btn-sm" @onclick="MarkDoneAsync" disabled="@isSaving">I’m Done</button>
+                            @if (hasCachedRetry)
+                            {
+                                <button class="btn btn-outline-warning btn-sm" @onclick="RetryCachedAsync" disabled="@isSaving">Retry Saved Draft</button>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(successMessage))
+                        {
+                            <div class="text-success mt-2">@successMessage</div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-light border">No current performer yet.</div>
+            }
+        }
+        else if (activeTab == "ondeck")
+        {
+            @if (OnDeckPerformer() is { } onDeck)
+            {
+                <div class="card">
+                    <div class="card-header fw-semibold">On Deck</div>
+                    <div class="card-body">
+                        <div class="fw-semibold">@onDeck.PerformerNames</div>
+                        <div class="text-muted">@onDeck.ActTitle</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-light border">No on deck performer.</div>
+            }
+        }
+        else if (activeTab == "queue")
+        {
+            <div class="card">
+                <div class="card-header fw-semibold">StandBy Queue</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var item in StandByEntries())
+                    {
+                        <li class="list-group-item">@item.PerformerNames <span class="text-muted">— @item.ActTitle</span></li>
+                    }
+                    @if (!StandByEntries().Any())
+                    {
+                        <li class="list-group-item text-muted">No performers in standby queue.</li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-header fw-semibold">Past Performers</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Performer(s)</th>
+                                    <th>Act</th>
+                                    <th>Status</th>
+                                    <th style="width: 120px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var performer in PastPerformers())
+                                {
+                                    <tr>
+                                        <td>@performer.PerformerNames</td>
+                                        <td>@performer.ActTitle</td>
+                                        <td>@performer.Status</td>
+                                        <td>
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => LoadDraftForEntryAsync(performer)">Score</button>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!PastPerformers().Any())
+                                {
+                                    <tr><td colspan="4" class="text-muted">No past performers yet.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int eventId { get; set; }
+
+    private const string JudgeIdStorageKey = "tryoutJudgeId";
+    private const string CurrentFormStorageKey = "tryoutJudgeCurrentForm";
+
+    private TalentShowTryOutsConfigDTO settings = new();
+    private List<TalentShowTryOutEntry> entries = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private string selectedSessionId = string.Empty;
+    private string judgeId = string.Empty;
+    private string activeTab = "current";
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    private Dictionary<string, int> scoreDraft = new(StringComparer.OrdinalIgnoreCase);
+    private string commentDraft = string.Empty;
+    private bool doneDraft;
+    private int? draftEntryId;
+    private CachedJudgeForm? cachedRetryForm;
+    private bool hasCachedRetry;
+
+    private HubConnection? hubConnection;
+    private bool isHubConnected;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        selectedSessionId = GetQueryValue("sessionId");
+        await RestoreJudgeIdAsync();
+        await LoadAllAsync();
+        await EnsureHubConnectionAsync();
+        await JoinSessionAsync();
+        await RestoreCachedRetryAsync();
+        await LoadDraftForEntryAsync(CurrentPerformer());
+    }
+
+    private async Task LoadAllAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        try
+        {
+            settings = await Http.GetFromJsonAsync<TalentShowTryOutsConfigDTO>($"/api/talentshow/{eventId}/tryouts/configure") ?? new();
+            entries = await Http.GetFromJsonAsync<List<TalentShowTryOutEntry>>($"/api/talentshow/{eventId}/tryouts/entries") ?? [];
+
+            if (string.IsNullOrWhiteSpace(selectedSessionId))
+            {
+                selectedSessionId = AvailableSessionIds().FirstOrDefault() ?? string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading judge data: {ex.Message}";
+            settings = new();
+            entries = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetQueryValue(string key)
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        return query.TryGetValue(key, out var value) ? value.ToString().Trim() : string.Empty;
+    }
+
+    private IEnumerable<string> AvailableSessionIds()
+    {
+        var configSessions = settings.Sessions.Select(s => s.SessionId?.Trim() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s));
+        var entrySessions = entries.Select(e => e.SessionLabel?.Trim() ?? string.Empty).Where(s => !string.IsNullOrWhiteSpace(s));
+        return configSessions.Concat(entrySessions).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s);
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> ActiveSessionEntries()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return [];
+        }
+
+        return entries.Where(e => string.Equals(e.SessionLabel?.Trim() ?? string.Empty, selectedSessionId.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.CheckInTimestamp ?? e.CreatedAtUtc);
+    }
+
+    private TalentShowTryOutEntry? CurrentPerformer()
+        => ActiveSessionEntries().FirstOrDefault(e => e.Status == TalentShowTryOutEntryStatus.Performing)
+           ?? ActiveSessionEntries().FirstOrDefault(e => e.Status == TalentShowTryOutEntryStatus.OnDeck);
+
+    private TalentShowTryOutEntry? OnDeckPerformer()
+        => ActiveSessionEntries().FirstOrDefault(e => e.Status == TalentShowTryOutEntryStatus.OnDeck);
+
+    private IEnumerable<TalentShowTryOutEntry> StandByEntries()
+        => ActiveSessionEntries().Where(e => e.Status == TalentShowTryOutEntryStatus.StandBy);
+
+    private IEnumerable<TalentShowTryOutEntry> PastPerformers()
+        => ActiveSessionEntries().Where(e => e.Status is TalentShowTryOutEntryStatus.Completed or TalentShowTryOutEntryStatus.Approved or TalentShowTryOutEntryStatus.Rejected);
+
+    private IEnumerable<string> ScoringFieldLabels()
+    {
+        if (settings.ScoringFields.Any())
+        {
+            return settings.ScoringFields.OrderBy(f => f.OrderIndex).Select(f => f.Label).Where(l => !string.IsNullOrWhiteSpace(l));
+        }
+
+        return ["Overall"];
+    }
+
+    private int GetDraftScore(string field)
+    {
+        if (scoreDraft.TryGetValue(field, out var value))
+        {
+            return value;
+        }
+
+        return Math.Max(1, settings.ScoringScaleMax <= 0 ? 5 : Math.Min(settings.ScoringScaleMax, 3));
+    }
+
+    private void OnScoreChanged(string field, string? rawValue)
+    {
+        if (!int.TryParse(rawValue, out var score))
+        {
+            score = 1;
+        }
+
+        var max = Math.Max(1, settings.ScoringScaleMax);
+        scoreDraft[field] = Math.Clamp(score, 1, max);
+        _ = PersistCurrentFormAsync();
+    }
+
+    private void OnCommentChanged(ChangeEventArgs args)
+    {
+        commentDraft = args.Value?.ToString() ?? string.Empty;
+        _ = PersistCurrentFormAsync();
+    }
+
+    private void OnDoneChanged(ChangeEventArgs args)
+    {
+        doneDraft = args.Value is bool checkedValue && checkedValue;
+        _ = PersistCurrentFormAsync();
+    }
+
+    private async Task LoadDraftForEntryAsync(TalentShowTryOutEntry? entry)
+    {
+        if (entry == null)
+        {
+            scoreDraft = new(StringComparer.OrdinalIgnoreCase);
+            commentDraft = string.Empty;
+            doneDraft = false;
+            draftEntryId = null;
+            return;
+        }
+
+        draftEntryId = entry.Id;
+        scoreDraft = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        var existingScores = string.IsNullOrWhiteSpace(entry.ScoresJson)
+            ? []
+            : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowTryOutScoreDTO>>(entry.ScoresJson) ?? [];
+        foreach (var field in ScoringFieldLabels())
+        {
+            var existing = existingScores.LastOrDefault(s =>
+                s.PerformerId == entry.Id &&
+                s.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase) &&
+                s.Category.Equals(field, StringComparison.OrdinalIgnoreCase));
+            scoreDraft[field] = existing?.Value ?? Math.Max(1, Math.Min(Math.Max(1, settings.ScoringScaleMax), 3));
+        }
+
+        commentDraft = entry.Notes ?? string.Empty;
+
+        var completions = string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson)
+            ? []
+            : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowJudgeCompletionDTO>>(entry.JudgeCompletionsJson) ?? [];
+        doneDraft = completions.Any(c => c.PerformerId == entry.Id && c.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase) && c.Completed);
+
+        await RestoreCurrentFormAsync(entry.Id);
+    }
+
+    private async Task SaveCurrentAsync(bool markDone)
+    {
+        var entry = CurrentPerformer();
+        if (entry == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(judgeId))
+        {
+            errorMessage = "Judge ID is required.";
+            return;
+        }
+
+        if (markDone)
+        {
+            doneDraft = true;
+        }
+
+        isSaving = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        await PersistCurrentFormAsync();
+
+        try
+        {
+            var scores = string.IsNullOrWhiteSpace(entry.ScoresJson)
+                ? new List<TalentShowTryOutScoreDTO>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowTryOutScoreDTO>>(entry.ScoresJson) ?? [];
+
+            scores.RemoveAll(s => s.PerformerId == entry.Id && s.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase));
+            foreach (var field in ScoringFieldLabels())
+            {
+                scores.Add(new TalentShowTryOutScoreDTO
+                {
+                    Category = field,
+                    Value = GetDraftScore(field),
+                    JudgeId = judgeId.Trim(),
+                    PerformerId = entry.Id
+                });
+            }
+
+            var completions = string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson)
+                ? new List<TalentShowJudgeCompletionDTO>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowJudgeCompletionDTO>>(entry.JudgeCompletionsJson) ?? [];
+            completions.RemoveAll(c => c.PerformerId == entry.Id && c.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase));
+            completions.Add(new TalentShowJudgeCompletionDTO
+            {
+                JudgeId = judgeId.Trim(),
+                PerformerId = entry.Id,
+                Completed = doneDraft
+            });
+
+            var update = new TalentShowTryOutEntryUpsertDTO
+            {
+                SignupId = entry.SignupId,
+                PerformerNames = entry.PerformerNames,
+                ActTitle = entry.ActTitle,
+                MusicUrl = entry.MusicUrl,
+                PickupAdult = entry.PickupAdult,
+                SlotTime = entry.SlotTime,
+                CheckInTimestamp = entry.CheckInTimestamp,
+                SessionLabel = entry.SessionLabel,
+                Notes = commentDraft,
+                Scores = scores,
+                JudgeCompletions = completions,
+                Status = entry.Status,
+                Selected = entry.Selected
+            };
+
+            var response = await Http.PutAsJsonAsync($"/api/talentshow/{eventId}/tryouts/entries/{entry.Id}", update);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(body) ? "Failed to save scores." : body);
+            }
+
+            await ClearCurrentFormCacheAsync();
+            cachedRetryForm = null;
+            hasCachedRetry = false;
+
+            await LoadAllAsync();
+            await PublishTryOutStateAsync();
+            successMessage = markDone ? "Scoring saved and marked done." : "Scoring saved.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Save failed. Current form is cached for retry. ({ex.Message})";
+            cachedRetryForm = await CaptureCurrentFormAsync();
+            hasCachedRetry = cachedRetryForm != null;
+            await PersistCurrentFormAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private Task SaveCurrentAsync() => SaveCurrentAsync(false);
+
+    private Task MarkDoneAsync() => SaveCurrentAsync(true);
+
+    private async Task RetryCachedAsync()
+    {
+        if (cachedRetryForm == null)
+        {
+            return;
+        }
+
+        await LoadAllAsync();
+        var target = ActiveSessionEntries().FirstOrDefault(e => e.Id == cachedRetryForm.EntryId) ?? CurrentPerformer();
+        await LoadDraftForEntryAsync(target);
+        await SaveCurrentAsync(cachedRetryForm.Done);
+    }
+
+    private async Task<CachedJudgeForm?> CaptureCurrentFormAsync()
+    {
+        if (draftEntryId == null)
+        {
+            return null;
+        }
+
+        return new CachedJudgeForm
+        {
+            EventId = eventId,
+            SessionId = selectedSessionId,
+            JudgeId = judgeId,
+            EntryId = draftEntryId.Value,
+            Scores = scoreDraft,
+            Comment = commentDraft,
+            Done = doneDraft
+        };
+    }
+
+    private async Task PersistCurrentFormAsync()
+    {
+        var snapshot = await CaptureCurrentFormAsync();
+        if (snapshot == null)
+        {
+            return;
+        }
+
+        var json = System.Text.Json.JsonSerializer.Serialize(snapshot);
+        await JS.InvokeVoidAsync("localStorage.setItem", CurrentFormStorageKey, json);
+    }
+
+    private async Task RestoreCurrentFormAsync(int entryId)
+    {
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", CurrentFormStorageKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        var cached = System.Text.Json.JsonSerializer.Deserialize<CachedJudgeForm>(json);
+        if (cached == null ||
+            cached.EventId != eventId ||
+            !cached.SessionId.Equals(selectedSessionId, StringComparison.OrdinalIgnoreCase) ||
+            !cached.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase) ||
+            cached.EntryId != entryId)
+        {
+            return;
+        }
+
+        scoreDraft = new Dictionary<string, int>(cached.Scores, StringComparer.OrdinalIgnoreCase);
+        commentDraft = cached.Comment;
+        doneDraft = cached.Done;
+        cachedRetryForm = cached;
+        hasCachedRetry = true;
+    }
+
+    private async Task RestoreCachedRetryAsync()
+    {
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", CurrentFormStorageKey);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            cachedRetryForm = null;
+            hasCachedRetry = false;
+            return;
+        }
+
+        var cached = System.Text.Json.JsonSerializer.Deserialize<CachedJudgeForm>(json);
+        if (cached == null || cached.EventId != eventId)
+        {
+            cachedRetryForm = null;
+            hasCachedRetry = false;
+            return;
+        }
+
+        cachedRetryForm = cached;
+        hasCachedRetry = true;
+    }
+
+    private async Task ClearCurrentFormCacheAsync()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", CurrentFormStorageKey);
+    }
+
+    private async Task RestoreJudgeIdAsync()
+    {
+        var fromQuery = GetQueryValue("judge");
+        if (!string.IsNullOrWhiteSpace(fromQuery))
+        {
+            judgeId = fromQuery.Trim();
+            await PersistJudgeIdAsync();
+            return;
+        }
+
+        var cached = await JS.InvokeAsync<string?>("localStorage.getItem", JudgeIdStorageKey);
+        judgeId = string.IsNullOrWhiteSpace(cached) ? "Judge-1" : cached.Trim();
+    }
+
+    private async Task PersistJudgeIdAsync()
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", JudgeIdStorageKey, judgeId?.Trim() ?? string.Empty);
+    }
+
+    private async Task OnSessionChangedAsync()
+    {
+        await JoinSessionAsync();
+        await LoadDraftForEntryAsync(CurrentPerformer());
+    }
+
+    private string BuildSessionCode()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return string.Empty;
+        }
+
+        var raw = $"TRYOUT-{eventId}-{selectedSessionId.Trim()}";
+        return new string(raw.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", async incomingState =>
+        {
+            if (!string.Equals(incomingState.SessionCode, BuildSessionCode(), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            await LoadAllAsync();
+            await LoadDraftForEntryAsync(CurrentPerformer());
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isHubConnected = hubConnection.State == HubConnectionState.Connected;
+    }
+
+    private async Task JoinSessionAsync()
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var sessionCode = BuildSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("JoinSession", sessionCode);
+    }
+
+    private async Task PublishTryOutStateAsync()
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var sessionCode = BuildSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        var active = ActiveSessionEntries().ToList();
+        var ordered = new List<TalentShowTryOutEntry>();
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.Performing));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.OnDeck));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.StandBy));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.Completed));
+
+        var state = new TalentShowRealtimeState
+        {
+            ShowName = $"Try-Outs: {selectedSessionId.Trim()}",
+            SessionCode = sessionCode,
+            CurrentState = TalentShowLifecycleState.TryOuts,
+            OverallState = TalentShowOverallState.Live,
+            LiveSubState = TalentShowLiveSubState.ActShow,
+            NextLiveSubState = TalentShowLiveSubState.ActShow,
+            IsLiveMode = true,
+            CurrentIndex = ordered.Any() ? 0 : -1,
+            Items = ordered.Select((entry, idx) => new TalentShowScheduleItem
+            {
+                Order = idx + 1,
+                PerformerName = entry.PerformerNames,
+                ActTitle = entry.ActTitle,
+                Category = entry.Status,
+                IntroLine = entry.SessionLabel,
+                OutroLine = entry.Notes
+            }).ToList(),
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        await hubConnection.InvokeAsync("PublishState", state);
+    }
+
+    private sealed class CachedJudgeForm
+    {
+        public int EventId { get; set; }
+        public string SessionId { get; set; } = string.Empty;
+        public string JudgeId { get; set; } = string.Empty;
+        public int EntryId { get; set; }
+        public Dictionary<string, int> Scores { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public string Comment { get; set; } = string.Empty;
+        public bool Done { get; set; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

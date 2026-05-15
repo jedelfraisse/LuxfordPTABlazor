@@ -48,7 +48,7 @@ else
     }
     else if (!isToolRoute && normalizedSubEventType == "tryouts" && normalizedMode is "sessions" or "run")
     {
-        <TryOutsRunPanel EventId="@eventItem.Id" />
+        <TryOutsRunPanel EventId="@eventItem.Id" InitialTab="@normalizedMode" />
     }
     else if (!isToolRoute && normalizedMode == "configure" && normalizedSubEventType == "rehearsals")
     {

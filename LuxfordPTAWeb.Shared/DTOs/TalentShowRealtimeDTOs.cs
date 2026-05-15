@@ -33,13 +33,21 @@ public class TalentShowRealtimeState
 {
     public string ShowName { get; set; } = string.Empty;
     public string SessionCode { get; set; } = string.Empty;
+    public string ConfigStatus { get; set; } = TalentShowConfigStatus.Setup;
+    public string LiveStatus { get; set; } = TalentShowLiveStatus.PreShow;
     public string CurrentState { get; set; } = TalentShowLifecycleState.PreShow;
+    public string CurrentSegmentType { get; set; } = string.Empty;
     public bool IsLiveMode { get; set; }
     public string OverallState { get; set; } = TalentShowOverallState.PreShow;
     public string LiveSubState { get; set; } = TalentShowLiveSubState.HostTalk;
     public string NextLiveSubState { get; set; } = TalentShowLiveSubState.ActShow;
+    public DateTime? LiveCountdownTargetUtc { get; set; }
     public DateTime SegmentStartedAtUtc { get; set; } = DateTime.UtcNow;
     public int EstimatedSegmentMinutes { get; set; } = 5;
+    public bool JudgesVotingEnabled { get; set; }
+    public bool AudienceVotingEnabled { get; set; }
+    public List<string> HostNames { get; set; } = new();
+    public DateTime? TryOutSessionEndUtc { get; set; }
     public int CurrentIndex { get; set; } = -1;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     public List<TalentShowScheduleItem> Items { get; set; } = new();
@@ -105,13 +113,31 @@ public static class TalentShowDisplayRole
     public const string BackstageDirector = "BackstageDirector";
     public const string JudgesVote = "JudgesVote";
     public const string AudienceVote = "AudienceVote";
+    public const string MainDisplay = "MainDisplay";
+    public const string BackstagePrompt = "BackstagePrompt";
+    public const string FrontstagePrompt = "FrontstagePrompt";
+    public const string HostPrompt = "HostPrompt";
+    public const string Judges = "Judges";
+    public const string Voters = "Voters";
+    public const string TryOutsMainBoard = "TryOuts.MainBoard";
+    public const string TryOutsActDisplay = "TryOuts.ActDisplay";
+    public const string TryOutsJudgePage = "TryOuts.JudgePage";
 
     public static readonly string[] All =
     [
         MainBoard,
         BackstageDirector,
         JudgesVote,
-        AudienceVote
+        AudienceVote,
+        MainDisplay,
+        BackstagePrompt,
+        FrontstagePrompt,
+        HostPrompt,
+        Judges,
+        Voters,
+        TryOutsMainBoard,
+        TryOutsActDisplay,
+        TryOutsJudgePage
     ];
 }
 
@@ -150,6 +176,15 @@ public class TalentShowDeviceAssignment
     public string PairingCode { get; set; } = string.Empty;
     public string SessionCode { get; set; } = string.Empty;
     public string DisplayRole { get; set; } = string.Empty;
+}
+
+public class TalentShowDisplayCommand
+{
+    public string SessionCode { get; set; } = string.Empty;
+    public string TargetRole { get; set; } = string.Empty;
+    public string Command { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }
 
 public class TalentShowVoteSubmission

@@ -175,6 +175,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 			.HasMaxLength(254);
 
 		builder.Entity<TalentShowSignup>()
+			.Property(ts => ts.MusicUrl)
+			.HasMaxLength(600);
+
+		builder.Entity<TalentShowSignup>()
 			.Property(ts => ts.Status)
 			.HasMaxLength(40);
 
@@ -200,6 +204,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		builder.Entity<TalentShowTryOutEntry>()
 			.Property(te => te.ActTitle)
 			.HasMaxLength(120);
+
+		builder.Entity<TalentShowTryOutEntry>()
+			.Property(te => te.MusicUrl)
+			.HasMaxLength(600);
 
 		builder.Entity<TalentShowTryOutEntry>()
 			.Property(te => te.Status)

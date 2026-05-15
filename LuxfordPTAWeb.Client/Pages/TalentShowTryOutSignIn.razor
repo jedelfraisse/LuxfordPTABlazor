@@ -1,0 +1,336 @@
+@page "/talent-show/tryouts/signin/{eventId:int}"
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.WebUtilities
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Try-Outs Sign-In</PageTitle>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Try-Outs Sign-In</h3>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="LoadEntriesAsync">Refresh</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-6">
+            <label class="form-label form-label-sm">Session</label>
+            <select class="form-select" @bind="selectedSessionId" @bind:after="OnSessionChangedAsync">
+                <option value="">Select a session...</option>
+                @foreach (var sessionId in AvailableSessionIds())
+                {
+                    <option value="@sessionId">@sessionId</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <div class="text-muted small">
+                Live sync: <span class="badge @(isHubConnected ? "bg-success" : "bg-secondary")">@(isHubConnected ? "Connected" : "Disconnected")</span>
+            </div>
+        </div>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(selectedSessionId))
+    {
+        <div class="alert alert-warning">Select a session to manage check-ins.</div>
+    }
+    else if (isLoading)
+    {
+        <div class="alert alert-info"><em>Loading sign-ins...</em></div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Waiting Check-In</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Performer(s)</th>
+                                <th>Act</th>
+                                <th style="width: 180px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in WaitingEntries())
+                            {
+                                <tr>
+                                    <td>@entry.PerformerNames</td>
+                                    <td>@entry.ActTitle</td>
+                                    <td>
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="@(() => CheckInAsync(entry))">Check-In</button>
+                                    </td>
+                                </tr>
+                            }
+                            @if (!WaitingEntries().Any())
+                            {
+                                <tr><td colspan="3" class="text-muted">No students waiting for check-in.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header fw-semibold">Checked In (StandBy)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Performer(s)</th>
+                                <th>Act</th>
+                                <th>Checked In</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in StandByEntries())
+                            {
+                                <tr>
+                                    <td>@entry.PerformerNames</td>
+                                    <td>@entry.ActTitle</td>
+                                    <td>@(entry.CheckInTimestamp?.ToLocalTime().ToString("g") ?? "-")</td>
+                                </tr>
+                            }
+                            @if (!StandByEntries().Any())
+                            {
+                                <tr><td colspan="3" class="text-muted">No students currently checked in.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int eventId { get; set; }
+
+    private List<TalentShowTryOutEntry> entries = [];
+    private TalentShowTryOutsConfigDTO config = new();
+    private string selectedSessionId = string.Empty;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private HubConnection? hubConnection;
+    private bool isHubConnected;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        selectedSessionId = GetSessionFromQuery();
+        await LoadConfigAsync();
+        await LoadEntriesAsync();
+        await EnsureHubConnectionAsync();
+        await JoinCurrentSessionAsync();
+    }
+
+    private string GetSessionFromQuery()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        return query.TryGetValue("sessionId", out var value) ? value.ToString().Trim() : string.Empty;
+    }
+
+    private async Task LoadConfigAsync()
+    {
+        config = await Http.GetFromJsonAsync<TalentShowTryOutsConfigDTO>($"/api/talentshow/{eventId}/tryouts/configure") ?? new();
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            entries = await Http.GetFromJsonAsync<List<TalentShowTryOutEntry>>($"/api/talentshow/{eventId}/tryouts/entries") ?? [];
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading entries: {ex.Message}";
+            entries = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private IEnumerable<string> AvailableSessionIds()
+    {
+        var configSessions = config.Sessions
+            .Select(s => s.SessionId?.Trim() ?? string.Empty)
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        var entrySessions = entries
+            .Select(e => e.SessionLabel?.Trim() ?? string.Empty)
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        return configSessions.Concat(entrySessions).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s);
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> ActiveSessionEntries()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return [];
+        }
+
+        return entries.Where(e => string.Equals(e.SessionLabel?.Trim() ?? string.Empty, selectedSessionId.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.CreatedAtUtc);
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> WaitingEntries()
+        => ActiveSessionEntries().Where(e => e.Status == TalentShowTryOutEntryStatus.Invited);
+
+    private IEnumerable<TalentShowTryOutEntry> StandByEntries()
+        => ActiveSessionEntries().Where(e => e.Status == TalentShowTryOutEntryStatus.StandBy);
+
+    private async Task CheckInAsync(TalentShowTryOutEntry entry)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            var update = new TalentShowTryOutEntryUpsertDTO
+            {
+                SignupId = entry.SignupId,
+                PerformerNames = entry.PerformerNames,
+                ActTitle = entry.ActTitle,
+                MusicUrl = entry.MusicUrl,
+                PickupAdult = entry.PickupAdult,
+                SlotTime = entry.SlotTime,
+                CheckInTimestamp = entry.CheckInTimestamp ?? DateTime.UtcNow,
+                SessionLabel = selectedSessionId.Trim(),
+                Notes = entry.Notes,
+                Scores = string.IsNullOrWhiteSpace(entry.ScoresJson) ? [] : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowTryOutScoreDTO>>(entry.ScoresJson) ?? [],
+                JudgeCompletions = string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson) ? [] : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowJudgeCompletionDTO>>(entry.JudgeCompletionsJson) ?? [],
+                Status = TalentShowTryOutEntryStatus.StandBy,
+                Selected = entry.Selected
+            };
+
+            var response = await Http.PutAsJsonAsync($"/api/talentshow/{eventId}/tryouts/entries/{entry.Id}", update);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            await LoadEntriesAsync();
+            await PublishTryOutStateAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error during check-in: {ex.Message}";
+        }
+    }
+
+    private async Task OnSessionChangedAsync()
+    {
+        await JoinCurrentSessionAsync();
+        await PublishTryOutStateAsync();
+    }
+
+    private string BuildSessionCode()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return string.Empty;
+        }
+
+        var raw = $"TRYOUT-{eventId}-{selectedSessionId.Trim()}";
+        return new string(raw.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", async incomingState =>
+        {
+            if (!string.Equals(incomingState.SessionCode, BuildSessionCode(), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            await LoadEntriesAsync();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        isHubConnected = hubConnection.State == HubConnectionState.Connected;
+    }
+
+    private async Task JoinCurrentSessionAsync()
+    {
+        var sessionCode = BuildSessionCode();
+        if (hubConnection == null || string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("JoinSession", sessionCode);
+    }
+
+    private async Task PublishTryOutStateAsync()
+    {
+        var sessionCode = BuildSessionCode();
+        if (hubConnection == null || string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        var active = ActiveSessionEntries().ToList();
+        var ordered = new List<TalentShowTryOutEntry>();
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.Performing));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.OnDeck));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.StandBy));
+        ordered.AddRange(active.Where(e => e.Status == TalentShowTryOutEntryStatus.Completed));
+
+        var state = new TalentShowRealtimeState
+        {
+            ShowName = $"Try-Outs: {selectedSessionId.Trim()}",
+            SessionCode = sessionCode,
+            CurrentState = TalentShowLifecycleState.TryOuts,
+            OverallState = TalentShowOverallState.Live,
+            LiveSubState = TalentShowLiveSubState.ActShow,
+            NextLiveSubState = TalentShowLiveSubState.ActShow,
+            IsLiveMode = true,
+            CurrentIndex = ordered.Any() ? 0 : -1,
+            Items = ordered.Select((entry, idx) => new TalentShowScheduleItem
+            {
+                Order = idx + 1,
+                PerformerName = entry.PerformerNames,
+                ActTitle = entry.ActTitle,
+                Category = entry.Status,
+                IntroLine = entry.SessionLabel,
+                OutroLine = entry.Notes
+            }).ToList(),
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        await hubConnection.InvokeAsync("PublishState", state);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

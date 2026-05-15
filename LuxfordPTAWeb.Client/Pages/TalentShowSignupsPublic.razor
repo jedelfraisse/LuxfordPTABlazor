@@ -90,6 +90,16 @@ else
                         <label class="form-label">Media upload link or path (optional)</label>
                         <input class="form-control" @bind="submission.MediaUpload" />
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Music/Track URL (optional)</label>
+                        <input type="url" class="form-control" @bind="submission.MusicUrl" placeholder="https://example.com/music.mp3" />
+                        <small class="form-text text-muted">Link to background music or track for your act (if applicable)</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Authorized Pickup Adult (optional)</label>
+                        <input class="form-control" @bind="submission.PickupAdult" placeholder="Name of adult authorized for pickup" />
+                        <small class="form-text text-muted">Name of adult who can pick up student after event (if different from contact)</small>
+                    </div>
                 </div>
 
                 @if (!string.IsNullOrWhiteSpace(formError))

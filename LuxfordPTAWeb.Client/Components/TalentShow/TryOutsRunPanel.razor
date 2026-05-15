@@ -1,13 +1,15 @@
 @using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Models
+@using Microsoft.AspNetCore.SignalR.Client
 @inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="text-warning mb-0"><i class="bi bi-list-check"></i> Try-Out Queue</h6>
+        <h6 class="text-warning mb-0"><i class="bi bi-list-check"></i> Try-Out Session Workspace</h6>
         <a class="btn btn-outline-secondary btn-sm" href="@($"/admin/eventcontrols/talent-show-director/{EventId}/subevents/tryouts/configure")">Go to Configure</a>
     </div>
-    <p class="text-muted">Manage invited performers, update try-out status, and mark selections for the show.</p>
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
@@ -16,134 +18,358 @@
 
     @if (isLoading)
     {
-        <div class="alert alert-info"><em>Loading try-out entries...</em></div>
+        <div class="alert alert-info"><em>Loading try-out data...</em></div>
+    }
+    else if (string.IsNullOrWhiteSpace(selectedSessionId))
+    {
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Try-Out Sessions</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Location</th>
+                                <th style="width: 160px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var session in OrderedSessions())
+                            {
+                                <tr>
+                                    <td>@FormatDateOnly(session.Date)</td>
+                                    <td>@FormatTimeOnly(session.StartTime)</td>
+                                    <td>@FormatTimeOnly(session.EndTime)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(session.Location) ? "-" : session.Location)</td>
+                                    <td>
+                                        <button class="btn btn-outline-primary btn-sm" @onclick="() => ActivateSessionAsync(session.SessionId)">Activate</button>
+                                    </td>
+                                </tr>
+                            }
+                            @if (!OrderedSessions().Any())
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-muted text-center py-3">No sessions configured yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     }
     else
     {
-        @if (!entries.Any())
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                    <div>
+                        <div class="fw-semibold">Active Session</div>
+                        <div>@FormatDateOnly(ActiveSessionConfig()?.Date) @FormatTimeOnly(ActiveSessionConfig()?.StartTime) - @FormatTimeOnly(ActiveSessionConfig()?.EndTime)</div>
+                        <div class="text-muted">@(string.IsNullOrWhiteSpace(ActiveSessionConfig()?.Location) ? "-" : ActiveSessionConfig()!.Location)</div>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="DoneSessionAsync">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Total Sign-Ups</div>
+                        <div class="fs-4 fw-semibold">@ActiveSessionEntries().Count()</div>
+                        <div class="small text-muted mt-1">Invited to Try-Outs: @InvitedCount()</div>
+                        <div class="small text-muted">Approved: @ApprovedCount()</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small"># Checked In</div>
+                        <div class="fs-4 fw-semibold">@CheckedInCount()</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="text-muted small"># Completed</div>
+                        <div class="fs-4 fw-semibold">@CompletedCount()</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-md-6">
+                <div class="card border-primary h-100">
+                    <div class="card-header bg-primary-subtle fw-semibold">Current Performer</div>
+                    <div class="card-body">
+                        @if (CurrentPerformer() is { } currentPerformer)
+                        {
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                <div>
+                                    <div class="fw-semibold">@currentPerformer.PerformerNames</div>
+                                    <div class="text-muted">@currentPerformer.ActTitle</div>
+                                </div>
+                                <span class="badge bg-primary">@currentPerformer.Status</span>
+                            </div>
+                            <div class="mt-2">
+                                <div><strong>Music URL:</strong> @(string.IsNullOrWhiteSpace(currentPerformer.MusicUrl) ? "None" : currentPerformer.MusicUrl)</div>
+                                <div class="small mt-1"><strong>Judge Completion:</strong> @RenderJudgeStatusText(currentPerformer)</div>
+                                <div class="small mt-1"><strong>Display Status:</strong> @RenderDisplayStatusText()</div>
+                            </div>
+                            <textarea class="form-control form-control-sm mt-2" rows="2" @bind="currentPerformer.Notes" placeholder="Notes"></textarea>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label form-label-sm mb-1">Audio Output</label>
+                                    <select class="form-select form-select-sm" @bind="audioOutputMode">
+                                        <option value="director">Director Computer</option>
+                                        <option value="display">Display Device</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label form-label-sm mb-1">Volume (%)</label>
+                                    <input type="number" class="form-control form-control-sm" min="0" max="100" @bind="displayVolumePercent" />
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12">
+                                    <label class="form-label form-label-sm mb-1">Act Video URL</label>
+                                    <input class="form-control form-control-sm" @bind="videoCommandUrl" placeholder="https://..." />
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SendPlaySongCommandAsync(currentPerformer))" disabled="@string.IsNullOrWhiteSpace(currentPerformer.MusicUrl)">Play Song</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="SendStopSongCommandAsync">Stop Song</button>
+                                <button class="btn btn-outline-info btn-sm" @onclick="SendStartTimerCommandAsync">Start Timer</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="SendResetTimerCommandAsync">Reset Timer</button>
+                                <button class="btn btn-outline-primary btn-sm" @onclick="SendPlayVideoCommandAsync" disabled="@string.IsNullOrWhiteSpace(videoCommandUrl)">Play Video</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="SendStopVideoCommandAsync">Stop Video</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="SendSetVolumeCommandAsync">Set Volume</button>
+                                <button class="btn btn-outline-success btn-sm" @onclick="@(() => SetStatusAsync(currentPerformer, TalentShowTryOutEntryStatus.Completed))">Complete Act</button>
+                                <button class="btn btn-outline-info btn-sm" @onclick="PromptNextActAsync">Prompt Next Act</button>
+                                <button class="btn btn-outline-dark btn-sm" @onclick="@(() => SaveDetailsAsync(currentPerformer))">Save</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">No performer is currently in Performing status.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-info h-100">
+                    <div class="card-header bg-info-subtle fw-semibold">On Deck</div>
+                    <div class="card-body">
+                        @if (OnDeckPerformer() is { } onDeckPerformer)
+                        {
+                            <div class="fw-semibold">@onDeckPerformer.PerformerNames</div>
+                            <div class="text-muted">@onDeckPerformer.ActTitle</div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">No performer is currently On Deck.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="auto-standby-ondeck" @bind="autoMoveStandByToOnDeck" @bind:after="EvaluateAutoMovesAsync" />
+                <label class="form-check-label" for="auto-standby-ondeck">Auto move StandBy -> OnDeck</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="auto-ondeck-performing" @bind="autoMoveOnDeckToPerforming" @bind:after="EvaluateAutoMovesAsync" />
+                <label class="form-check-label" for="auto-ondeck-performing">Auto move OnDeck -> Performing</label>
+            </div>
+        </div>
+
+        <ul class="nav nav-pills mb-2">
+            <li class="nav-item">
+                <button class="nav-link @(queueTab == "standby" ? "active" : string.Empty)" @onclick="@(() => queueTab = "standby")">StandBy</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(queueTab == "completed" ? "active" : string.Empty)" @onclick="@(() => queueTab = "completed")">Completed</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(queueTab == "notcheckedin" ? "active" : string.Empty)" @onclick="@(() => queueTab = "notcheckedin")">Not Checked In</button>
+            </li>
+        </ul>
+
+        @if (queueTab == "standby")
         {
-            <div class="alert alert-light border">No try-out entries yet.</div>
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">StandBy List</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Performer(s)</th>
+                                    <th>Act</th>
+                                    <th>Checked In</th>
+                                    <th style="width: 300px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in StandByEntries())
+                                {
+                                    <tr>
+                                        <td>@entry.PerformerNames</td>
+                                        <td>@entry.ActTitle</td>
+                                        <td>@FormatDate(entry.CheckInTimestamp)</td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.OnDeck))">Put On Deck</button>
+                                                <button class="btn btn-outline-warning btn-sm" @onclick="@(() => CheckOutAsync(entry))">Check-Out</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!StandByEntries().Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center py-3">No stand-by entries.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (queueTab == "completed")
+        {
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Completed</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Performer(s)</th>
+                                    <th>Act</th>
+                                    <th>Judge Completion</th>
+                                    <th style="width: 260px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in CompletedEntries())
+                                {
+                                    <tr>
+                                        <td>@entry.PerformerNames</td>
+                                        <td>@entry.ActTitle</td>
+                                        <td>@RenderJudgeStatusText(entry)</td>
+                                        <td>
+                                             <div class="d-flex flex-wrap gap-1">
+                                                 <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.StandBy))">Retry StandBy</button>
+                                                 <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.OnDeck))">Retry On Deck</button>
+                                                 <button class="btn btn-outline-success btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Approved))">Approve</button>
+                                                 <button class="btn btn-outline-danger btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Rejected))">Reject</button>
+                                             </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!CompletedEntries().Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center py-3">No completed entries.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th>Performer(s)</th>
-                            <th>Act</th>
-                            <th>Slot</th>
-                            <th>Session</th>
-                            <th>Status</th>
-                            <th>Selected</th>
-                            <th style="width: 360px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in entries)
-                        {
-                            <tr>
-                                <td>@entry.PerformerNames</td>
-                                <td>@entry.ActTitle</td>
-                                <td>@FormatSlot(entry.SlotTime)</td>
-                                <td>
-                                    <input class="form-control form-control-sm" @bind="entry.SessionLabel" placeholder="Session label" />
-                                    <textarea class="form-control form-control-sm mt-1" rows="2" @bind="entry.Notes" placeholder="Notes"></textarea>
-                                </td>
-                                <td><span class="badge bg-secondary">@entry.Status</span></td>
-                                <td>
-                                    @if (entry.Selected)
-                                    {
-                                        <span class="badge bg-success">Yes</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-light text-dark border">No</span>
-                                    }
-                                </td>
-                                <td>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Arrived))">Arrived</button>
-                                        <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Performing))">Performing</button>
-                                        <button class="btn btn-outline-success btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.Completed))">Completed</button>
-                                        <button class="btn btn-outline-secondary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.NoShow))">No-Show</button>
-                                        <button class="btn btn-outline-dark btn-sm" @onclick="@(() => SaveDetailsAsync(entry))">Save Details</button>
-                                        @if (!entry.Selected)
-                                        {
-                                            <button class="btn btn-success btn-sm" @onclick="@(() => SelectForShowAsync(entry))">Select for Show</button>
-                                        }
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Not Checked In</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Performer(s)</th>
+                                    <th>Act</th>
+                                    <th>Status</th>
+                                    <th style="width: 180px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in NotCheckedInEntries())
+                                {
+                                    <tr>
+                                        <td>@entry.PerformerNames</td>
+                                        <td>@entry.ActTitle</td>
+                                        <td>
+                                            <span class="badge @(entry.Status == TalentShowTryOutEntryStatus.Approved ? "bg-success" : "bg-secondary")">@entry.Status</span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="@(() => SetStatusAsync(entry, TalentShowTryOutEntryStatus.StandBy))">Check-In</button>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!NotCheckedInEntries().Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center py-3">Everyone is checked in.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         }
 
-        <div class="mt-3 d-flex justify-content-between align-items-center">
-            <button class="btn btn-outline-secondary btn-sm" @onclick="LoadEntriesAsync">Refresh</button>
-            @if (!string.IsNullOrWhiteSpace(successMessage))
-            {
-                <span class="text-success">@successMessage</span>
-            }
-        </div>
-
-        <hr />
-        <h6>Add Try-Out Entry (Walk-In or Manual)</h6>
-        <div class="row g-2">
-            <div class="col-md-6">
-                <input class="form-control form-control-sm" placeholder="Performer name(s)" @bind="newEntry.PerformerNames" />
-            </div>
-            <div class="col-md-6">
-                <input class="form-control form-control-sm" placeholder="Act title" @bind="newEntry.ActTitle" />
-            </div>
-            <div class="col-md-4">
-                <input class="form-control form-control-sm" placeholder="Session label" @bind="newEntry.SessionLabel" />
-            </div>
-            <div class="col-md-4">
-                <input type="datetime-local" class="form-control form-control-sm" @bind-value="newEntrySlotDateTime" @bind-value:format="yyyy-MM-ddTHH:mm" />
-            </div>
-            <div class="col-md-4">
-                <select class="form-select form-select-sm" @bind="newEntry.Status">
-                    @foreach (var status in TalentShowTryOutEntryStatus.All)
-                    {
-                        <option value="@status">@status</option>
-                    }
-                </select>
-            </div>
-            <div class="col-12">
-                <textarea class="form-control form-control-sm" rows="2" placeholder="Notes" @bind="newEntry.Notes"></textarea>
-            </div>
-            <div class="col-12">
-                <button class="btn btn-outline-primary btn-sm" @onclick="CreateEntryAsync" disabled="@isSaving">
-                    Add Try-Out Entry
-                </button>
-            </div>
-        </div>
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="mt-2 text-success">@successMessage</div>
+        }
     }
 </div>
 
 @code {
     [Parameter] public int EventId { get; set; }
+    [Parameter] public string? InitialTab { get; set; }
 
     private List<TalentShowTryOutEntry> entries = [];
-    private TalentShowTryOutEntryUpsertDTO newEntry = new()
-    {
-        Status = TalentShowTryOutEntryStatus.Scheduled
-    };
-    private DateTime? newEntrySlotDateTime;
+    private TalentShowTryOutsConfigDTO? config;
     private bool isLoading = true;
-    private bool isSaving;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
+    private string selectedSessionId = string.Empty;
+    private string queueTab = "standby";
+    private string audioOutputMode = "display";
+    private string videoCommandUrl = string.Empty;
+    private int displayVolumePercent = 80;
+    private bool autoMoveStandByToOnDeck;
+    private bool autoMoveOnDeckToPerforming;
+    private bool isEvaluatingAutoMoves;
+    private HubConnection? hubConnection;
+    private List<TalentShowConnectedDevice> connectedDevices = [];
 
     protected override async Task OnParametersSetAsync()
     {
         await LoadEntriesAsync();
+        await LoadConfigAsync();
+        await EnsureHubConnectionAsync();
     }
 
-    private async Task LoadEntriesAsync()
+    private async Task LoadEntriesAsync(bool publishState = true)
     {
         isLoading = true;
         errorMessage = string.Empty;
@@ -162,11 +388,238 @@
         {
             isLoading = false;
         }
+
+        if (publishState)
+        {
+            await PublishTryOutStateAsync();
+        }
+
+        await EvaluateAutoMovesAsync();
     }
+
+    private async Task LoadConfigAsync()
+    {
+        try
+        {
+            config = await Http.GetFromJsonAsync<TalentShowTryOutsConfigDTO>($"/api/talentshow/{EventId}/tryouts/configure")
+                ?? new();
+            if (string.IsNullOrWhiteSpace(selectedSessionId) && !string.IsNullOrWhiteSpace(config.ActiveSessionId))
+            {
+                selectedSessionId = config.ActiveSessionId.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedSessionId) &&
+                !AvailableSessionIds().Any(sessionId => sessionId.Equals(selectedSessionId, StringComparison.OrdinalIgnoreCase)))
+            {
+                selectedSessionId = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading try-out configuration: {ex.Message}";
+        }
+    }
+
+    private IEnumerable<string> AvailableSessionIds()
+    {
+        var configSessionIds = config?.Sessions
+            .Select(session => session.SessionId?.Trim() ?? string.Empty)
+            .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId))
+            ?? Enumerable.Empty<string>();
+
+        var entrySessionIds = entries
+            .Select(entry => entry.SessionLabel?.Trim() ?? string.Empty)
+            .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId));
+
+        return configSessionIds
+            .Concat(entrySessionIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(sessionId => sessionId);
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> ActiveSessionEntries()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return [];
+        }
+
+        var normalized = selectedSessionId.Trim();
+        return entries
+            .Where(entry => IsEntryInActiveSession(entry, normalized))
+            .OrderBy(entry => entry.CheckInTimestamp ?? DateTime.MaxValue)
+            .ThenBy(entry => entry.CreatedAtUtc)
+            .ThenBy(entry => entry.PerformerNames);
+    }
+
+    private static bool IsEntryInActiveSession(TalentShowTryOutEntry entry, string activeSessionId)
+    {
+        var entrySession = entry.SessionLabel?.Trim() ?? string.Empty;
+        if (entrySession.Equals(activeSessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(entrySession))
+        {
+            return false;
+        }
+
+        // Legacy/test data can have invited records without a session label.
+        // Keep them visible so they can be checked in to the active session.
+        return entry.Status == TalentShowTryOutEntryStatus.Invited;
+    }
+
+    private TalentShowTryOutSessionDTO? ActiveSessionConfig()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId) || config == null)
+        {
+            return null;
+        }
+
+        return config.Sessions.FirstOrDefault(session =>
+            string.Equals(session.SessionId?.Trim(), selectedSessionId.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IEnumerable<TalentShowTryOutSessionDTO> OrderedSessions()
+    {
+        return (config?.Sessions
+            .OrderBy(session => session.Date ?? DateOnly.MaxValue)
+            .ThenBy(session => session.StartTime ?? TimeOnly.MaxValue)
+            .ThenBy(session => session.SessionId)
+            .ToList()) ?? [];
+    }
+
+    private async Task ActivateSessionAsync(string? sessionId)
+    {
+        selectedSessionId = sessionId?.Trim() ?? string.Empty;
+        queueTab = "standby";
+        await SaveActiveSessionAsync(selectedSessionId);
+        await AssignRoleDisplaysToActiveSessionAsync();
+        await PublishTryOutStateAsync();
+    }
+
+    private async Task DoneSessionAsync()
+    {
+        var sessionCode = BuildTryOutSessionCode();
+        await ClearSessionAssignmentsAsync(sessionCode);
+        selectedSessionId = string.Empty;
+        queueTab = "standby";
+        await SaveActiveSessionAsync(string.Empty);
+        if (hubConnection != null && !string.IsNullOrWhiteSpace(sessionCode))
+        {
+            await hubConnection.InvokeAsync("ClearSession", sessionCode);
+        }
+    }
+
+    private async Task SaveActiveSessionAsync(string? sessionId)
+    {
+        if (config == null)
+        {
+            return;
+        }
+
+        config.ActiveSessionId = string.IsNullOrWhiteSpace(sessionId)
+            ? string.Empty
+            : sessionId.Trim();
+
+        var response = await Http.PutAsJsonAsync($"/api/talentshow/{EventId}/tryouts/configure", config);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to save active try-out session." : body;
+        }
+    }
+
+    private async Task AssignRoleDisplaysToActiveSessionAsync()
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var sessionCode = BuildTryOutSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        foreach (var device in connectedDevices.Where(d => !string.IsNullOrWhiteSpace(d.AssignedDisplayRole)))
+        {
+            await hubConnection.InvokeAsync("AssignDeviceToSession", device.PairingCode, sessionCode, device.AssignedDisplayRole);
+        }
+    }
+
+    private async Task ClearSessionAssignmentsAsync(string sessionCode)
+    {
+        if (hubConnection == null || string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        foreach (var device in connectedDevices.Where(d =>
+                     d.AssignedSessionCode.Equals(sessionCode, StringComparison.OrdinalIgnoreCase) &&
+                     !string.IsNullOrWhiteSpace(d.AssignedDisplayRole)))
+        {
+            await hubConnection.InvokeAsync("ClearDeviceSessionAssignment", device.PairingCode);
+        }
+    }
+
+    private TalentShowTryOutEntry? CurrentPerformer()
+        => ActiveSessionEntries().FirstOrDefault(entry => entry.Status == TalentShowTryOutEntryStatus.Performing);
+
+    private IEnumerable<TalentShowTryOutEntry> StandByEntries()
+        => ActiveSessionEntries().Where(entry => entry.Status == TalentShowTryOutEntryStatus.StandBy);
+
+    private IEnumerable<TalentShowTryOutEntry> WaitingCheckInEntries()
+        => ActiveSessionEntries().Where(entry => entry.Status == TalentShowTryOutEntryStatus.Invited);
+
+    private IEnumerable<TalentShowTryOutEntry> NotCheckedInEntries()
+    {
+        return ActiveSessionEntries()
+            .Where(entry =>
+                entry.Status == TalentShowTryOutEntryStatus.Invited ||
+                (entry.Status == TalentShowTryOutEntryStatus.Approved && IsApprovedTryOutEligibleForCheckIn(entry)))
+            .OrderBy(entry => entry.Status == TalentShowTryOutEntryStatus.Invited ? 0 : 1)
+            .ThenBy(entry => entry.CreatedAtUtc)
+            .ThenBy(entry => entry.PerformerNames);
+    }
+
+    private IEnumerable<TalentShowTryOutEntry> CompletedEntries()
+        => ActiveSessionEntries().Where(entry => entry.Status == TalentShowTryOutEntryStatus.Completed);
+
+    private int InvitedCount()
+        => ActiveSessionEntries().Count(entry => entry.Status == TalentShowTryOutEntryStatus.Invited);
+
+    private int ApprovedCount()
+        => ActiveSessionEntries().Count(entry =>
+            entry.Status == TalentShowTryOutEntryStatus.Approved &&
+            IsApprovedTryOutEligibleForCheckIn(entry));
+
+    private static bool IsApprovedTryOutEligibleForCheckIn(TalentShowTryOutEntry entry)
+    {
+        if (entry.CheckInTimestamp.HasValue)
+        {
+            return false;
+        }
+
+        var hasScoring = !string.IsNullOrWhiteSpace(entry.ScoresJson);
+        var hasJudgeCompletions = !string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson);
+        return !hasScoring && !hasJudgeCompletions;
+    }
+
+    private int CheckedInCount()
+        => ActiveSessionEntries().Count(entry =>
+            entry.CheckInTimestamp.HasValue ||
+            entry.Status is TalentShowTryOutEntryStatus.StandBy or TalentShowTryOutEntryStatus.OnDeck or TalentShowTryOutEntryStatus.Performing or TalentShowTryOutEntryStatus.Completed or TalentShowTryOutEntryStatus.Approved or TalentShowTryOutEntryStatus.Rejected);
+
+    private int CompletedCount()
+        => ActiveSessionEntries().Count(entry =>
+            entry.Status is TalentShowTryOutEntryStatus.Completed or TalentShowTryOutEntryStatus.Approved or TalentShowTryOutEntryStatus.Rejected);
 
     private async Task SetStatusAsync(TalentShowTryOutEntry entry, string status)
     {
-        await UpdateEntryAsync(entry, status, entry.Selected);
+        await UpdateEntryAsync(entry, status, status == TalentShowTryOutEntryStatus.Approved || entry.Selected);
     }
 
     private async Task SaveDetailsAsync(TalentShowTryOutEntry entry)
@@ -174,12 +627,66 @@
         await UpdateEntryAsync(entry, entry.Status, entry.Selected);
     }
 
-    private async Task SelectForShowAsync(TalentShowTryOutEntry entry)
+    private async Task CheckOutAsync(TalentShowTryOutEntry entry)
     {
-        await UpdateEntryAsync(entry, TalentShowTryOutEntryStatus.Completed, true);
+        await UpdateEntryAsync(entry, TalentShowTryOutEntryStatus.Invited, entry.Selected, clearCheckInTimestamp: true);
     }
 
-    private async Task UpdateEntryAsync(TalentShowTryOutEntry entry, string status, bool selected)
+    private async Task PromptNextActAsync()
+    {
+        var firstStandBy = StandByEntries().FirstOrDefault();
+        if (firstStandBy == null)
+        {
+            successMessage = "No stand-by entries are available to prompt next.";
+            return;
+        }
+
+        await SetStatusAsync(firstStandBy, TalentShowTryOutEntryStatus.OnDeck);
+    }
+
+    private TalentShowTryOutEntry? OnDeckPerformer()
+        => ActiveSessionEntries().FirstOrDefault(entry => entry.Status == TalentShowTryOutEntryStatus.OnDeck);
+
+    private async Task EvaluateAutoMovesAsync()
+    {
+        if (isEvaluatingAutoMoves || string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return;
+        }
+
+        if (!autoMoveStandByToOnDeck && !autoMoveOnDeckToPerforming)
+        {
+            return;
+        }
+
+        isEvaluatingAutoMoves = true;
+        try
+        {
+            if (autoMoveStandByToOnDeck && OnDeckPerformer() == null)
+            {
+                var standby = StandByEntries().FirstOrDefault();
+                if (standby != null)
+                {
+                    await UpdateEntryAsync(standby, TalentShowTryOutEntryStatus.OnDeck, standby.Selected);
+                }
+            }
+
+            if (autoMoveOnDeckToPerforming && CurrentPerformer() == null)
+            {
+                var onDeck = OnDeckPerformer();
+                if (onDeck != null)
+                {
+                    await UpdateEntryAsync(onDeck, TalentShowTryOutEntryStatus.Performing, onDeck.Selected);
+                }
+            }
+        }
+        finally
+        {
+            isEvaluatingAutoMoves = false;
+        }
+    }
+
+    private async Task UpdateEntryAsync(TalentShowTryOutEntry entry, string status, bool selected, bool clearCheckInTimestamp = false)
     {
         errorMessage = string.Empty;
         successMessage = string.Empty;
@@ -191,9 +698,22 @@
                 SignupId = entry.SignupId,
                 PerformerNames = entry.PerformerNames,
                 ActTitle = entry.ActTitle,
+                MusicUrl = entry.MusicUrl,
+                PickupAdult = entry.PickupAdult,
                 SlotTime = entry.SlotTime,
-                SessionLabel = entry.SessionLabel,
+                CheckInTimestamp = status == TalentShowTryOutEntryStatus.StandBy
+                    ? entry.CheckInTimestamp ?? DateTime.UtcNow
+                    : clearCheckInTimestamp ? null : entry.CheckInTimestamp,
+                SessionLabel = string.IsNullOrWhiteSpace(selectedSessionId)
+                    ? entry.SessionLabel
+                    : selectedSessionId.Trim(),
                 Notes = entry.Notes,
+                Scores = string.IsNullOrWhiteSpace(entry.ScoresJson)
+                    ? []
+                    : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowTryOutScoreDTO>>(entry.ScoresJson) ?? [],
+                JudgeCompletions = string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson)
+                    ? []
+                    : System.Text.Json.JsonSerializer.Deserialize<List<TalentShowJudgeCompletionDTO>>(entry.JudgeCompletionsJson) ?? [],
                 Status = status,
                 Selected = selected
             };
@@ -206,10 +726,9 @@
                 return;
             }
 
-            successMessage = selected
-                ? "Performer selected for show."
-                : $"Entry moved to {status}.";
+            successMessage = $"Entry moved to {status}.";
             await LoadEntriesAsync();
+            await PublishTryOutStateAsync();
         }
         catch (Exception ex)
         {
@@ -217,42 +736,214 @@
         }
     }
 
-    private async Task CreateEntryAsync()
+    private static string FormatDate(DateTime? value)
     {
-        isSaving = true;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
-        try
+        return value?.ToLocalTime().ToString("g") ?? "Not checked in";
+    }
+
+    private static string FormatDateOnly(DateOnly? value)
+        => value?.ToString("MMM d, yyyy") ?? "-";
+
+    private static string FormatTimeOnly(TimeOnly? value)
+        => value?.ToString("h:mm tt") ?? "-";
+
+    private static List<TalentShowJudgeCompletionDTO> ParseJudgeCompletions(TalentShowTryOutEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.JudgeCompletionsJson))
         {
-            newEntry.SlotTime = newEntrySlotDateTime;
-            var response = await Http.PostAsJsonAsync($"/api/talentshow/{EventId}/tryouts/entries", newEntry);
-            if (!response.IsSuccessStatusCode)
+            return [];
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<List<TalentShowJudgeCompletionDTO>>(entry.JudgeCompletionsJson) ?? [];
+    }
+
+    private string RenderJudgeStatusText(TalentShowTryOutEntry entry)
+    {
+        var completions = ParseJudgeCompletions(entry);
+        if (!completions.Any())
+        {
+            return "No judge updates yet";
+        }
+
+        return string.Join(", ", completions.Select(completion =>
+            $"{completion.JudgeId}: {(completion.Completed ? "Done" : "Pending")}"));
+    }
+
+    private string RenderDisplayStatusText()
+    {
+        var sessionCode = BuildTryOutSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return "No active session";
+        }
+
+        var displays = connectedDevices
+            .Where(device => device.AssignedSessionCode.Equals(sessionCode, StringComparison.OrdinalIgnoreCase))
+            .Select(device => $"{device.DisplayName} ({device.AssignedDisplayRole})")
+            .ToList();
+
+        return displays.Any() ? string.Join(", ", displays) : "No displays assigned";
+    }
+
+    private async Task SendPlaySongCommandAsync(TalentShowTryOutEntry entry)
+    {
+        if (audioOutputMode == "director")
+        {
+            successMessage = "Director audio mode selected. Use the provided music URL on the director machine.";
+            return;
+        }
+
+        await SendDisplayCommandAsync("play-song", entry.MusicUrl ?? string.Empty);
+    }
+
+    private Task SendStopSongCommandAsync()
+        => SendDisplayCommandAsync("stop-song");
+
+    private Task SendStartTimerCommandAsync()
+        => SendDisplayCommandAsync("start-timer");
+
+    private Task SendResetTimerCommandAsync()
+        => SendDisplayCommandAsync("reset-timer");
+
+    private Task SendPlayVideoCommandAsync()
+        => SendDisplayCommandAsync("play-video", videoCommandUrl.Trim());
+
+    private Task SendStopVideoCommandAsync()
+        => SendDisplayCommandAsync("stop-video");
+
+    private Task SendSetVolumeCommandAsync()
+        => SendDisplayCommandAsync("set-volume", (Math.Clamp(displayVolumePercent, 0, 100) / 100d).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private async Task SendDisplayCommandAsync(string command, string value = "")
+    {
+        if (hubConnection == null)
+        {
+            return;
+        }
+
+        var sessionCode = BuildTryOutSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        await hubConnection.InvokeAsync("SendDisplayCommand", sessionCode, TalentShowDisplayRole.TryOutsActDisplay, command, value);
+    }
+
+    private string BuildTryOutSessionCode()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return string.Empty;
+        }
+
+        var raw = $"TRYOUT-{EventId}-{selectedSessionId.Trim()}";
+        var normalized = new string(raw.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+        return string.IsNullOrWhiteSpace(normalized) ? $"TRYOUT{EventId}" : normalized;
+    }
+
+    private async Task EnsureHubConnectionAsync()
+    {
+        if (hubConnection != null)
+        {
+            return;
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/talent-show"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<List<TalentShowConnectedDevice>>("DeviceRegistryUpdated", devices =>
+        {
+            connectedDevices = devices ?? [];
+            InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<TalentShowRealtimeState>("ShowStateUpdated", async incomingState =>
+        {
+            var activeSessionCode = BuildTryOutSessionCode();
+            if (string.IsNullOrWhiteSpace(activeSessionCode) ||
+                !incomingState.SessionCode.Equals(activeSessionCode, StringComparison.OrdinalIgnoreCase))
             {
-                var body = await response.Content.ReadAsStringAsync();
-                errorMessage = string.IsNullOrWhiteSpace(body) ? "Failed to add try-out entry." : body;
                 return;
             }
 
-            newEntry = new TalentShowTryOutEntryUpsertDTO
-            {
-                Status = TalentShowTryOutEntryStatus.Scheduled
-            };
-            newEntrySlotDateTime = null;
-            successMessage = "Try-out entry added.";
-            await LoadEntriesAsync();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error adding try-out entry: {ex.Message}";
-        }
-        finally
-        {
-            isSaving = false;
-        }
+            await LoadEntriesAsync(false);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("SubscribeController");
+        connectedDevices = await hubConnection.InvokeAsync<List<TalentShowConnectedDevice>>("GetDeviceRegistry") ?? [];
     }
 
-    private static string FormatSlot(DateTime? value)
+    private async Task PublishTryOutStateAsync()
     {
-        return value?.ToLocalTime().ToString("g") ?? "Unscheduled";
+        if (hubConnection == null || string.IsNullOrWhiteSpace(selectedSessionId))
+        {
+            return;
+        }
+
+        var sessionCode = BuildTryOutSessionCode();
+        if (string.IsNullOrWhiteSpace(sessionCode))
+        {
+            return;
+        }
+
+        var activeEntries = ActiveSessionEntries().ToList();
+        var ordered = new List<TalentShowTryOutEntry>();
+        ordered.AddRange(activeEntries.Where(entry => entry.Status == TalentShowTryOutEntryStatus.Performing));
+        ordered.AddRange(activeEntries.Where(entry => entry.Status == TalentShowTryOutEntryStatus.OnDeck));
+        ordered.AddRange(activeEntries.Where(entry => entry.Status == TalentShowTryOutEntryStatus.StandBy));
+        ordered.AddRange(activeEntries.Where(entry => entry.Status == TalentShowTryOutEntryStatus.Completed));
+
+        var scheduleItems = ordered.Select((entry, index) => new TalentShowScheduleItem
+        {
+            Order = index + 1,
+            PerformerName = entry.PerformerNames,
+            ActTitle = entry.ActTitle,
+            Category = entry.Status,
+            DurationMinutes = 0,
+            IntroLine = entry.SessionLabel,
+            OutroLine = entry.Notes
+        }).ToList();
+
+        var state = new TalentShowRealtimeState
+        {
+            ShowName = $"Try-Outs: {selectedSessionId.Trim()}",
+            SessionCode = sessionCode,
+            CurrentState = TalentShowLifecycleState.TryOuts,
+            OverallState = TalentShowOverallState.Live,
+            LiveSubState = TalentShowLiveSubState.ActShow,
+            NextLiveSubState = TalentShowLiveSubState.ActShow,
+            IsLiveMode = true,
+            TryOutSessionEndUtc = ResolveTryOutSessionEndUtc(),
+            CurrentIndex = scheduleItems.Any() ? 0 : -1,
+            Items = scheduleItems,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        await hubConnection.InvokeAsync("PublishState", state);
+    }
+
+    private DateTime? ResolveTryOutSessionEndUtc()
+    {
+        var session = ActiveSessionConfig();
+        if (session?.Date == null || session.EndTime == null)
+        {
+            return null;
+        }
+
+        var date = session.Date.Value.ToDateTime(session.EndTime.Value);
+        return DateTime.SpecifyKind(date, DateTimeKind.Local).ToUniversalTime();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 }

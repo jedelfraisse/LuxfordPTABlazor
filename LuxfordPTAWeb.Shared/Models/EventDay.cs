@@ -33,6 +33,10 @@ public class EventDay
     // Weather and logistics
     public string WeatherBackupPlan { get; set; } = string.Empty; // Day-specific backup plan
     
+    // Try-outs integration
+    public bool IsFromTryOuts { get; set; } = false; // Generated from try-out sessions, read-only on event edit
+    public bool PublicVisibleFromTryOuts { get; set; } = false; // Whether to show on public event detail page
+    
     // Navigation properties for related entities (Phase 2 - commented out for now)
     // public ICollection<EventStation> Stations { get; set; } = new List<EventStation>();
     // public ICollection<EventScheduleItem> ScheduleItems { get; set; } = new List<EventScheduleItem>();
