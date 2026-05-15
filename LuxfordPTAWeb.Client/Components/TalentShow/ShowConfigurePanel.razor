@@ -127,11 +127,11 @@
                                     <label class="form-label">Option 2: Paste External URL</label>
                                     <input class="form-control" @bind="showConfig.ShowSettings.ShowBackgroundImageUrl" placeholder="https://example.com/image.jpg" />
                                 </div>
-                                @if (!string.IsNullOrWhiteSpace(showConfig.ShowSettings.ShowBackgroundImageUrl))
+                                @if (!string.IsNullOrWhiteSpace(GetBackgroundImagePreviewUrl()))
                                 {
                                     <div class="mt-2">
                                         <small class="text-muted">Preview:</small><br />
-                                        <img src="@showConfig.ShowSettings.ShowBackgroundImageUrl" style="max-width: 180px; max-height: 120px; border-radius: 4px; margin-top: 5px; object-fit: cover;" alt="Preview" onerror="this.style.display='none';" />
+                                        <img src="@GetBackgroundImagePreviewUrl()" style="max-width: 180px; max-height: 120px; border-radius: 4px; margin-top: 5px; object-fit: cover;" alt="Preview" onerror="this.style.display='none';" />
                                     </div>
                                 }
                             </div>
@@ -911,13 +911,11 @@
                 try
                 {
                     var content = await response.Content.ReadAsStringAsync();
-                    // Parse the JSON response to get the URL
-                    if (content.Contains("\"url\""))
+                    using var document = System.Text.Json.JsonDocument.Parse(content);
+                    if (document.RootElement.TryGetProperty("url", out var urlElement))
                     {
-                        var startIdx = content.IndexOf("\"url\":\"") + 7;
-                        var endIdx = content.IndexOf("\"", startIdx);
-                        var uploadedUrl = content.Substring(startIdx, endIdx - startIdx);
-                        showConfig.ShowSettings.ShowBackgroundImageUrl = uploadedUrl;
+                        var uploadedUrl = urlElement.GetString() ?? string.Empty;
+                        showConfig.ShowSettings.ShowBackgroundImageUrl = NormalizeBackgroundImageUrl(uploadedUrl);
                         backgroundUploadProgress = $"Uploaded: {file.Name}";
                     }
                 }
@@ -935,6 +933,28 @@
         {
             backgroundUploadError = $"Error: {ex.Message}";
         }
+    }
+
+    private string GetBackgroundImagePreviewUrl()
+    {
+        return NormalizeBackgroundImageUrl(showConfig.ShowSettings.ShowBackgroundImageUrl);
+    }
+
+    private static string NormalizeBackgroundImageUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = url.Trim();
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return trimmed.StartsWith('/') ? trimmed : "/" + trimmed.TrimStart('/');
     }
 
     private async Task SyncDisplayAssignmentsAsync()
