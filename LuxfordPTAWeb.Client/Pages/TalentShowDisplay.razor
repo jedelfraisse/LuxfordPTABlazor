@@ -13,7 +13,7 @@
 
 <PageTitle>Display</PageTitle>
 
-<div class="container-fluid py-4 @(isAssigned && !isDirectAudienceVoteMode ? "pb-5" : string.Empty)">
+<div class="container-fluid py-4 @(isAssigned && !isDirectAudienceVoteMode ? "pb-5" : string.Empty)" style="@GetDisplayStyle()">
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
             @if (isDirectAudienceVoteMode)
@@ -46,42 +46,9 @@
                     case TalentShowDisplayRole.MainDisplay:
                         <div class="card bg-dark text-light border-success mb-3 @state.Presentation.ThemeClass">
                             <div class="card-body">
-                                @if (IsSetupMode())
+                                @if (ShouldRenderMainStatusTemplate())
                                 {
-                                    <h2>Display Connected — Setup Mode</h2>
-                                    <p>Font size test text — The quick brown fox jumps over the lazy dog.</p>
-                                }
-                                else if (IsDoneStatus())
-                                {
-                                    <h2>Show Complete</h2>
-                                    <p>This display session has ended.</p>
-                                }
-                                else if (IsWrapUpStatus())
-                                {
-                                    <h2>Wrap-Up</h2>
-                                    <p>Thank you for attending!</p>
-                                }
-                                else if (IsStandByStatus())
-                                {
-                                    <h2>Show starting soon</h2>
-                                    <p>@state.Presentation.WelcomeMessage</p>
-                                    @if (GetReadySegment() is { } readySegment)
-                                    {
-                                        <p><strong>First Segment:</strong> @readySegment.ActTitle</p>
-                                    }
-                                    @if (TryGetOnDeckText() is { } onDeckText)
-                                    {
-                                        <p><strong>On Deck:</strong> @onDeckText</p>
-                                    }
-                                    @if (GetCountdownText() is { } countdownText)
-                                    {
-                                        <p><strong>Going Live In:</strong> @countdownText</p>
-                                    }
-                                }
-                                else if (state.CurrentState == TalentShowLifecycleState.PreShow)
-                                {
-                                    <h2>Welcome to the Talent Show!</h2>
-                                    <p>@state.Presentation.WelcomeMessage</p>
+                                    <div class="template-markdown">@((MarkupString)RenderMarkdownTemplate(GetMainStatusTemplateMarkdown()))</div>
                                 }
                                 else if (state.CurrentState == TalentShowLifecycleState.HostTalk)
                                 {
@@ -494,6 +461,9 @@
     private bool startupCompleted;
     private bool isPreviewMode;
     private bool mediaEnabled;
+    private decimal fontScale = 1.00m;
+    private decimal lineHeight = 1.40m;
+    private int displayPadding = 16;
     private string currentAudioUrl = string.Empty;
     private string currentVideoUrl = string.Empty;
     private DateTime? actTimerStartedAtUtc;
@@ -679,6 +649,15 @@
             await InvokeAsync(StateHasChanged);
         });
 
+        hubConnection.On<TalentShowDeviceDisplaySettings>("DeviceDisplaySettingsUpdated", async incomingSettings =>
+        {
+            fontScale = incomingSettings.FontScale;
+            lineHeight = incomingSettings.LineHeight;
+            displayPadding = incomingSettings.Padding;
+            await PersistDeviceRegistrationAsync();
+            await InvokeAsync(StateHasChanged);
+        });
+
         hubConnection.On<TalentShowDisplayCommand>("DisplayCommandReceived", async command =>
         {
             if (!isAssigned ||
@@ -728,6 +707,9 @@
         assignedRole = string.IsNullOrWhiteSpace(registration.AssignedDisplayRole)
             ? string.Empty
             : registration.AssignedDisplayRole;
+        fontScale = registration.FontScale;
+        lineHeight = registration.LineHeight;
+        displayPadding = registration.Padding;
         isAssigned = registration.IsAssigned;
         if (isAssigned)
         {
@@ -777,6 +759,9 @@
         {
             deviceNameInput = cache.DisplayName;
         }
+        fontScale = cache.FontScale <= 0 ? 1.00m : cache.FontScale;
+        lineHeight = cache.LineHeight <= 0 ? 1.40m : cache.LineHeight;
+        displayPadding = cache.Padding <= 0 ? 16 : cache.Padding;
 
         var assignedRoleFromStorage = await JS.InvokeAsync<string?>("localStorage.getItem", AssignedRoleStorageKey);
         if (!string.IsNullOrWhiteSpace(assignedRoleFromStorage))
@@ -791,7 +776,10 @@
         {
             DeviceId = deviceId,
             PairingCode = pairingCode,
-            DisplayName = deviceNameInput
+            DisplayName = deviceNameInput,
+            FontScale = fontScale,
+            LineHeight = lineHeight,
+            Padding = displayPadding
         };
 
         var json = System.Text.Json.JsonSerializer.Serialize(cache);
@@ -1117,6 +1105,129 @@
         return state.LiveStatus.Equals(TalentShowLiveStatus.Done, StringComparison.OrdinalIgnoreCase);
     }
 
+    private string GetDisplayStyle()
+    {
+        var safeScale = Math.Clamp(fontScale, 0.50m, 2.00m).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var safeLineHeight = Math.Clamp(lineHeight, 1.00m, 2.20m).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var safePadding = Math.Clamp(displayPadding, 0, 64);
+        var backgroundUrl = state.Presentation.BackgroundImageUrl;
+        var backgroundCss = string.IsNullOrWhiteSpace(backgroundUrl) ? string.Empty : $"background-image:url('{backgroundUrl}');background-size:cover;background-position:center;";
+        return $"font-size:{safeScale}rem;line-height:{safeLineHeight};padding:{safePadding}px;{backgroundCss}";
+    }
+
+    private bool ShouldRenderMainStatusTemplate()
+    {
+        return IsSetupMode() || IsReadyMode() || IsStandByStatus() || IsWrapUpStatus() || IsDoneStatus() || state.CurrentState == TalentShowLifecycleState.PreShow;
+    }
+
+    private string GetMainStatusTemplateMarkdown()
+    {
+        if (IsSetupMode()) return state.Presentation.SetupTemplateMarkdown;
+        if (IsReadyMode()) return state.Presentation.ReadyTemplateMarkdown;
+        if (IsStandByStatus()) return state.Presentation.StandByTemplateMarkdown;
+        if (IsWrapUpStatus()) return state.Presentation.WrapUpTemplateMarkdown;
+        if (IsDoneStatus()) return state.Presentation.DoneTemplateMarkdown;
+        return state.Presentation.PreShowTemplateMarkdown;
+    }
+
+    private string RenderMarkdownTemplate(string? markdown)
+    {
+        var template = string.IsNullOrWhiteSpace(markdown) ? "# Talent Show" : markdown;
+        var replaced = ReplaceTemplatePlaceholders(template);
+        var lines = replaced.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var htmlParts = new List<string>();
+        var inList = false;
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd();
+            if (line.StartsWith("- ", StringComparison.Ordinal))
+            {
+                if (!inList)
+                {
+                    htmlParts.Add("<ul>");
+                    inList = true;
+                }
+
+                htmlParts.Add($"<li>{ApplyInlineMarkdown(line[2..].Trim())}</li>");
+                continue;
+            }
+
+            if (inList)
+            {
+                htmlParts.Add("</ul>");
+                inList = false;
+            }
+
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
+                htmlParts.Add($"<h4>{ApplyInlineMarkdown(line[4..].Trim())}</h4>");
+            }
+            else if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                htmlParts.Add($"<h3>{ApplyInlineMarkdown(line[3..].Trim())}</h3>");
+            }
+            else if (line.StartsWith("# ", StringComparison.Ordinal))
+            {
+                htmlParts.Add($"<h2>{ApplyInlineMarkdown(line[2..].Trim())}</h2>");
+            }
+            else if (string.IsNullOrWhiteSpace(line))
+            {
+                htmlParts.Add("<br />");
+            }
+            else
+            {
+                htmlParts.Add($"<p>{ApplyInlineMarkdown(line)}</p>");
+            }
+        }
+
+        if (inList)
+        {
+            htmlParts.Add("</ul>");
+        }
+
+        return string.Join(string.Empty, htmlParts);
+    }
+
+    private static string ApplyInlineMarkdown(string line)
+    {
+        var encoded = System.Text.Encodings.Web.HtmlEncoder.Default.Encode(line);
+        return System.Text.RegularExpressions.Regex.Replace(
+            encoded,
+            "\\*\\*(.+?)\\*\\*",
+            "<strong>$1</strong>",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    }
+
+    private string ReplaceTemplatePlaceholders(string template)
+    {
+        var current = GetCurrentItem();
+        var countdown = GetCountdownText() ?? string.Empty;
+        var hosts = state.HostNames.Any() ? string.Join(", ", state.HostNames) : "Host Team";
+        var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["{{Title}}"] = state.ShowName,
+            ["{{Subtitle}}"] = state.Presentation.WelcomeMessage,
+            ["{{HostedBy}}"] = hosts,
+            ["{{SchoolName}}"] = "Luxford",
+            ["{{EventDate}}"] = DateTime.Now.ToString("MMMM d"),
+            ["{{EventTime}}"] = DateTime.Now.ToString("h:mm tt"),
+            ["{{Countdown}}"] = countdown,
+            ["{{Theme}}"] = state.Presentation.ThemeLabel,
+            ["{{ActTitle}}"] = current?.ActTitle ?? string.Empty,
+            ["{{PerformerNames}}"] = current?.PerformerName ?? string.Empty,
+            ["{{Duration}}"] = current == null ? string.Empty : $"{current.DurationMinutes:00}:00",
+            ["{{Background}}"] = state.Presentation.BackgroundImageUrl
+        };
+
+        var output = template;
+        foreach (var replacement in replacements)
+        {
+            output = output.Replace(replacement.Key, replacement.Value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return output;
+    }
+
     private bool IsActLiveSegment()
     {
         return state.LiveStatus.Equals(TalentShowLiveStatus.Live, StringComparison.OrdinalIgnoreCase) &&
@@ -1248,6 +1359,9 @@
         public string DeviceId { get; set; } = string.Empty;
         public string PairingCode { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
+        public decimal FontScale { get; set; } = 1.00m;
+        public decimal LineHeight { get; set; } = 1.40m;
+        public int Padding { get; set; } = 16;
     }
 
     private sealed class VoteDraftCache
@@ -1392,5 +1506,21 @@
         background: rgba(100, 100, 130, 0.5);
         color: #b8c0e0;
         border: 1px solid rgba(54, 211, 126, 0.3);
+    }
+
+    .template-markdown h2,
+    .template-markdown h3,
+    .template-markdown h4 {
+        margin-top: 0.25rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .template-markdown p {
+        margin-bottom: 0.45rem;
+    }
+
+    .template-markdown ul {
+        padding-left: 1.25rem;
+        margin-bottom: 0.5rem;
     }
 </style>

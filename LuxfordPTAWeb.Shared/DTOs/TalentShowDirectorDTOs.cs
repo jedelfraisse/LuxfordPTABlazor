@@ -348,6 +348,13 @@ public class TalentShowShowSettingsDTO
     public string ShowTheme { get; set; } = string.Empty;
     public int DefaultSegmentDurationSeconds { get; set; }
     public bool EnableSponsorRotation { get; set; }
+    public string SetupTemplateMarkdown { get; set; } = string.Empty;
+    public string ReadyTemplateMarkdown { get; set; } = string.Empty;
+    public string PreShowTemplateMarkdown { get; set; } = string.Empty;
+    public string StandByTemplateMarkdown { get; set; } = string.Empty;
+    public string LiveStartTemplateMarkdown { get; set; } = string.Empty;
+    public string WrapUpTemplateMarkdown { get; set; } = string.Empty;
+    public string DoneTemplateMarkdown { get; set; } = string.Empty;
 }
 
 public class TalentShowDisplayRoleAssignmentDTO

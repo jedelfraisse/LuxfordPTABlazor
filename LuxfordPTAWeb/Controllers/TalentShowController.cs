@@ -2657,7 +2657,16 @@ public class TalentShowController : ControllerBase
                 FooterMessage = config.ConfigStatus.Equals(TalentShowConfigStatus.Ready, StringComparison.OrdinalIgnoreCase)
                     ? "Ready Mode"
                     : "Setup Mode",
-                ThemeClass = config.ConfigStatus.Equals(TalentShowConfigStatus.Ready, StringComparison.OrdinalIgnoreCase) ? "theme-ready" : "theme-setup"
+                ThemeClass = config.ConfigStatus.Equals(TalentShowConfigStatus.Ready, StringComparison.OrdinalIgnoreCase) ? "theme-ready" : "theme-setup",
+                ThemeLabel = config.ShowSettings.ShowTheme,
+                BackgroundImageUrl = config.ShowSettings.ShowBackgroundImageUrl,
+                SetupTemplateMarkdown = config.ShowSettings.SetupTemplateMarkdown,
+                ReadyTemplateMarkdown = config.ShowSettings.ReadyTemplateMarkdown,
+                PreShowTemplateMarkdown = config.ShowSettings.PreShowTemplateMarkdown,
+                StandByTemplateMarkdown = config.ShowSettings.StandByTemplateMarkdown,
+                LiveStartTemplateMarkdown = config.ShowSettings.LiveStartTemplateMarkdown,
+                WrapUpTemplateMarkdown = config.ShowSettings.WrapUpTemplateMarkdown,
+                DoneTemplateMarkdown = config.ShowSettings.DoneTemplateMarkdown
             }
         };
     }
@@ -2702,6 +2711,13 @@ public class TalentShowController : ControllerBase
             .Select(category => category.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        normalized.ShowSettings.SetupTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.SetupTemplateMarkdown, "# Setup\nDisplay connected. Director is preparing the show.");
+        normalized.ShowSettings.ReadyTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.ReadyTemplateMarkdown, "# Ready\n{{Title}}\nHosted by {{HostedBy}}\nStarting soon.");
+        normalized.ShowSettings.PreShowTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.PreShowTemplateMarkdown, "# Pre-Show\nWelcome to {{Title}}");
+        normalized.ShowSettings.StandByTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.StandByTemplateMarkdown, "# Stand-By\nShow begins in {{Countdown}}");
+        normalized.ShowSettings.LiveStartTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.LiveStartTemplateMarkdown, "# Live\nNow on stage: {{ActTitle}}\n{{PerformerNames}}");
+        normalized.ShowSettings.WrapUpTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.WrapUpTemplateMarkdown, "# Wrap-Up\nThank you for supporting {{SchoolName}}.");
+        normalized.ShowSettings.DoneTemplateMarkdown = EnsureTemplateDefault(normalized.ShowSettings.DoneTemplateMarkdown, "# Done\nThe show has ended.");
 
         normalized.EnableJudgesVoting = normalized.ShowSettings.JudgesVotingEnabled;
         normalized.EnableAudienceVoting = normalized.ShowSettings.AudienceVotingEnabled;
@@ -2798,6 +2814,11 @@ public class TalentShowController : ControllerBase
         }
 
         return normalized;
+    }
+
+    private static string EnsureTemplateDefault(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
     }
 
     private static TalentShowReadinessValidationDTO ValidateShowReadiness(TalentShowShowConfigDTO config)

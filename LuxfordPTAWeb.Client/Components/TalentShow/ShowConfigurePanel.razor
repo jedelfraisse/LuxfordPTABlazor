@@ -153,6 +153,43 @@
             </div>
 
             <div class="card mb-3">
+                <div class="card-header fw-semibold">MainDisplay Status Templates (Markdown)</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Setup Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.SetupTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ready Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.ReadyTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Pre-Show Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.PreShowTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Stand-By Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.StandByTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Live Start Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.LiveStartTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Wrap-Up Template</label>
+                            <textarea class="form-control" rows="4" @bind="showConfig.ShowSettings.WrapUpTemplateMarkdown"></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Done Template</label>
+                            <textarea class="form-control" rows="3" @bind="showConfig.ShowSettings.DoneTemplateMarkdown"></textarea>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2">Placeholders: {{Title}}, {{HostedBy}}, {{SchoolName}}, {{EventDate}}, {{EventTime}}, {{Countdown}}, {{Theme}}, {{ActTitle}}, {{PerformerNames}}, {{Duration}}</small>
+                </div>
+            </div>
+
+            <div class="card mb-3">
                 <div class="card-header fw-semibold">Voting Options</div>
                 <div class="card-body">
                     <div class="row g-2">
@@ -616,11 +653,42 @@
                                                 <code>@device.PairingCode</code>
                                             </td>
                                             <td>
-                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => SaveConnectedDisplayAsync(device.PairingCode)" title="Save this display">
-                                                    Save
-                                                </button>
+                                                <div class="d-flex gap-1">
+                                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => SaveConnectedDisplayAsync(device.PairingCode)" title="Save this display">
+                                                        Save
+                                                    </button>
+                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => ToggleDeviceDetails(device.PairingCode)" title="Device details">
+                                                        Details
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
+                                        @if (IsDeviceDetailsVisible(device.PairingCode))
+                                        {
+                                            <tr>
+                                                <td colspan="5" class="bg-light">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-2">
+                                                            <label class="form-label form-label-sm">Font Scale</label>
+                                                            <input type="number" step="0.05" min="0.5" max="2.0" class="form-control form-control-sm" @bind="device.FontScale" />
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <label class="form-label form-label-sm">Line Height</label>
+                                                            <input type="number" step="0.05" min="1.0" max="2.2" class="form-control form-control-sm" @bind="device.LineHeight" />
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <label class="form-label form-label-sm">Padding (px)</label>
+                                                            <input type="number" min="0" max="64" class="form-control form-control-sm" @bind="device.Padding" />
+                                                        </div>
+                                                        <div class="col-md-6 d-flex align-items-end">
+                                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => SaveConnectedDisplayAsync(device.PairingCode)">
+                                                                Save Details
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
                                     }
                                 </tbody>
                             </table>
@@ -769,6 +837,7 @@
     private string successMessage = string.Empty;
     private string backgroundUploadProgress = string.Empty;
     private string backgroundUploadError = string.Empty;
+    private readonly HashSet<string> expandedDeviceDetails = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly List<string> DefaultScoringCategories = new()
     {
@@ -1414,6 +1483,7 @@
         {
             await hubConnection.InvokeAsync("UpdateDeviceDisplayName", pairingCode, device.DisplayName);
             await hubConnection.InvokeAsync("UpdateDeviceDisplayRole", pairingCode, role);
+            await hubConnection.InvokeAsync("UpdateDeviceDisplaySettings", pairingCode, device.FontScale, device.LineHeight, device.Padding);
             SetDisplayAssignment(role, pairingCode);
             successMessage = $"Saved {device.DisplayName}.";
         }
@@ -1421,6 +1491,23 @@
         {
             errorMessage = $"Error saving display: {ex.Message}";
         }
+    }
+
+    private void ToggleDeviceDetails(string pairingCode)
+    {
+        if (expandedDeviceDetails.Contains(pairingCode))
+        {
+            expandedDeviceDetails.Remove(pairingCode);
+        }
+        else
+        {
+            expandedDeviceDetails.Add(pairingCode);
+        }
+    }
+
+    private bool IsDeviceDetailsVisible(string pairingCode)
+    {
+        return expandedDeviceDetails.Contains(pairingCode);
     }
 
     private async Task EnsureHubConnectionAsync()

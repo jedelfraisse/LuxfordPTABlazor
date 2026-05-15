@@ -27,6 +27,15 @@ public class TalentShowPresentationSettings
     public string FooterMessage { get; set; } = string.Empty;
     public string IntermissionMessage { get; set; } = string.Empty;
     public string ThemeClass { get; set; } = string.Empty;
+    public string BackgroundImageUrl { get; set; } = string.Empty;
+    public string ThemeLabel { get; set; } = string.Empty;
+    public string SetupTemplateMarkdown { get; set; } = string.Empty;
+    public string ReadyTemplateMarkdown { get; set; } = string.Empty;
+    public string PreShowTemplateMarkdown { get; set; } = string.Empty;
+    public string StandByTemplateMarkdown { get; set; } = string.Empty;
+    public string LiveStartTemplateMarkdown { get; set; } = string.Empty;
+    public string WrapUpTemplateMarkdown { get; set; } = string.Empty;
+    public string DoneTemplateMarkdown { get; set; } = string.Empty;
 }
 
 public class TalentShowRealtimeState
@@ -148,6 +157,9 @@ public class TalentShowDeviceRegistrationResult
     public string DisplayName { get; set; } = string.Empty;
     public string AssignedSessionCode { get; set; } = string.Empty;
     public string AssignedDisplayRole { get; set; } = string.Empty;
+    public decimal FontScale { get; set; } = 1.00m;
+    public decimal LineHeight { get; set; } = 1.40m;
+    public int Padding { get; set; } = 16;
     public bool IsAssigned => !string.IsNullOrWhiteSpace(AssignedSessionCode);
 }
 
@@ -167,6 +179,9 @@ public class TalentShowConnectedDevice
     public string DisplayName { get; set; } = string.Empty;
     public string AssignedSessionCode { get; set; } = string.Empty;
     public string AssignedDisplayRole { get; set; } = string.Empty;
+    public decimal FontScale { get; set; } = 1.00m;
+    public decimal LineHeight { get; set; } = 1.40m;
+    public int Padding { get; set; } = 16;
     public DateTime LastSeenUtc { get; set; } = DateTime.UtcNow;
     public bool IsAssigned => !string.IsNullOrWhiteSpace(AssignedSessionCode);
 }
@@ -185,6 +200,13 @@ public class TalentShowDisplayCommand
     public string Command { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class TalentShowDeviceDisplaySettings
+{
+    public decimal FontScale { get; set; } = 1.00m;
+    public decimal LineHeight { get; set; } = 1.40m;
+    public int Padding { get; set; } = 16;
 }
 
 public class TalentShowVoteSubmission

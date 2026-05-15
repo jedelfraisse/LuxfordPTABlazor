@@ -148,6 +148,9 @@ public class TalentShowHub : Hub
             AssignedDisplayRole = persistedProfile?.AssignedDisplayRole
                 ?? existingDevice?.AssignedDisplayRole
                 ?? string.Empty,
+            FontScale = persistedProfile?.FontScale ?? existingDevice?.FontScale ?? 1.00m,
+            LineHeight = persistedProfile?.LineHeight ?? existingDevice?.LineHeight ?? 1.40m,
+            Padding = persistedProfile?.Padding ?? existingDevice?.Padding ?? 16,
             LastSeenUtc = DateTime.UtcNow
         };
 
@@ -167,7 +170,10 @@ public class TalentShowHub : Hub
             PairingCode = device.PairingCode,
             DisplayName = device.DisplayName,
             AssignedSessionCode = device.AssignedSessionCode,
-            AssignedDisplayRole = device.AssignedDisplayRole
+            AssignedDisplayRole = device.AssignedDisplayRole,
+            FontScale = device.FontScale,
+            LineHeight = device.LineHeight,
+            Padding = device.Padding
         };
     }
 
@@ -211,6 +217,33 @@ public class TalentShowHub : Hub
         DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
 
         await Clients.Client(device.ConnectionId).SendAsync("DeviceRoleUpdated", device.AssignedDisplayRole);
+        await BroadcastDeviceRegistryAsync();
+    }
+
+    public async Task UpdateDeviceDisplaySettings(string pairingCode, decimal fontScale, decimal lineHeight, int padding)
+    {
+        var normalizedPairingCode = NormalizePairingCode(pairingCode);
+        var device = DevicesByConnection.Values.FirstOrDefault(d =>
+            d.PairingCode.Equals(normalizedPairingCode, StringComparison.OrdinalIgnoreCase));
+
+        if (device == null)
+        {
+            throw new HubException("Device not found.");
+        }
+
+        device.FontScale = NormalizeFontScale(fontScale);
+        device.LineHeight = NormalizeLineHeight(lineHeight);
+        device.Padding = NormalizePadding(padding);
+        device.LastSeenUtc = DateTime.UtcNow;
+        DevicesByConnection[device.ConnectionId] = device;
+        DeviceProfilesById[device.DeviceId] = PersistedDeviceProfile.FromConnectedDevice(device);
+
+        await Clients.Client(device.ConnectionId).SendAsync("DeviceDisplaySettingsUpdated", new TalentShowDeviceDisplaySettings
+        {
+            FontScale = device.FontScale,
+            LineHeight = device.LineHeight,
+            Padding = device.Padding
+        });
         await BroadcastDeviceRegistryAsync();
     }
 
@@ -407,6 +440,21 @@ public class TalentShowHub : Hub
         return score;
     }
 
+    private static decimal NormalizeFontScale(decimal value)
+    {
+        return Math.Clamp(value, 0.50m, 2.00m);
+    }
+
+    private static decimal NormalizeLineHeight(decimal value)
+    {
+        return Math.Clamp(value, 1.00m, 2.20m);
+    }
+
+    private static int NormalizePadding(int value)
+    {
+        return Math.Clamp(value, 0, 64);
+    }
+
     private static string GenerateUniquePairingCode()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -473,6 +521,9 @@ public class TalentShowHub : Hub
                 DisplayName = d.DisplayName,
                 AssignedSessionCode = d.AssignedSessionCode,
                 AssignedDisplayRole = d.AssignedDisplayRole,
+                FontScale = d.FontScale,
+                LineHeight = d.LineHeight,
+                Padding = d.Padding,
                 LastSeenUtc = d.LastSeenUtc
             })
             .ToList();
@@ -490,6 +541,9 @@ public class TalentShowHub : Hub
         public string DisplayName { get; set; } = string.Empty;
         public string AssignedSessionCode { get; set; } = string.Empty;
         public string AssignedDisplayRole { get; set; } = string.Empty;
+        public decimal FontScale { get; set; } = 1.00m;
+        public decimal LineHeight { get; set; } = 1.40m;
+        public int Padding { get; set; } = 16;
 
         public static PersistedDeviceProfile FromConnectedDevice(TalentShowConnectedDevice device)
         {
@@ -499,7 +553,10 @@ public class TalentShowHub : Hub
                 PairingCode = device.PairingCode,
                 DisplayName = device.DisplayName,
                 AssignedSessionCode = device.AssignedSessionCode,
-                AssignedDisplayRole = device.AssignedDisplayRole
+                AssignedDisplayRole = device.AssignedDisplayRole,
+                FontScale = device.FontScale,
+                LineHeight = device.LineHeight,
+                Padding = device.Padding
             };
         }
     }
