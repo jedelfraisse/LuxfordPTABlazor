@@ -346,77 +346,101 @@
                     
                     <div class="row g-2 mb-2">
                         <div class="col-md-6">
-                            <label class="form-label">Intro Text</label>
-                            <div class="d-flex gap-2 align-items-end">
-                                <div class="flex-grow-1">
-                                    <textarea class="form-control" rows="3" @bind="editingSegment.IntroText"></textarea>
-                                </div>
-                                <div>
-                                    <button class="btn btn-outline-secondary btn-sm" @onclick="ShowHostNameInsertMenu" title="Insert host name as literal text">
-                                        Insert Host
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Host Text / Script</label>
-                            <div class="d-flex gap-2 align-items-end">
-                                <div class="flex-grow-1">
-                                    <textarea class="form-control" rows="3" @bind="editingSegment.HostText"></textarea>
-                                </div>
-                                <div class="d-flex flex-column gap-1">
-                                    <button class="btn btn-outline-secondary btn-sm" @onclick="ShowHostNameInsertMenu" title="Insert host name as literal text">
-                                        Host
-                                    </button>
-                                    @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
-                                    {
-                                        <button class="btn btn-outline-secondary btn-sm" @onclick="ShowPerformerInsertMenu" title="Insert performer name as literal text">
-                                            Performer
+                            @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
+                            {
+                                <label class="form-label">Intro Text (for Act announcements)</label>
+                                <textarea class="form-control" rows="3" @bind="editingSegment.IntroText"></textarea>
+                            }
+                            else
+                            {
+                                <label class="form-label">Host Text / Script</label>
+                                <div class="d-flex gap-2 align-items-end">
+                                    <div class="flex-grow-1">
+                                        <textarea class="form-control" rows="3" @bind="editingSegment.HostText"></textarea>
+                                    </div>
+                                    <div style="position: relative;">
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => showHostInsertDropdown = !showHostInsertDropdown" title="Insert host name">
+                                            <i class="bi bi-plus"></i> Host
                                         </button>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    @if (showHostInsertMenu)
-                    {
-                        <div class="row g-2 mb-2">
-                            <div class="col-md-12">
-                                <div class="border p-2 rounded bg-light">
-                                    <strong>Select Host Name to Insert:</strong>
-                                    <div class="d-flex gap-2 flex-wrap mt-2">
-                                        @foreach (var hostName in showConfig.ShowSettings.HostNames)
+                                        @if (showHostInsertDropdown)
                                         {
-                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => InsertHostName(hostName)">
-                                                @hostName:
-                                            </button>
+                                            <div style="position: absolute; top: 100%; left: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; min-width: 150px;">
+                                                @foreach (var hostName in showConfig.ShowSettings.HostNames)
+                                                {
+                                                    var textToInsert = hostName + ": ";
+                                                    <button class="dropdown-item" style="display: block; width: 100%; text-align: left; padding: 8px 12px; border: none; background: none; cursor: pointer;" @onclick="() => { InsertTextIntoHostText(textToInsert); showHostInsertDropdown = false; }">
+                                                        @hostName:
+                                                    </button>
+                                                }
+                                            </div>
                                         }
                                     </div>
                                 </div>
-                            </div>
+                            }
                         </div>
-                    }
-
-                    @if (showPerformerInsertMenu && editingSegment.SegmentType == TalentShowSegmentType.Act && editingSegment.ActId.HasValue)
-                    {
-                        var selectedAct = acts.FirstOrDefault(a => a.Id == editingSegment.ActId);
-                        @if (selectedAct != null)
-                        {
-                            <div class="row g-2 mb-2">
-                                <div class="col-md-12">
-                                    <div class="border p-2 rounded bg-light">
-                                        <strong>Selected performers:</strong>
-                                        <div class="d-flex gap-2 flex-wrap mt-2">
-                                            <button class="btn btn-sm btn-outline-info" @onclick="() => InsertPerformerName(selectedAct.PerformerName)">
-                                                @selectedAct.PerformerName
-                                            </button>
+                        <div class="col-md-6">
+                            @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
+                            {
+                                <label class="form-label">Performer Notes (from Act)</label>
+                                @if (editingSegment.ActId.HasValue)
+                                {
+                                    var selectedAct = acts.FirstOrDefault(a => a.Id == editingSegment.ActId);
+                                    @if (selectedAct != null)
+                                    {
+                                        <div class="card p-2" style="background: #f8f9fa; font-size: 0.9em;">
+                                            @if (!string.IsNullOrWhiteSpace(selectedAct.PerformerNotes))
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>Performer Notes:</strong>
+                                                    <div style="white-space: pre-wrap;">@selectedAct.PerformerNotes</div>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(selectedAct.StageNotes))
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>Stage Notes:</strong>
+                                                    <div style="white-space: pre-wrap;">@selectedAct.StageNotes</div>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(selectedAct.LightingNotes))
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>Lighting Notes:</strong>
+                                                    <div style="white-space: pre-wrap;">@selectedAct.LightingNotes</div>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(selectedAct.SoundNotes))
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>Sound Notes:</strong>
+                                                    <div style="white-space: pre-wrap;">@selectedAct.SoundNotes</div>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(selectedAct.PropsRequired))
+                                            {
+                                                <div class="mb-2">
+                                                    <strong>Props Required:</strong>
+                                                    <div style="white-space: pre-wrap;">@selectedAct.PropsRequired</div>
+                                                </div>
+                                            }
+                                            @if (string.IsNullOrWhiteSpace(selectedAct.PerformerNotes) && 
+                                                 string.IsNullOrWhiteSpace(selectedAct.StageNotes) && 
+                                                 string.IsNullOrWhiteSpace(selectedAct.LightingNotes) && 
+                                                 string.IsNullOrWhiteSpace(selectedAct.SoundNotes) && 
+                                                 string.IsNullOrWhiteSpace(selectedAct.PropsRequired))
+                                            {
+                                                <em class="text-muted">No notes for this act</em>
+                                            }
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    }
+                                    }
+                                }
+                                else
+                                {
+                                    <small class="text-muted">Select an act to view notes</small>
+                                }
+                            }
+                        </div>
+                    </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-12">
@@ -426,7 +450,7 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button class="btn btn-primary" @onclick="SaveSegmentAsync">@(editingSegment.SegmentId == 0 ? "Add Segment" : "Update Segment")</button>
+                        <button class="btn btn-primary" @onclick="SaveSegmentAsync">@(editingSegment.SegmentId == 0 ? "Add Segment" : "Save Segment")</button>
                         @if (editingSegment.SegmentId != 0)
                         {
                             <button class="btn btn-secondary" @onclick="ResetSegmentForm">Cancel</button>
@@ -703,6 +727,7 @@
     private string musicOffsetText = string.Empty;
     private string segmentDurationText = string.Empty;
     private bool showHostInsertMenu;
+    private bool showHostInsertDropdown;
     private bool showPerformerInsertMenu;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
@@ -1157,30 +1182,27 @@
         showPerformerInsertMenu = !showPerformerInsertMenu;
     }
 
-    private void InsertHostName(string hostName)
+    private void InsertTextIntoHostText(string text)
     {
-        var currentFocus = "hostText";
         if (editingSegment.HostText == null)
         {
-            editingSegment.HostText = $"{hostName}: ";
+            editingSegment.HostText = text;
         }
         else
         {
-            editingSegment.HostText += $"{hostName}: ";
+            editingSegment.HostText += text;
         }
+    }
+
+    private void InsertHostName(string hostName)
+    {
+        InsertTextIntoHostText($"{hostName}: ");
         showHostInsertMenu = false;
     }
 
     private void InsertPerformerName(string performerName)
     {
-        if (editingSegment.HostText == null)
-        {
-            editingSegment.HostText = performerName;
-        }
-        else
-        {
-            editingSegment.HostText += performerName;
-        }
+        InsertTextIntoHostText(performerName);
         showPerformerInsertMenu = false;
     }
 
