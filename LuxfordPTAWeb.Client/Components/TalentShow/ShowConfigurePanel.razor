@@ -349,7 +349,36 @@
                             @if (editingSegment.SegmentType == TalentShowSegmentType.Act)
                             {
                                 <label class="form-label">Intro Text (for Act announcements)</label>
-                                <textarea class="form-control" rows="3" @bind="editingSegment.IntroText"></textarea>
+                                <div class="d-flex gap-2 align-items-end">
+                                    <div class="flex-grow-1">
+                                        <textarea class="form-control" rows="3" @bind="editingSegment.IntroText"></textarea>
+                                    </div>
+                                    <div style="position: relative;">
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => showIntroHostInsertDropdown = !showIntroHostInsertDropdown" title="Insert host name">
+                                            <i class="bi bi-plus"></i> Host
+                                        </button>
+                                        @if (showIntroHostInsertDropdown)
+                                        {
+                                            <div style="position: absolute; top: 100%; left: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; min-width: 150px;">
+                                                @foreach (var hostName in showConfig.ShowSettings.HostNames)
+                                                {
+                                                    var textToInsert = $"{hostName}: ";
+                                                    <button class="dropdown-item" style="display: block; width: 100%; text-align: left; padding: 8px 12px; border: none; background: none; cursor: pointer;" @onclick="() => { InsertTextIntoIntroText(textToInsert); showIntroHostInsertDropdown = false; }">
+                                                        @hostName:
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (editingSegment.ActId.HasValue)
+                                    {
+                                        <div>
+                                            <button class="btn btn-outline-secondary btn-sm" @onclick="InsertSelectedPerformerIntoIntroText" title="Insert performer name">
+                                                Performer
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
                             }
                             else
                             {
@@ -367,7 +396,7 @@
                                             <div style="position: absolute; top: 100%; left: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; min-width: 150px;">
                                                 @foreach (var hostName in showConfig.ShowSettings.HostNames)
                                                 {
-                                                    var textToInsert = hostName + ": ";
+                                                    var textToInsert = $"{hostName}: ";
                                                     <button class="dropdown-item" style="display: block; width: 100%; text-align: left; padding: 8px 12px; border: none; background: none; cursor: pointer;" @onclick="() => { InsertTextIntoHostText(textToInsert); showHostInsertDropdown = false; }">
                                                         @hostName:
                                                     </button>
@@ -387,13 +416,13 @@
                                     var selectedAct = acts.FirstOrDefault(a => a.Id == editingSegment.ActId);
                                     @if (selectedAct != null)
                                     {
-                                        <div class="card p-2" style="background: #f8f9fa; font-size: 0.9em;">
-                                            @if (!string.IsNullOrWhiteSpace(selectedAct.PerformerNotes))
-                                            {
+                                <div class="card p-2" style="background: #f8f9fa; font-size: 0.9em;">
+                                    @if (!string.IsNullOrWhiteSpace(selectedAct.PerformerNotes))
+                                    {
                                                 <div class="mb-2">
                                                     <strong>Performer Notes:</strong>
                                                     <div style="white-space: pre-wrap;">@selectedAct.PerformerNotes</div>
-                                                </div>
+    </div>
                                             }
                                             @if (!string.IsNullOrWhiteSpace(selectedAct.StageNotes))
                                             {
@@ -487,6 +516,8 @@
                                         <td>@SecondsToMmSs(segment.ExpectedDurationSeconds)</td>
                                         <td>
                                             <div class="d-flex gap-1">
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => MoveSegmentUp(segment.SegmentId)" disabled="@(segment.OrderIndex <= 1)" title="Move up">▲</button>
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => MoveSegmentDown(segment.SegmentId)" disabled="@(segment.OrderIndex >= showConfig.Segments.Count)" title="Move down">▼</button>
                                                 <button class="btn btn-outline-secondary btn-sm" @onclick="() => EditSegment(segment)">Edit</button>
                                                 <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteSegmentAsync(segment.SegmentId)">Delete</button>
                                             </div>
@@ -728,6 +759,7 @@
     private string segmentDurationText = string.Empty;
     private bool showHostInsertMenu;
     private bool showHostInsertDropdown;
+    private bool showIntroHostInsertDropdown;
     private bool showPerformerInsertMenu;
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
@@ -1156,6 +1188,8 @@
         segmentDurationText = SecondsToMmSs(segment.ExpectedDurationSeconds);
         showHostInsertMenu = false;
         showPerformerInsertMenu = false;
+        showHostInsertDropdown = false;
+        showIntroHostInsertDropdown = false;
     }
 
     private void ResetSegmentForm()
@@ -1164,6 +1198,8 @@
         segmentDurationText = string.Empty;
         showHostInsertMenu = false;
         showPerformerInsertMenu = false;
+        showHostInsertDropdown = false;
+        showIntroHostInsertDropdown = false;
     }
 
     private async Task DeleteSegmentAsync(int segmentId)
@@ -1194,6 +1230,18 @@
         }
     }
 
+    private void InsertTextIntoIntroText(string text)
+    {
+        if (editingSegment.IntroText == null)
+        {
+            editingSegment.IntroText = text;
+        }
+        else
+        {
+            editingSegment.IntroText += text;
+        }
+    }
+
     private void InsertHostName(string hostName)
     {
         InsertTextIntoHostText($"{hostName}: ");
@@ -1204,6 +1252,69 @@
     {
         InsertTextIntoHostText(performerName);
         showPerformerInsertMenu = false;
+    }
+
+    private void InsertSelectedPerformerIntoIntroText()
+    {
+        if (!editingSegment.ActId.HasValue)
+        {
+            return;
+        }
+
+        var selectedAct = acts.FirstOrDefault(a => a.Id == editingSegment.ActId.Value);
+        if (selectedAct == null || string.IsNullOrWhiteSpace(selectedAct.PerformerName))
+        {
+            return;
+        }
+
+        InsertTextIntoIntroText(selectedAct.PerformerName);
+    }
+
+    private void MoveSegmentUp(int segmentId)
+    {
+        var orderedSegments = showConfig.Segments.OrderBy(s => s.OrderIndex).ToList();
+        var index = orderedSegments.FindIndex(s => s.SegmentId == segmentId);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        SwapSegmentOrder(orderedSegments[index - 1], orderedSegments[index]);
+    }
+
+    private void MoveSegmentDown(int segmentId)
+    {
+        var orderedSegments = showConfig.Segments.OrderBy(s => s.OrderIndex).ToList();
+        var index = orderedSegments.FindIndex(s => s.SegmentId == segmentId);
+        if (index < 0 || index >= orderedSegments.Count - 1)
+        {
+            return;
+        }
+
+        SwapSegmentOrder(orderedSegments[index], orderedSegments[index + 1]);
+    }
+
+    private void SwapSegmentOrder(TalentShowSegmentDTO first, TalentShowSegmentDTO second)
+    {
+        (first.OrderIndex, second.OrderIndex) = (second.OrderIndex, first.OrderIndex);
+        NormalizeSegmentOrder();
+        if (editingSegment.SegmentId == first.SegmentId)
+        {
+            editingSegment.OrderIndex = first.OrderIndex;
+        }
+        else if (editingSegment.SegmentId == second.SegmentId)
+        {
+            editingSegment.OrderIndex = second.OrderIndex;
+        }
+    }
+
+    private void NormalizeSegmentOrder()
+    {
+        var orderedSegments = showConfig.Segments.OrderBy(s => s.OrderIndex).ToList();
+        for (var i = 0; i < orderedSegments.Count; i++)
+        {
+            orderedSegments[i].OrderIndex = i + 1;
+        }
     }
 
     private TalentShowDisplayRoleAssignmentDTO? GetDisplayAssignment(string role)
