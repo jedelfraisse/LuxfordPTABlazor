@@ -639,6 +639,9 @@ else
             .OrderBy(d => d.DayNumber)
             .FirstOrDefault();
 
+        if (firstDay != null && !firstDay.StartTime.HasValue)
+            return string.Empty; // all day event
+
         if (firstDay?.StartTime.HasValue == true && firstDay.EndTime.HasValue)
         {
             if (firstDay.StartTime.Value.TimeOfDay == firstDay.EndTime.Value.TimeOfDay)
