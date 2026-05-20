@@ -18,8 +18,8 @@ public partial class Home : ComponentBase
     private bool hasRendered = false;
     
     // Event lists for home page
-    private List<Event> previousEvents = new();
-    private List<Event> upcomingEvents = new();
+    private List<EventListItemDTO> previousEvents = new();
+    private List<EventListItemDTO> upcomingEvents = new();
     private bool isLoadingEvents = true;
 
     protected override async Task OnInitializedAsync()
@@ -63,7 +63,7 @@ public partial class Home : ComponentBase
         try
         {
             // Get all events for the school year
-            var allEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/by-school-year/{schoolYearId}");
+            var allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{schoolYearId}");
             
             if (allEvents != null && allEvents.Any())
             {

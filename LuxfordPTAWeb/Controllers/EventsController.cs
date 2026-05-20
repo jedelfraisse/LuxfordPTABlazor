@@ -40,6 +40,84 @@ public class EventsController : ControllerBase
     private static string? NormalizeCoordinatorId(string? coordinatorId)
         => string.IsNullOrWhiteSpace(coordinatorId) ? null : coordinatorId.Trim();
 
+    private IQueryable<EventListItemDTO> BuildEventListQuery(int? schoolYearId, bool activeOnly)
+    {
+        var query = _db.Events.AsNoTracking();
+
+        if (schoolYearId.HasValue && schoolYearId.Value > 0)
+        {
+            query = query.Where(e => e.SchoolYearId == schoolYearId.Value);
+        }
+
+        if (activeOnly)
+        {
+            query = query.Where(e => e.Status == EventStatus.Active);
+        }
+
+        return query
+            .OrderBy(e => e.Date)
+            .ThenBy(e => e.Id)
+            .Select(e => new EventListItemDTO
+            {
+                Id = e.Id,
+                Title = e.Title,
+                Date = e.Date,
+                Description = e.Description,
+                DescriptionMarkdown = e.DescriptionMarkdown,
+                DescriptionHtml = e.DescriptionHtml,
+                MoreDetailsMarkdown = e.MoreDetailsMarkdown,
+                MoreDetailsHtml = e.MoreDetailsHtml,
+                Location = e.Location,
+                ImageUrl = e.ImageUrl,
+                Link = e.Link,
+                Slug = e.Slug,
+                FlyerUrl = e.FlyerUrl,
+                FlyerUrlsJson = e.FlyerUrlsJson,
+                Status = e.Status,
+                SetupStartTime = e.SetupStartTime,
+                EventStartTime = e.EventStartTime,
+                EventEndTime = e.EventEndTime,
+                CleanupEndTime = e.CleanupEndTime,
+                SignupWindowStart = e.SignupWindowStart,
+                SignupWindowEnd = e.SignupWindowEnd,
+                RequiresVolunteers = e.RequiresVolunteers,
+                RequiresSetup = e.RequiresSetup,
+                RequiresCleanup = e.RequiresCleanup,
+                ExcelImportId = e.ExcelImportId,
+                SchoolYearId = e.SchoolYearId,
+                SchoolYearName = e.SchoolYear.Name,
+                SchoolYearStatus = e.SchoolYear.Status,
+                EventCatId = e.EventCatId,
+                EventCatName = e.EventCat.Name,
+                EventCatSlug = e.EventCat.Slug,
+                EventCatColorClass = e.EventCat.ColorClass,
+                EventCatCoordinatorRequirement = e.EventCat.CoordinatorRequirement,
+                EventSubTypeId = e.EventSubTypeId,
+                EventSubCatName = e.EventSubTypeId.HasValue
+                    ? e.EventCatSub!.Name
+                    : string.Empty,
+                EventCoordinatorId = e.EventCoordinatorId,
+                EventCoordinatorFirstName = e.EventCoordinatorId != null ? e.EventCoordinator!.FirstName : string.Empty,
+                EventCoordinatorLastName = e.EventCoordinatorId != null ? e.EventCoordinator!.LastName : string.Empty,
+                CreatedBy = e.CreatedBy,
+                CreatedOn = e.CreatedOn,
+                LastEditedBy = e.LastEditedBy,
+                LastEditedOn = e.LastEditedOn,
+                HasPublicControlInformation = e.EventControls.Any(c => c.IsActive && c.PublicInformation),
+                EventDays = e.EventDays
+                    .OrderBy(d => d.DayNumber)
+                    .Select(d => new EventListDayDTO
+                    {
+                        Id = d.Id,
+                        DayNumber = d.DayNumber,
+                        Date = d.Date,
+                        StartTime = d.StartTime,
+                        EndTime = d.EndTime
+                    })
+                    .ToList()
+            });
+    }
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Event>>> Get()
     {
@@ -202,11 +280,18 @@ public class EventsController : ControllerBase
     {
         try
         {
-            // Filter events by the provided school year ID
             var allEvents = await _db.Events
-                .Include(e => e.SchoolYear)
-                .Include(e => e.EventCat)
+                .AsNoTracking()
                 .Where(e => e.SchoolYearId == schoolYearId)
+                .Select(e => new
+                {
+                    e.Status,
+                    e.Date,
+                    e.RequiresVolunteers,
+                    e.ExcelImportId,
+                    e.EventCoordinatorId,
+                    CoordinatorRequirement = e.EventCat.CoordinatorRequirement
+                })
                 .ToListAsync();
 
             var now = DateTime.UtcNow;
@@ -231,8 +316,7 @@ public class EventsController : ControllerBase
                     (e.Status == EventStatus.InProgress && e.Date < now.AddDays(-1)) ||
                     (e.RequiresVolunteers && string.IsNullOrEmpty(e.ExcelImportId) && 
                      e.Date >= now && e.Date <= next30Days) ||
-                    // NEW: Add events that require a coordinator but don't have one
-                    (e.EventCat != null && e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
+                    (e.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
                      string.IsNullOrEmpty(e.EventCoordinatorId) && e.Date >= now)),
                 RequiringVolunteers = allEvents.Count(e => e.RequiresVolunteers && 
                     e.Date >= now && (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress))
@@ -975,26 +1059,11 @@ public class EventsController : ControllerBase
 
     [HttpGet("all-admin")]
     [Authorize(Roles = "Admin,BoardMember")]
-    public async Task<ActionResult<IEnumerable<Event>>> GetAllAdmin([FromQuery] int? schoolYearId = null)
+    public async Task<ActionResult<IEnumerable<EventListItemDTO>>> GetAllAdmin([FromQuery] int? schoolYearId = null)
     {
         try
         {
-            var query = _db.Events
-                .Include(e => e.EventCat)
-                .Include(e => e.EventCatSub)
-                .Include(e => e.SchoolYear)
-                .Include(e => e.EventCoordinator)
-                .Include(e => e.EventDays)
-                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
-                .AsQueryable();
-
-            // Filter by school year if provided
-            if (schoolYearId.HasValue && schoolYearId.Value > 0)
-            {
-                query = query.Where(e => e.SchoolYearId == schoolYearId.Value);
-            }
-
-            var events = await query.ToListAsync();
+            var events = await BuildEventListQuery(schoolYearId, activeOnly: false).ToListAsync();
             return Ok(events);
         }
         catch (Exception ex)
@@ -1039,20 +1108,11 @@ public class EventsController : ControllerBase
     }
 
     [HttpGet("by-school-year/{schoolYearId}")]
-    public async Task<ActionResult<IEnumerable<Event>>> GetBySchoolYear(int schoolYearId)
+    public async Task<ActionResult<IEnumerable<EventListItemDTO>>> GetBySchoolYear(int schoolYearId)
     {
         try
         {
-            var events = await _db.Events
-                .Include(e => e.EventCat)
-                .Include(e => e.EventCatSub)
-                .Include(e => e.SchoolYear)
-                .Include(e => e.EventCoordinator)
-                .Include(e => e.EventDays.OrderBy(d => d.DayNumber))
-                .Include(e => e.EventControls.OrderBy(c => c.SequenceOrder))
-                .Where(e => e.SchoolYearId == schoolYearId && e.Status == EventStatus.Active)
-                .OrderBy(e => e.Date)
-                .ToListAsync();
+            var events = await BuildEventListQuery(schoolYearId, activeOnly: true).ToListAsync();
 
             return Ok(events);
         }

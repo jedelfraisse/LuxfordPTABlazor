@@ -167,7 +167,7 @@ else
 
 @code {
     private SchoolYear? selectedSchoolYear;
-    private List<Event>? allEvents;
+    private List<EventListItemDTO>? allEvents;
     private EventDashboardSummaryDTO? eventSummary;
 
     protected override async Task OnInitializedAsync()
@@ -178,8 +178,7 @@ else
             
             if (selectedSchoolYear != null)
             {
-                await LoadEvents();
-                await LoadEventSummary();
+                await Task.WhenAll(LoadEvents(), LoadEventSummary());
             }
         }
         catch (Exception)
@@ -193,11 +192,11 @@ else
         try
         {
             if (selectedSchoolYear == null) return;
-            allEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
+            allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
         }
         catch (Exception)
         {
-            allEvents = new List<Event>();
+            allEvents = new List<EventListItemDTO>();
         }
     }
 
@@ -231,9 +230,9 @@ else
         return months;
     }
 
-    private List<Event> GetEventsForMonth(int year, int month)
+    private List<EventListItemDTO> GetEventsForMonth(int year, int month)
     {
-        if (allEvents == null) return new List<Event>();
+        if (allEvents == null) return new List<EventListItemDTO>();
         
         return allEvents
             .Where(e => e.Date.Year == year && e.Date.Month == month)
@@ -297,8 +296,7 @@ else
             var response = await Http.PostAsync($"api/events/{eventId}/approve", null);
             if (response.IsSuccessStatusCode)
             {
-                await LoadEvents();
-                await LoadEventSummary();
+                await Task.WhenAll(LoadEvents(), LoadEventSummary());
             }
         }
         catch (Exception)

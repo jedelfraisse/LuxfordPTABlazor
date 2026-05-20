@@ -210,7 +210,7 @@ else
 					<tr class="@rowClass">
 						<td class="admin-events-cell">
 							<strong>@evt.Title</strong>
-							@if (evt.EventDays != null && evt.EventDays.Count > 1)
+                            @if (evt.EventDays.Count > 1)
 							{
 								<span class="badge bg-info ms-2">Multi-Day (@evt.EventDays.Count days)</span>
 							}
@@ -226,10 +226,7 @@ else
 							{
 								<span class="badge bg-info ms-2">Volunteers Needed</span>
 							}
-							@{
-								var coordinatorReq = GetCoordinatorRequirement(evt.EventCat);
-							}
-							@if (coordinatorReq == EventCoordinatorRequirement.Required && string.IsNullOrEmpty(evt.EventCoordinatorId))
+                            @if (evt.EventCatCoordinatorRequirement == EventCoordinatorRequirement.Required && string.IsNullOrEmpty(evt.EventCoordinatorId))
 							{
 								<span class="badge bg-danger ms-2">
 									<i class="bi bi-person-exclamation"></i> No Coordinator
@@ -242,17 +239,17 @@ else
 							</span>
 						</td>
 						<td class="admin-events-cell">
-							<span class="badge @(evt.SchoolYear?.Status == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear ? "bg-success" : "bg-light text-dark")">
-								@evt.SchoolYear?.Name
-							</span>
+                            <span class="badge @(evt.SchoolYearStatus == LuxfordPTAWeb.Shared.Enums.SchoolYearStatus.CurrentYear ? "bg-success" : "bg-light text-dark")">
+                                @evt.SchoolYearName
+                            </span>
 						</td>
 						<td class="admin-events-cell">
-							<span class="badge bg-primary text-white">@evt.EventCat?.Name</span>
+                            <span class="badge bg-primary text-white">@evt.EventCatName</span>
 						</td>
 						<td class="admin-events-cell">
 							@if (!string.IsNullOrEmpty(GetEventSubCategoryName(evt)))
 							{
-								<span class="badge bg-secondary text-white">@GetEventSubCategoryName(evt)</span>
+                                <span class="badge bg-secondary text-white">@evt.EventSubCatName</span>
 							}
 							else
 							{
@@ -261,10 +258,10 @@ else
 						</td>
 						<td class="admin-events-cell">
 							@evt.Date.ToString("MMM d, yyyy")
-							@if (evt.EventDays != null && evt.EventDays.Count > 1 && evt.EventDays.Any())
-							{
-								var endDate = evt.EventDays.Max(d => d.Date);
-								if (endDate != evt.Date)
+                            @if (evt.EventDays.Count > 1)
+                            {
+                                var endDate = evt.EventDays.Max(d => d.Date);
+                                if (endDate != evt.Date)
 								{
 									<br>
 									<small class="text-muted">to @endDate.ToString("MMM d, yyyy")</small>
@@ -273,26 +270,23 @@ else
 						</td>
 						<td class="admin-events-cell">@evt.Location</td>
 						<td class="admin-events-cell">
-							@{
-								var coordinatorRequirement = GetCoordinatorRequirement(evt.EventCat);
-							}
-							@if (coordinatorRequirement == EventCoordinatorRequirement.NotNeeded)
-							{
-								<!-- Show nothing for categories that don't need coordinators -->
-								<span class="text-muted small">N/A</span>
-							}
-							else if (evt.EventCoordinator != null)
-							{
-								<!-- Show coordinator name with optional role badge -->
-								<div>
-									@evt.EventCoordinator.FirstName @evt.EventCoordinator.LastName
-									@if (coordinatorRequirement == EventCoordinatorRequirement.Required)
-									{
-										<i class="bi bi-check-circle text-success ms-1" title="Required coordinator assigned"></i>
-									}
-								</div>
-							}
-							else if (coordinatorRequirement == EventCoordinatorRequirement.Required)
+                            @if (evt.EventCatCoordinatorRequirement == EventCoordinatorRequirement.NotNeeded)
+                            {
+                                <!-- Show nothing for categories that don't need coordinators -->
+                                <span class="text-muted small">N/A</span>
+                            }
+                            else if (!string.IsNullOrEmpty(evt.EventCoordinatorFirstName) || !string.IsNullOrEmpty(evt.EventCoordinatorLastName))
+                            {
+                                <!-- Show coordinator name with optional role badge -->
+                                <div>
+                                    @evt.EventCoordinatorFirstName @evt.EventCoordinatorLastName
+                                    @if (evt.EventCatCoordinatorRequirement == EventCoordinatorRequirement.Required)
+                                    {
+                                        <i class="bi bi-check-circle text-success ms-1" title="Required coordinator assigned"></i>
+                                    }
+                                </div>
+                            }
+                            else if (evt.EventCatCoordinatorRequirement == EventCoordinatorRequirement.Required)
 							{
 								<!-- Show alert for required but unassigned -->
 								<span class="badge bg-danger" title="This event category requires a coordinator but none is assigned">

@@ -23,11 +23,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore LuxfordPTAWeb/LuxfordPTAWeb.csproj
 
-      - name: Write production appsettings
-        run: printf '%s' "$APPSETTINGS_PRODUCTION" > LuxfordPTAWeb/appsettings.Production.json
-        env:
-          APPSETTINGS_PRODUCTION: ${{ secrets.APPSETTINGS_PRODUCTION }}
-
       - name: Publish
         run: dotnet publish LuxfordPTAWeb/LuxfordPTAWeb.csproj -c Release -o ./publish --no-restore
 

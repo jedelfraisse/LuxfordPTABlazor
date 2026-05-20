@@ -4,6 +4,7 @@
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.Enums
 @using LuxfordPTAWeb.Shared.DTOs
+@using System.Text.Json
 
 <PageTitle>Events - @(selectedSchoolYear?.Name ?? "Loading...")</PageTitle>
 
@@ -95,9 +96,9 @@
                                     <BlazorMarkdown.Markdown Content="@evt.DescriptionMarkdown" />
                                 </div>
                             }
-                            @if (evt.EventCat != null)
+                            @if (!string.IsNullOrWhiteSpace(evt.EventCatName))
                             {
-                                <span class="badge bg-light text-dark">@evt.EventCat.Name</span>
+                                <span class="badge bg-light text-dark">@evt.EventCatName</span>
                             }
                             @if (HasDetailsOrFlyer(evt))
                             {
@@ -165,7 +166,7 @@ else
                             <!-- Show subcategories with their next event or description -->
                             @foreach (var subcat in subcategories.OrderBy(sc => sc.DisplayOrder))
                             {
-                                var subcatEvents = categoryEvents.Where(e => e.EventCatSub?.Id == subcat.Id);
+                                var subcatEvents = categoryEvents.Where(e => e.EventSubTypeId == subcat.Id);
                                 var nextEvent = GetNextEventForSubcategory(subcatEvents);
                                 
                                 <div class="mb-3 @(subcat != subcategories.Last() ? "border-bottom pb-2" : "")">
@@ -394,10 +395,10 @@ else
 </div>
 
 @code {
-    private List<Event>? upcomingEvents;
+    private List<EventListItemDTO>? upcomingEvents;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
-    private List<Event>? allEvents;
+    private List<EventListItemDTO>? allEvents;
     private SchoolYear? selectedSchoolYear;
     private bool isCurrentSchoolYear = false;
     private bool showGetInvolved = false;
@@ -463,7 +464,7 @@ else
         try
         {
             // Get upcoming events for the current school year
-            var events = await Http.GetFromJsonAsync<List<Event>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
+            var events = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
             
             var now = DateTime.UtcNow.Date;
             var in30Days = now.AddDays(30);
@@ -471,11 +472,11 @@ else
             upcomingEvents = events?
                 .Where(e => e.Date >= now && e.Date <= in30Days)
                 .OrderBy(e => e.Date)
-                .ToList() ?? new List<Event>();
+                .ToList() ?? new List<EventListItemDTO>();
         }
         catch (Exception)
         {
-            upcomingEvents = new List<Event>();
+            upcomingEvents = new List<EventListItemDTO>();
         }
     }
 
@@ -489,30 +490,30 @@ else
             if (isCurrentSchoolYear)
             {
                 // For current year, only get active events
-                allEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
+                allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
             }
             else
             {
                 // For past years, we need all events (including completed), use admin endpoint if available
                 try 
                 {
-                    allEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
+                    allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
                     // Filter to show completed and active events for past years
                     allEvents = allEvents?
                         .Where(e => e.Status == EventStatus.Completed ||
                                    e.Status == EventStatus.Active)
-                        .ToList() ?? new List<Event>();
+                        .ToList() ?? new List<EventListItemDTO>();
                 }
                 catch
                 {
                     // Fallback to public endpoint for past years
-                    allEvents = await Http.GetFromJsonAsync<List<Event>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
+                    allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
                 }
             }
         }
         catch (Exception)
         {
-            allEvents = new List<Event>();
+            allEvents = new List<EventListItemDTO>();
         }
     }
 
@@ -558,9 +559,9 @@ else
         }
     }
 
-    private IEnumerable<Event> GetEventsForCategory(int categoryId)
+    private IEnumerable<EventListItemDTO> GetEventsForCategory(int categoryId)
     {
-        return allEvents?.Where(e => e.EventCat?.Id == categoryId) ?? Enumerable.Empty<Event>();
+        return allEvents?.Where(e => e.EventCatId == categoryId) ?? Enumerable.Empty<EventListItemDTO>();
     }
 
     private IEnumerable<EventCatSub> GetSubcategoriesForCategory(int categoryId)
@@ -568,12 +569,12 @@ else
         return eventSubcategories?.Where(esc => esc.EventCatId == categoryId && esc.IsActive) ?? Enumerable.Empty<EventCatSub>();
     }
 
-    private IEnumerable<Event> GetEventsWithoutSubcategory(IEnumerable<Event> categoryEvents)
+    private IEnumerable<EventListItemDTO> GetEventsWithoutSubcategory(IEnumerable<EventListItemDTO> categoryEvents)
     {
-        return categoryEvents.Where(e => e.EventCatSub == null);
+        return categoryEvents.Where(e => e.EventSubTypeId == null);
     }
 
-    private Event? GetNextEventForSubcategory(IEnumerable<Event> events)
+    private EventListItemDTO? GetNextEventForSubcategory(IEnumerable<EventListItemDTO> events)
     {
         if (isCurrentSchoolYear)
         {
@@ -607,9 +608,9 @@ else
         };
     }
 
-    private static string GetEventBorderStyle(Event evt)
+    private static string GetEventBorderStyle(EventListItemDTO evt)
     {
-        var borderColor = evt.EventCat?.ColorClass switch
+        var borderColor = evt.EventCatColorClass switch
         {
             "text-danger" => "#dc3545",
             "text-success" => "#198754",
@@ -632,7 +633,7 @@ else
         return description.Substring(0, maxLength - 3) + "...";
     }
 
-    private static string GetEventTimeText(Event evt)
+    private static string GetEventTimeText(EventListItemDTO evt)
     {
         var firstDay = evt.EventDays?
             .OrderBy(d => d.DayNumber)
@@ -671,7 +672,7 @@ else
         return $"{evt.EventStartTime:h:mm tt} - {evt.EventEndTime:h:mm tt}";
     }
 
-    private static string GetVolunteerSignupText(Event evt)
+    private static string GetVolunteerSignupText(EventListItemDTO evt)
     {
         if (evt.SignupWindowStart.HasValue && evt.SignupWindowEnd.HasValue)
         {
@@ -691,34 +692,59 @@ else
         return "Volunteers needed";
     }
 
-    private static bool HasDetailsOrFlyer(Event evt)
+    private static bool HasDetailsOrFlyer(EventListItemDTO evt)
     {
         return HasEventDetails(evt) || GetFlyerUrls(evt).Any();
     }
 
-    private static bool HasEventDetails(Event evt)
+    private static bool HasEventDetails(EventListItemDTO evt)
     {
         return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown)
             || HasPublicControlInfo(evt);
     }
 
-    private static string GetEventDetailsUrl(Event evt)
+    private static string GetEventDetailsUrl(EventListItemDTO evt)
     {
         return $"/events/{evt.Slug}";
     }
 
-    private static string GetPrimaryFlyerUrl(Event evt)
+    private static string GetPrimaryFlyerUrl(EventListItemDTO evt)
     {
         return GetFlyerUrls(evt).FirstOrDefault() ?? string.Empty;
     }
 
-    private static bool HasPublicControlInfo(Event evt)
+    private static bool HasPublicControlInfo(EventListItemDTO evt)
     {
-        return evt.EventControls?.Any(c => c.IsActive && c.PublicInformation) == true;
+        return evt.HasPublicControlInformation;
     }
 
-    private static IReadOnlyList<string> GetFlyerUrls(Event evt)
+    private static IReadOnlyList<string> GetFlyerUrls(EventListItemDTO evt)
     {
-        return evt.FlyerUrls;
+        var flyers = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(evt.FlyerUrl))
+        {
+            flyers.Add(evt.FlyerUrl.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(evt.FlyerUrlsJson))
+        {
+            try
+            {
+                var extraFlyers = JsonSerializer.Deserialize<List<string>>(evt.FlyerUrlsJson);
+                if (extraFlyers != null)
+                {
+                    flyers.AddRange(extraFlyers.Where(url => !string.IsNullOrWhiteSpace(url)).Select(url => url.Trim()));
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return flyers
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }

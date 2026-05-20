@@ -10,8 +10,8 @@ namespace LuxfordPTAWeb.Client.AdminPages;
 
 public partial class EventsAdmin : ComponentBase
 {
-    private List<Event>? allEvents;
-    private List<Event>? filteredEvents;
+    private List<EventListItemDTO>? allEvents;
+    private List<EventListItemDTO>? filteredEvents;
     private List<EventCat>? eventCats;
     private List<EventCatSub>? allEventSubCats;
     private List<EventCatSub>? availableSubCats;
@@ -51,9 +51,10 @@ public partial class EventsAdmin : ComponentBase
             selectedQuickFilter = filterValue.ToString().ToLower();
         }
 
-        await LoadSchoolYears();
-        await LoadEventCats();
-        await LoadEventSubCats();
+        await Task.WhenAll(
+            LoadSchoolYears(),
+            LoadEventCats(),
+            LoadEventSubCats());
         
         // Auto-select current school year if no specific school year is selected
         if (selectedSchoolYearId == 0)
@@ -66,8 +67,7 @@ public partial class EventsAdmin : ComponentBase
             }
         }
         
-        await LoadEvents();
-        await LoadEventSummary();
+        await Task.WhenAll(LoadEvents(), LoadEventSummary());
     }
 
     private async Task LoadEvents()
@@ -93,8 +93,8 @@ public partial class EventsAdmin : ComponentBase
                     }
                 }
 
-                allEvents = new List<Event>();
-                filteredEvents = new List<Event>();
+                allEvents = new List<EventListItemDTO>();
+                filteredEvents = new List<EventListItemDTO>();
                 loadError = await GetApiErrorMessage(response, "Unable to load events.");
                 return;
             }
@@ -107,23 +107,23 @@ public partial class EventsAdmin : ComponentBase
                     return;
                 }
 
-                allEvents = new List<Event>();
-                filteredEvents = new List<Event>();
+                allEvents = new List<EventListItemDTO>();
+                filteredEvents = new List<EventListItemDTO>();
                 loadError = "Unable to load events. Your session may have expired. Refresh the page and sign in again.";
                 return;
             }
 
-            allEvents = await response.Content.ReadFromJsonAsync<List<Event>>();
+            allEvents = await response.Content.ReadFromJsonAsync<List<EventListItemDTO>>();
             if (allEvents == null)
             {
-                allEvents = new List<Event>();
+                allEvents = new List<EventListItemDTO>();
             }
             ApplyFilters();
         }
         catch (Exception ex)
         {
-            allEvents = new List<Event>();
-            filteredEvents = new List<Event>();
+            allEvents = new List<EventListItemDTO>();
+            filteredEvents = new List<EventListItemDTO>();
             loadError = $"Unable to load events. {ex.Message}";
         }
     }
@@ -259,8 +259,7 @@ public partial class EventsAdmin : ComponentBase
             {
                 selectedSchoolYearId = currentYear.Id;
                 selectedSchoolYear = currentYear;
-                await LoadEvents(); // Reload events with new school year filter
-                await LoadEventSummary(); // Reload summary with new filter
+                await Task.WhenAll(LoadEvents(), LoadEventSummary()); // Reload with new school year filter
             }
         }
 
@@ -273,8 +272,7 @@ public partial class EventsAdmin : ComponentBase
         {
             selectedSchoolYearId = schoolYearId;
             selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == schoolYearId);
-            await LoadEvents(); // Reload events with new filter
-            await LoadEventSummary(); // Reload summary with new filter
+            await Task.WhenAll(LoadEvents(), LoadEventSummary()); // Reload with new filter
             ApplyFilters();
         }
     }
@@ -303,8 +301,7 @@ public partial class EventsAdmin : ComponentBase
     private async Task OnSchoolYearFilterChanged()
     {
         selectedSchoolYear = schoolYears?.FirstOrDefault(sy => sy.Id == selectedSchoolYearId);
-        await LoadEvents(); // Reload events with new filter
-        await LoadEventSummary(); // Reload summary with new filter
+        await Task.WhenAll(LoadEvents(), LoadEventSummary()); // Reload with new filter
         ApplyFilters();
     }
 
@@ -324,7 +321,7 @@ public partial class EventsAdmin : ComponentBase
     {
         if (allEvents == null) return;
 
-        IEnumerable<Event> filtered = allEvents;
+        IEnumerable<EventListItemDTO> filtered = allEvents;
 
         // Apply quick filters first
         var now = DateTime.UtcNow;
@@ -339,20 +336,19 @@ public partial class EventsAdmin : ComponentBase
                 (e.Status == EventStatus.Active || e.Status == EventStatus.InProgress)),
             "active" => filtered.Where(e => e.Status == EventStatus.Active),
             "planning" => filtered.Where(e => e.Status == EventStatus.Planning),
-            "missing-coordinator" => filtered.Where(e => e.EventCat != null && 
-                e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
-                string.IsNullOrEmpty(e.EventCoordinatorId) && e.Date >= now),
-            _ => filtered
-        };
+                "missing-coordinator" => filtered.Where(e => e.EventCatCoordinatorRequirement == EventCoordinatorRequirement.Required &&
+                    string.IsNullOrEmpty(e.EventCoordinatorId) && e.Date >= now),
+                _ => filtered
+            };
 
         if (selectedSchoolYearId > 0)
         {
-            filtered = filtered.Where(e => e.SchoolYear?.Id == selectedSchoolYearId);
+            filtered = filtered.Where(e => e.SchoolYearId == selectedSchoolYearId);
         }
 
         if (selectedEventCatId > 0)
         {
-            filtered = filtered.Where(e => e.EventCat?.Id == selectedEventCatId);
+            filtered = filtered.Where(e => e.EventCatId == selectedEventCatId);
         }
 
         if (selectedEventSubCatId > 0)
@@ -373,8 +369,7 @@ public partial class EventsAdmin : ComponentBase
         availableSubCats = new List<EventCatSub>();
 
         // Reload data when clearing filters
-        await LoadEvents();
-        await LoadEventSummary();
+        await Task.WhenAll(LoadEvents(), LoadEventSummary());
         ApplyFilters();
     }
 
@@ -392,8 +387,7 @@ public partial class EventsAdmin : ComponentBase
         availableSubCats = new List<EventCatSub>();
 
         // Reload data when showing current year
-        await LoadEvents();
-        await LoadEventSummary();
+        await Task.WhenAll(LoadEvents(), LoadEventSummary());
         ApplyFilters();
     }
 
@@ -424,11 +418,11 @@ public partial class EventsAdmin : ComponentBase
         return parts.Any() ? string.Join(" ", parts) : "";
     }
 
-    private string GetEventSubCategoryName(Event evt)
+    private string GetEventSubCategoryName(EventListItemDTO evt)
     {
-        if (evt.EventCatSub != null)
+        if (!string.IsNullOrWhiteSpace(evt.EventSubCatName))
         {
-            return evt.EventCatSub.Name;
+            return evt.EventSubCatName;
         }
 
         if (evt.EventSubTypeId > 0)
@@ -460,8 +454,7 @@ public partial class EventsAdmin : ComponentBase
                 HttpResponseMessage response = await Http.PostAsync($"api/events/{eventId}/approve", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    await LoadEvents();
-                    await LoadEventSummary();
+                    await Task.WhenAll(LoadEvents(), LoadEventSummary());
                 }
             }
             catch (Exception)
@@ -480,8 +473,7 @@ public partial class EventsAdmin : ComponentBase
                 HttpResponseMessage response = await Http.DeleteAsync($"api/events/{eventId}");
                 if (response.IsSuccessStatusCode)
                 {
-                    await LoadEvents();
-                    await LoadEventSummary();
+                    await Task.WhenAll(LoadEvents(), LoadEventSummary());
                 }
             }
             catch (Exception)
@@ -501,18 +493,12 @@ public partial class EventsAdmin : ComponentBase
         return await JS.InvokeAsync<bool>("confirm", "Are you sure you want to approve this event?");
     }
 
-    private EventCoordinatorRequirement GetCoordinatorRequirement(EventCat? eventCat)
-    {
-        return eventCat?.CoordinatorRequirement ?? EventCoordinatorRequirement.Optional;
-    }
-
     private int GetMissingCoordinatorCount()
     {
         if (allEvents == null) return 0;
         
         var now = DateTime.UtcNow;
-        return allEvents.Count(e => e.EventCat != null && 
-            e.EventCat.CoordinatorRequirement == EventCoordinatorRequirement.Required &&
+        return allEvents.Count(e => e.EventCatCoordinatorRequirement == EventCoordinatorRequirement.Required &&
             string.IsNullOrEmpty(e.EventCoordinatorId) && 
             e.Date >= now);
     }

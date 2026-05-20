@@ -1,6 +1,7 @@
-﻿@page "/admin/school-years"
+@page "/admin/school-years"
 
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
 @using LuxfordPTAWeb.Shared.Enums
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
@@ -305,7 +306,7 @@ else
 
 @code {
     private List<SchoolYear>? schoolYears;
-    private List<Event>? events;
+    private List<EventListItemDTO>? events;
     private SchoolYear? currentSchoolYear;
     private CreateSchoolYearDto editingSchoolYear = new();
     private TransitionToNewYearDto transitionModel = new();
@@ -385,11 +386,11 @@ else
     {
         try
         {
-            events = await Http.GetFromJsonAsync<List<Event>>("api/events/all-admin");
+            events = await Http.GetFromJsonAsync<List<EventListItemDTO>>("api/events/all-admin");
         }
         catch (Exception)
         {
-            events = new List<Event>();
+            events = new List<EventListItemDTO>();
         }
     }
 
