@@ -26,6 +26,9 @@ jobs:
       - name: Publish
         run: dotnet publish LuxfordPTAWeb/LuxfordPTAWeb.csproj -c Release -o ./publish --no-restore
 
+      - name: Create production appsettings
+        run: echo '${{ secrets.APPSETTINGS_PRODUCTION }}' > ./publish/appsettings.Production.json
+
       - name: Put site offline
         run: |
           python3 - << 'PYEOF'
