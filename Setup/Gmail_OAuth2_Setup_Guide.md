@@ -98,7 +98,7 @@ Check your `appsettings.json` contains:
 ```json
 {
   "OAuth2Settings": {
-    "ClientId": "998181497111-fr7mbk8itlfetjbuov48irgr3155stfr.apps.googleusercontent.com",
+    "ClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
     "RedirectUri": "https://localhost:7123/oauth2/callback",
     "TokenStoragePath": "Data/gmail-token.json",
     "EmailAddress": "maildragon@luxfordpta.org",
