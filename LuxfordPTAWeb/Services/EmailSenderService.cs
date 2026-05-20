@@ -124,7 +124,7 @@ namespace LuxfordPTAWeb.Services
                 else
                 {
                     // Traditional password authentication
-                    await client.AuthenticateAsync(_emailSettings.SmtpUser, _emailSettings.SmtpPassword);
+                    await client.AuthenticateAsync(_emailSettings.SmtpUser, _emailSettings.SmtpPassword ?? string.Empty);
                     _logger.LogInformation("Authenticated via password");
                 }
                 

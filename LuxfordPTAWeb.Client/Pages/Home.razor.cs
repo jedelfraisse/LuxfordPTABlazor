@@ -84,7 +84,7 @@ public partial class Home : ComponentBase
                     .ToList();
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Log error if needed
             previousEvents = new();

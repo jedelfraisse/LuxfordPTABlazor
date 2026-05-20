@@ -1999,7 +1999,7 @@ public class TalentShowController : ControllerBase
         // Remove days that are no longer in sessions
         foreach (var existingDay in existingTryOutDays)
         {
-            var hasSession = sessionsByDate.Any(s => s.Date.Value.ToDateTime(TimeOnly.MinValue) == existingDay.Date.Date);
+            var hasSession = sessionsByDate.Any(s => s.Date.HasValue && s.Date.Value.ToDateTime(TimeOnly.MinValue) == existingDay.Date.Date);
             if (!hasSession)
             {
                 daysToDelete.Add(existingDay);

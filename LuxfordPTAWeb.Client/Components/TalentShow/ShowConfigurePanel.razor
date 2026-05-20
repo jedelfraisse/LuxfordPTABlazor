@@ -1205,7 +1205,7 @@
         var usedActIds = new HashSet<int>(
             showConfig.Segments
                 .Where(s => s.SegmentType == TalentShowSegmentType.Act && s.ActId.HasValue)
-                .Select(s => s.ActId.Value)
+                .Select(s => s.ActId!.Value)
         );
 
         if (editingSegment.SegmentId != 0 && editingSegment.ActId.HasValue)

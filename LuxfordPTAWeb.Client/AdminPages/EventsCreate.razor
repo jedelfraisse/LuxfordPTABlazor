@@ -1126,7 +1126,7 @@ else if (createEventDto != null)
 
     private bool ShouldShowCoordinatorField()
     {
-        if (createEventDto?.EventCatId == 0 || eventCategories == null)
+        if (createEventDto == null || createEventDto.EventCatId == 0 || eventCategories == null)
             return true; // Default to showing if category not selected
 
         var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
@@ -1135,7 +1135,7 @@ else if (createEventDto != null)
 
     private bool IsCoordinatorRequired()
     {
-        if (createEventDto?.EventCatId == 0 || eventCategories == null)
+        if (createEventDto == null || createEventDto.EventCatId == 0 || eventCategories == null)
             return false; // Default to not required
 
         var category = eventCategories.FirstOrDefault(c => c.Id == createEventDto.EventCatId);
@@ -1144,7 +1144,7 @@ else if (createEventDto != null)
 
     private string GetSelectedCategoryHint()
     {
-        if (createEventDto?.EventCatId <= 0 || eventCategories == null)
+        if (createEventDto == null || createEventDto.EventCatId <= 0 || eventCategories == null)
         {
             return string.Empty;
         }

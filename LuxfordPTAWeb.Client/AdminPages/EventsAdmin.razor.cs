@@ -163,7 +163,7 @@ public partial class EventsAdmin : ComponentBase
 
         var queryParameters = query.ToDictionary(
             kvp => kvp.Key,
-            kvp => kvp.Value.ToString());
+            kvp => (string?)kvp.Value.ToString());
         queryParameters["sessionReloaded"] = "1";
 
         var reloadUri = QueryHelpers.AddQueryString(uri.GetLeftPart(UriPartial.Path), queryParameters);
