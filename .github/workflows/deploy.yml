@@ -26,10 +26,12 @@ jobs:
       - name: Publish
         run: dotnet publish LuxfordPTAWeb/LuxfordPTAWeb.csproj -c Release -o ./publish --no-restore
 
-      - name: Create production appsettings
-        run: echo '${{ secrets.APPSETTINGS_PRODUCTION }}' > ./publish/appsettings.Production.json
+      - name: Write production appsettings
+        run: printf '%s' "$APPSETTINGS_PRODUCTION" > LuxfordPTAWeb/appsettings.Production.json
+        env:
+          APPSETTINGS_PRODUCTION: ${{ secrets.APPSETTINGS_PRODUCTION }}
 
-      - name: Put site offline
+      - name: Publish
         run: |
           python3 - << 'PYEOF'
           import ftplib, io, os
