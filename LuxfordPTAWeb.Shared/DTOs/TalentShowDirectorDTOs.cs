@@ -235,12 +235,13 @@ public static class TalentShowSegmentType
     public const string Act = "Act";
     public const string HostTalk = "HostTalk";
     public const string Intermission = "Intermission";
+    public const string SponsorAd = "SponsorAd";
     public const string Awards = "Awards";
     public const string CustomSegment = "CustomSegment";
 
     public static List<string> All => new()
     {
-        HostTalk, Act, Intermission, Awards, CustomSegment
+        HostTalk, Act, Intermission, SponsorAd, Awards, CustomSegment
     };
 }
 

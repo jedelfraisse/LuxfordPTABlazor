@@ -2598,6 +2598,7 @@ public class TalentShowController : ControllerBase
                 => currentSegment?.SegmentType switch
                 {
                     var type when type == TalentShowSegmentType.HostTalk => TalentShowLifecycleState.HostTalk,
+                    var type when type == TalentShowSegmentType.SponsorAd => TalentShowLifecycleState.HostTalk,
                     var type when type == TalentShowSegmentType.Intermission => TalentShowLifecycleState.Intermission,
                     var type when type == TalentShowSegmentType.Awards => TalentShowLifecycleState.PostShow,
                     _ => TalentShowLifecycleState.ActShow
