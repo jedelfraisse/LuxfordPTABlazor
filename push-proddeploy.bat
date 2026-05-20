@@ -34,7 +34,11 @@ echo [5/6] Pushing ProdDeploy to origin...
 git push origin ProdDeploy
 if errorlevel 1 goto :fail
 
-echo [6/6] Done. ProdDeploy now matches main and is pushed.
+echo [6/7] Switching back to main...
+git checkout main
+if errorlevel 1 goto :fail
+
+echo [7/7] Done. ProdDeploy now matches main and is pushed.
 goto :end
 
 :fail

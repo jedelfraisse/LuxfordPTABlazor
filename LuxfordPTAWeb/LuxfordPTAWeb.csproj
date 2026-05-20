@@ -23,6 +23,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Content Include="_app_offline.htm">
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
 		<Folder Include="Migrations\" />
 		<Folder Include="Views\OAuth2\" />
 		<Folder Include="wwwroot\events\" />
