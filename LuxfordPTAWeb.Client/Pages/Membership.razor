@@ -1,4 +1,72 @@
-﻿@page "/membership"
+@page "/membership"
 @inherits ComponentBase
 
-<h3>Membership</h3>
+<PageTitle>Membership</PageTitle>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h1 class="card-title text-center mb-3">Join the Luxford Elementary PTA</h1>
+        <p class="lead text-center">
+            PTA membership is purchased and managed through our <strong>Givebacks</strong> platform —
+            it only takes a couple of minutes.
+        </p>
+        <p class="lead text-center mb-0">
+            <a href="https://luxfordpta.givebacks.com/" target="_blank" class="btn btn-success btn-lg">
+                Purchase Your Membership on Givebacks →
+            </a>
+        </p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-success text-white fw-bold">🎯 How to Join</div>
+    <div class="card-body">
+        <ol class="mb-0">
+            <li class="mb-2">
+                Go to <a href="https://luxfordpta.givebacks.com/" target="_blank">luxfordpta.givebacks.com</a>
+                and create an account (or sign in if you already have one).
+            </li>
+            <li class="mb-2">
+                Select <strong>PTA Membership</strong> and choose the membership type that applies to you
+                (Parent/Guardian, Teacher/Staff, Student, etc.).
+            </li>
+            <li class="mb-2">Complete your purchase — Givebacks accepts credit/debit cards.</li>
+            <li>
+                You're a member! You'll appear in our records for the current school year, and you're
+                welcome to link your cards while you're there to start earning passive donations for the
+                PTA on your everyday shopping too.
+            </li>
+        </ol>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-shop text-primary" style="font-size: 2.5rem;"></i>
+                <h5 class="mt-3">More About Givebacks</h5>
+                <p class="text-muted">
+                    Full details on membership benefits, passive fundraising, and getting started.
+                </p>
+                <a href="/givebacks" class="btn btn-outline-primary">Learn More</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up-arrow text-danger" style="font-size: 2.5rem;"></i>
+                <h5 class="mt-3">See Our Progress</h5>
+                <p class="text-muted">
+                    Check out this year's membership drive milestones and see how close we are to our goals.
+                </p>
+                <a href="/membership-drive" class="btn btn-outline-danger">Membership Drive</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-light text-center">
+    <strong>Questions?</strong> Email us at <a href="mailto:questions@luxfordpta.org">questions@luxfordpta.org</a>.
+</div>

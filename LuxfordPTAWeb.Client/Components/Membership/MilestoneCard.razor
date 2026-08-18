@@ -1,0 +1,49 @@
+@using LuxfordPTAWeb.Shared.DTOs
+
+<div class="card h-100 milestone-card @(Milestone.IsAchieved ? "border-success" : "")">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <h5 class="card-title mb-1">@Milestone.Title</h5>
+            <div class="d-flex flex-column align-items-end gap-1">
+                @if (Milestone.IsAchieved)
+                {
+                    <span class="badge bg-success"><i class="bi bi-trophy-fill"></i> Achieved!</span>
+                }
+                @if (ShowHiddenBadge && !Milestone.IsVisible)
+                {
+                    <span class="badge bg-secondary"><i class="bi bi-eye-slash"></i> Hidden</span>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Milestone.Description))
+        {
+            <p class="card-text text-muted small">@Milestone.Description</p>
+        }
+
+        @if (Milestone.TargetValue.HasValue && Milestone.CurrentValue.HasValue)
+        {
+            var pct = Math.Clamp(Milestone.PercentComplete ?? 0, 0, 100);
+            <div class="progress mb-2" style="height: 1.25rem;" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar @(Milestone.IsAchieved ? "bg-success" : "bg-primary")" style="width:@(pct)%">
+                    @pct.ToString("0.#")%
+                </div>
+            </div>
+            <div class="d-flex justify-content-between small text-muted">
+                <span>@Milestone.CurrentValue.Value.ToString("0.#")@(Milestone.ValueSuffix) current</span>
+                <span>Goal: @Milestone.TargetValue@(Milestone.ValueSuffix)</span>
+            </div>
+        }
+        else
+        {
+            <p class="text-muted small fst-italic mb-0">Not enough data to compute progress yet.</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MilestoneProgressDTO Milestone { get; set; } = null!;
+
+    /// <summary>Admin views pass true so hidden milestones are visibly flagged instead of looking identical to live ones.</summary>
+    [Parameter] public bool ShowHiddenBadge { get; set; }
+}

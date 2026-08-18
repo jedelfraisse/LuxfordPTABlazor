@@ -1,0 +1,64 @@
+@using LuxfordPTAWeb.Shared.DTOs
+
+@if (Stats == null)
+{
+    <p class="text-muted"><em>Loading stats...</em></p>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Current Members</div>
+                    <div class="display-6 fw-bold text-primary">@Stats.CurrentCount</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Staff Members</div>
+                    <div class="display-6 fw-bold text-info">@Stats.StaffCount</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Growth</div>
+                    <div class="display-6 fw-bold @GrowthClass">
+                        @(Stats.GrowthPercent.HasValue ? $"{Stats.GrowthPercent:0.#}%" : "N/A")
+                    </div>
+                    @if (!string.IsNullOrEmpty(Stats.ComparisonYearName))
+                    {
+                        <div class="text-muted small">vs @Stats.ComparisonYearName</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Historical High</div>
+                    <div class="display-6 fw-bold text-warning">@Stats.HistoricalHigh</div>
+                    @if (!string.IsNullOrEmpty(Stats.HistoricalHighYearName))
+                    {
+                        <div class="text-muted small">@Stats.HistoricalHighYearName</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public MembershipStatsDTO? Stats { get; set; }
+
+    private string GrowthClass => Stats?.GrowthPercent switch
+    {
+        null => "text-muted",
+        >= 100 => "text-success",
+        _ => "text-danger"
+    };
+}

@@ -1,5 +1,6 @@
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Shared.DTOs
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -146,7 +147,7 @@
 						@if (showOverride && CanAssignUsers)
 						{
 							<td>
-								<select @onchange="(e) => OnUserSelected(title, pos, e.Value?.ToString())">
+								<select @onchange="(e) => OnUserSelected(title, pos, e.Value?.ToString())" disabled="@isSavingAssignment" class="form-select form-select-sm">
 									<option value="null">Unfilled</option>
 									<option value="new">New User</option>
 									@foreach (var user in AvailableUsers)
@@ -156,6 +157,10 @@
 										</option>
 									}
 								</select>
+								@if (isSavingAssignment && savingTitleId == title?.Id)
+								{
+									<span class="spinner-border spinner-border-sm ms-1" role="status"></span>
+								}
 							</td>
 						}
 					</tr>
@@ -274,9 +279,8 @@
 	private List<BoardPositionTitle> requiredTitles = new();
 	private bool showOverride = false;
 	private bool boardShowAllPositions = false;
-	private BoardPositionTitle? pendingAssignTitle;
-	private string? pendingAssignUserId;
-	private BoardPosition? pendingAssignBoardPosition;
+	private bool isSavingAssignment = false;
+	private int? savingTitleId;
 
 	// Add/Edit Position Title fields
 	private bool showAddTitleForm = false;
@@ -378,12 +382,53 @@
 		showOverride = !showOverride;
 	}
 
-	private void OnUserSelected(BoardPositionTitle? title, BoardPosition? pos, string? value)
+	private async Task OnUserSelected(BoardPositionTitle? title, BoardPosition? pos, string? value)
 	{
-		// User assignment logic would go here
-		pendingAssignTitle = title;
-		pendingAssignBoardPosition = pos;
-		pendingAssignUserId = value;
+		if (title == null || SchoolYear == null) return;
+
+		if (value == "new")
+		{
+			await JS.InvokeVoidAsync("alert", "To assign someone new, add them as a user first (Admin > Users), then pick them from this list.");
+			await LoadBoardPositionsAsync(); // reset the dropdown back to the saved assignment
+			return;
+		}
+
+		var userId = string.IsNullOrEmpty(value) || value == "null" ? null : value;
+
+		isSavingAssignment = true;
+		savingTitleId = title.Id;
+		StateHasChanged();
+
+		try
+		{
+			var dto = new AssignUserOverrideDTO
+			{
+				BoardPositionTitleId = title.Id,
+				SchoolYearId = SchoolYear.Id,
+				UserId = userId
+			};
+
+			var response = await Http.PutAsJsonAsync("api/boardpositions/assign-user-override", dto);
+			if (response.IsSuccessStatusCode)
+			{
+				await LoadBoardPositionsAsync();
+			}
+			else
+			{
+				await JS.InvokeVoidAsync("alert", "Could not save that assignment. Please try again.");
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Error saving assignment: {ex.Message}");
+			await JS.InvokeVoidAsync("alert", "Could not save that assignment. Please try again.");
+		}
+		finally
+		{
+			isSavingAssignment = false;
+			savingTitleId = null;
+			StateHasChanged();
+		}
 	}
 
 	// Position Title Management Methods

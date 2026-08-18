@@ -211,6 +211,28 @@
                     </div>
                 </div>
 
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <InputSelect id="status" @bind-Value="editingSchoolYear.Status" class="form-select">
+                                <option value="@SchoolYearStatus.FutureYear">Future Year (upcoming, planning phase)</option>
+                                <option value="@SchoolYearStatus.PendingYear">Pending Year</option>
+                                <option value="@SchoolYearStatus.CurrentYear">Current Year (active now)</option>
+                                <option value="@SchoolYearStatus.Wrapup">Wrap-up (audit/review, no new events)</option>
+                                <option value="@SchoolYearStatus.PrevYear">Previous Year (archived)</option>
+                            </InputSelect>
+                            <div class="form-text">Setting this to "Current Year" automatically moves any other Current Year back to Previous Year.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-center">
+                        <div class="form-check mt-3">
+                            <InputCheckbox id="isVisibleToPublic" @bind-Value="editingSchoolYear.IsVisibleToPublic" class="form-check-input" />
+                            <label for="isVisibleToPublic" class="form-check-label">Visible to the public</label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success" disabled="@isSaving">
                         @if (isSaving)
@@ -279,6 +301,11 @@ else
                                 <span class="badge @GetStatusBadgeClass(year)">
                                     @GetYearStatus(year)
                                 </span>
+                                @if (IsStatusStale(year))
+                                {
+                                    <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                       title="Today's date falls within this year's range but its status isn't Current Year — edit it to update."></i>
+                                }
                             </td>
                             <td>
                                 <span class="text-muted">@GetEventCount(year.Id) events</span>
@@ -710,24 +737,32 @@ else
         return events?.Count(e => e.SchoolYearId == schoolYearId) ?? 0;
     }
 
-    private string GetYearStatus(SchoolYear year)
+    private string GetYearStatus(SchoolYear year) => year.Status switch
+    {
+        SchoolYearStatus.FutureYear => "Future",
+        SchoolYearStatus.PendingYear => "Pending",
+        SchoolYearStatus.CurrentYear => "Current",
+        SchoolYearStatus.Wrapup => "Wrap-up",
+        SchoolYearStatus.PrevYear => "Previous",
+        _ => year.Status.ToString()
+    };
+
+    private string GetStatusBadgeClass(SchoolYear year) => year.Status switch
+    {
+        SchoolYearStatus.CurrentYear => "bg-success",
+        SchoolYearStatus.FutureYear => "bg-primary",
+        SchoolYearStatus.PendingYear => "bg-info text-dark",
+        SchoolYearStatus.Wrapup => "bg-warning text-dark",
+        SchoolYearStatus.PrevYear => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+
+    /// <summary>True when today falls within the year's date range but its stored Status hasn't caught up.</summary>
+    private bool IsStatusStale(SchoolYear year)
     {
         var now = DateTime.Now;
-        if (now < year.StartDate) return "Future";
-        if (now > year.EndDate) return "Past";
-        return "Active";
-    }
-
-    private string GetStatusBadgeClass(SchoolYear year)
-    {
-        var status = GetYearStatus(year);
-        return status switch
-        {
-            "Active" => "bg-success",
-            "Future" => "bg-primary",
-            "Past" => "bg-secondary",
-            _ => "bg-light text-dark"
-        };
+        var isWithinRange = now >= year.StartDate && now <= year.EndDate;
+        return isWithinRange != (year.Status == SchoolYearStatus.CurrentYear);
     }
 
     // DTO Classes for form binding

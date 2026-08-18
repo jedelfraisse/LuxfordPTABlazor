@@ -77,6 +77,10 @@
 								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
 								Get Involved
 							</NavLink>
+							<NavLink href="membership-drive" class="pta-nav-link text-danger" aria-label="Membership Drive" title="Membership Drive">
+								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-person-hearts"></i></span>
+								Membership Drive
+							</NavLink>
 							<NavLink href="events" class="pta-nav-link text-primary" aria-label="Events" title="Events">
 								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
 								Events
@@ -95,10 +99,12 @@
 								Documents
 							</NavLink>
 							*@
+							@*
 							<NavLink href="sponsors" class="pta-nav-link text-info" aria-label="Sponsors" title="Sponsors">
 								<span class="pta-nav-icon" aria-hidden="true"><i class="bi bi-star"></i></span>
 								Sponsors
 							</NavLink>
+							*@
 						</nav>
 						
 						<!-- Login Display -->
@@ -131,10 +137,11 @@
 	<div class="container d-flex justify-content-center gap-3 flex-wrap">
 		<NavLink href="/" class="text-decoration-none text-purple" title="Home">Home</NavLink>
 		<NavLink href="get-involved" class="text-decoration-none text-success" title="Get Involved">Get Involved</NavLink>
+		<NavLink href="membership-drive" class="text-decoration-none text-danger" title="Membership Drive">Membership Drive</NavLink>
 		<NavLink href="events" class="text-decoration-none text-primary" title="Events">Events</NavLink>
 		<NavLink href="programs" class="text-decoration-none text-info" title="Programs">Programs</NavLink>
 		<NavLink href="givebacks" class="text-decoration-none text-warning" title="Givebacks">Givebacks</NavLink>
-		<NavLink href="sponsors" class="text-decoration-none text-info" title="Sponsors">Sponsors</NavLink>
+		@* <NavLink href="sponsors" class="text-decoration-none text-info" title="Sponsors">Sponsors</NavLink> *@
 	</div>
 	<div class="container d-flex justify-content-center gap-3 flex-wrap mt-2">
 		<NavLink href="/privacy-policy" class="text-decoration-none text-muted small">Privacy Policy</NavLink>

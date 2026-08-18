@@ -1,0 +1,337 @@
+@page "/admin/membership/milestones"
+
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Client.Components.Membership
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+
+<PageTitle>Membership Milestones</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-flag"></i> Membership Milestones</h1>
+    <a href="/admin" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <label class="form-label mb-0">School Year:</label>
+    <select class="form-select" style="width:auto" value="@selectedSchoolYearId" @onchange="OnYearChanged">
+        @foreach (var sy in schoolYears)
+        {
+            <option value="@sy.Id">@sy.Name</option>
+        }
+    </select>
+    <a href="/admin/membership/list" class="btn btn-outline-info btn-sm ms-2">
+        <i class="bi bi-people-fill"></i> Membership List
+    </a>
+    <a href="/membership-drive" target="_blank" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> View Public Page
+    </a>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0"><i class="bi bi-bar-chart"></i> Current Stats</h6></div>
+    <div class="card-body">
+        <MembershipStatsPanel Stats="stats" />
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Milestones for @(schoolYears.FirstOrDefault(sy => sy.Id == selectedSchoolYearId)?.Name)</h5>
+    @if (!showForm)
+    {
+        <button type="button" class="btn btn-primary btn-sm" @onclick="ShowAddForm">
+            <i class="bi bi-plus"></i> Add Milestone
+        </button>
+    }
+</div>
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingMilestone.Id == Guid.Empty ? "Create" : "Edit") Milestone</h5>
+        </div>
+        <div class="card-body">
+            <AdminMilestoneEditor Milestone="editingMilestone" SchoolYears="schoolYears"
+                                   OnSave="SaveMilestone" OnCancel="() => showForm = false" IsSaving="isSaving" />
+        </div>
+    </div>
+}
+
+@if (milestoneProgress == null)
+{
+    <div class="alert alert-info"><em>Loading milestones...</em></div>
+}
+else if (milestoneProgress.Count == 0)
+{
+    <div class="alert alert-warning"><em>No milestones for this school year yet. Add one above, or use a built-in template.</em></div>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th width="70">Order</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Progress</th>
+                    <th>Visible</th>
+                    <th width="140">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in milestoneProgress.OrderBy(m => m.SortOrder))
+                {
+                    <tr>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" title="Move up" @onclick="() => Move(m, -1)"><i class="bi bi-arrow-up"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" title="Move down" @onclick="() => Move(m, 1)"><i class="bi bi-arrow-down"></i></button>
+                            </div>
+                        </td>
+                        <td>
+                            <strong>@m.Title</strong>
+                            @if (m.IsAchieved)
+                            {
+                                <span class="badge bg-success ms-1"><i class="bi bi-trophy-fill"></i></span>
+                            }
+                        </td>
+                        <td>@m.MilestoneType</td>
+                        <td>
+                            @if (m.TargetValue.HasValue && m.CurrentValue.HasValue)
+                            {
+                                <span>@m.CurrentValue.Value.ToString("0.#")@(m.ValueSuffix) / @m.TargetValue@(m.ValueSuffix) (@((m.PercentComplete ?? 0).ToString("0.#"))%)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">N/A</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" checked="@m.IsVisible" @onchange="() => ToggleVisibility(m)" />
+                            </div>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditMilestone(m)"><i class="bi bi-pencil"></i></button>
+                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteMilestone(m.Id)"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-eye"></i> Public Preview</h6></div>
+        <div class="card-body">
+            <MilestoneList Milestones="milestoneProgress" ShowHiddenBadge="true" EmptyMessage="No milestones to show." />
+        </div>
+    </div>
+}
+
+@code {
+    private List<SchoolYear> schoolYears = [];
+    private int selectedSchoolYearId;
+    private List<MilestoneProgressDTO>? milestoneProgress;
+    private MembershipStatsDTO? stats;
+
+    private bool showForm;
+    private bool isSaving;
+    private MembershipMilestoneDTO editingMilestone = new();
+
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears") ?? [];
+        // Default to the site-wide selected year from the header, same as the Membership List admin page.
+        var selected = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+        selectedSchoolYearId = selected?.Id ?? schoolYears.OrderByDescending(sy => sy.StartDate).FirstOrDefault()?.Id ?? 0;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (selectedSchoolYearId == 0) { milestoneProgress = []; return; }
+        try
+        {
+            milestoneProgress = await Http.GetFromJsonAsync<List<MilestoneProgressDTO>>(
+                $"api/membership/milestones/{selectedSchoolYearId}?includeHidden=true");
+            stats = await Http.GetFromJsonAsync<MembershipStatsDTO>($"api/membership/{selectedSchoolYearId}/stats");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading milestones: {ex.Message}";
+            milestoneProgress = [];
+        }
+    }
+
+    private async Task OnYearChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            selectedSchoolYearId = id;
+            showForm = false;
+            await LoadData();
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        var nextSort = (milestoneProgress?.Count ?? 0) == 0 ? 0 : milestoneProgress!.Max(m => m.SortOrder) + 1;
+        editingMilestone = new MembershipMilestoneDTO { SchoolYearId = selectedSchoolYearId, SortOrder = nextSort };
+        showForm = true;
+        ClearMessages();
+    }
+
+    private void EditMilestone(MilestoneProgressDTO m)
+    {
+        editingMilestone = new MembershipMilestoneDTO
+        {
+            Id = m.Id,
+            SchoolYearId = m.SchoolYearId,
+            Title = m.Title,
+            Description = m.Description,
+            MilestoneType = m.MilestoneType,
+            TargetValue = m.TargetValue,
+            ComparisonYearId = m.ComparisonYearId,
+            IsVisible = m.IsVisible,
+            SortOrder = m.SortOrder
+        };
+        showForm = true;
+        ClearMessages();
+    }
+
+    private async Task SaveMilestone(MembershipMilestoneDTO dto)
+    {
+        isSaving = true;
+        ClearMessages();
+        try
+        {
+            HttpResponseMessage response = dto.Id == Guid.Empty
+                ? await Http.PostAsJsonAsync("api/membership/milestones", dto)
+                : await Http.PutAsJsonAsync($"api/membership/milestones/{dto.Id}", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Milestone saved.";
+                showForm = false;
+                await LoadData();
+            }
+            else
+            {
+                errorMessage = $"Error saving milestone: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving milestone: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteMilestone(Guid id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/membership/milestones/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Milestone deleted.";
+                await LoadData();
+            }
+            else
+            {
+                errorMessage = $"Error deleting milestone: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting milestone: {ex.Message}";
+        }
+    }
+
+    private async Task ToggleVisibility(MilestoneProgressDTO m)
+    {
+        var dto = new MembershipMilestoneDTO
+        {
+            Id = m.Id,
+            SchoolYearId = m.SchoolYearId,
+            Title = m.Title,
+            Description = m.Description,
+            MilestoneType = m.MilestoneType,
+            TargetValue = m.TargetValue,
+            ComparisonYearId = m.ComparisonYearId,
+            IsVisible = !m.IsVisible,
+            SortOrder = m.SortOrder
+        };
+        var response = await Http.PutAsJsonAsync($"api/membership/milestones/{m.Id}", dto);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadData();
+        }
+        else
+        {
+            errorMessage = $"Error updating visibility: {await response.Content.ReadAsStringAsync()}";
+        }
+    }
+
+    private async Task Move(MilestoneProgressDTO m, int direction)
+    {
+        if (milestoneProgress == null) return;
+        var ordered = milestoneProgress.OrderBy(x => x.SortOrder).ToList();
+        var index = ordered.FindIndex(x => x.Id == m.Id);
+        var swapIndex = index + direction;
+        if (swapIndex < 0 || swapIndex >= ordered.Count) return;
+
+        (ordered[index].SortOrder, ordered[swapIndex].SortOrder) = (ordered[swapIndex].SortOrder, ordered[index].SortOrder);
+
+        var reorder = new MilestoneReorderDTO
+        {
+            Items = ordered.Select(x => new MilestoneReorderItem { Id = x.Id, SortOrder = x.SortOrder }).ToList()
+        };
+        var response = await Http.PutAsJsonAsync("api/membership/milestones/reorder", reorder);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadData();
+        }
+        else
+        {
+            errorMessage = $"Error reordering: {await response.Content.ReadAsStringAsync()}";
+        }
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+}

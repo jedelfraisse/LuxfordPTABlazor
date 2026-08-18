@@ -1,15 +1,17 @@
-﻿@page "/Account/Login"
+@page "/Account/Login"
 
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using LuxfordPTAWeb.Data
 @using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Services
 
-@inject SignInManager<ApplicationUser> SignInManager
+@inject IPasswordlessLoginService PasswordlessLoginService
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
 
 <PageTitle>Log in</PageTitle>
 
@@ -17,10 +19,13 @@
     <div class="col-lg-6">
         <section>
             <StatusMessage Message="@errorMessage" />
-            <EditForm Model="Input" FormName="loginForm" method="post" OnValidSubmit="LoginUser">
+            <EditForm Model="Input" FormName="loginForm" method="post" OnValidSubmit="RequestCode">
                 <DataAnnotationsValidator />
-                <h2>PTA Board Member & Admin Access</h2>
-                <p class="text-muted mb-2">This website is still in development. Student, teacher, and parent/guardian login is coming soon.</p>
+                <h2>Log in to the PTA Portal</h2>
+                <p class="text-muted mb-2">
+                    Enter your email and we'll send you a one-time login code — no password needed.
+                    This website is still in development; some features are limited to board members and admins.
+                </p>
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />
                 <div class="form-floating mb-3">
@@ -28,102 +33,83 @@
                     <label for="Input.Email" class="form-label">Email</label>
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
-                <div class="form-floating mb-3">
-                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
-                    <label for="Input.Password" class="form-label">Password</label>
-                    <ValidationMessage For="() => Input.Password" class="text-danger" />
-                </div>
-                <div class="checkbox mb-3">
-                    <label class="form-label">
-                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                        Remember me
-                    </label>
-                </div>
                 <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
-                </div>
-                <div class="mt-3">
-                    <p>
-                        <a href="Account/ForgotPassword">Forgot your password?</a>
-                    </p>
-                    <p>
-                        <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
-                    </p>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Send login code</button>
                 </div>
             </EditForm>
         </section>
-        
-        @* TEMPORARILY DISABLED: Google OAuth Login Section
-        <div class="mt-4">
-            <hr />
-            <h3 class="text-center mb-3">Or sign in with Google</h3>
-            <ExternalLoginPicker />
-        </div>
-        *@
-        
+
         <div class="alert alert-info mt-4">
-            <h6>Need an account?</h6>
-            <p class="mb-0">Contact the PTA board for an account.</p>
+            <h6>New here?</h6>
+            <p class="mb-0">Just enter your email above — an account is created automatically. Board members and volunteers get full access once they're added to the member list.</p>
         </div>
     </div>
 </div>
 
 @code {
-private string? errorMessage;
+    private string? errorMessage;
 
-[CascadingParameter]
-private HttpContext HttpContext { get; set; } = default!;
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
 
-[SupplyParameterFromForm]
-private InputModel Input { get; set; } = new();
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
 
-[SupplyParameterFromQuery]
-private string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
 
-protected override async Task OnInitializedAsync()
-{
-    // Only clear external cookies if we haven't started streaming the response yet
-    if (HttpMethods.IsGet(HttpContext.Request.Method) && !HttpContext.Response.HasStarted)
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    protected override async Task OnInitializedAsync()
     {
-        try
+        if (string.IsNullOrEmpty(Input.Email) && !string.IsNullOrEmpty(Email))
         {
-            // Clear the existing external cookie to ensure a clean login process
-            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+            Input.Email = Email;
         }
-        catch (InvalidOperationException)
+
+        // Only clear external cookies if we haven't started streaming the response yet
+        if (HttpMethods.IsGet(HttpContext.Request.Method) && !HttpContext.Response.HasStarted)
         {
-            // If response has already started, we can't modify cookies
-            // This is fine - the cookie will be cleared on next request
-            Logger.LogWarning("Could not clear external authentication cookie - response already started");
+            try
+            {
+                // Clear the existing external cookie to ensure a clean login process
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+            }
+            catch (InvalidOperationException)
+            {
+                // If response has already started, we can't modify cookies
+                // This is fine - the cookie will be cleared on next request
+                Logger.LogWarning("Could not clear external authentication cookie - response already started");
+            }
         }
     }
-}
 
-    public async Task LoginUser()
+    private async Task RequestCode()
     {
-        // This doesn't count login failures towards account lockout
-        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
-        if (result.Succeeded)
+        var result = await PasswordlessLoginService.RequestCodeAsync(Input.Email);
+
+        if (result.Status == RequestCodeStatus.Error)
         {
-            Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+            Logger.LogError("Failed to send login code to {Email}", Input.Email);
+            errorMessage = "Error: We couldn't send a login code right now. Please try again in a moment.";
+
+            // Set Login:ShowDebugErrors to false in config once done testing — this leaks server-side
+            // details (e.g. SMTP host/error) to anyone on the login page.
+            if (Configuration.GetValue<bool>("Login:ShowDebugErrors") && !string.IsNullOrWhiteSpace(result.DebugMessage))
+            {
+                errorMessage += $" [Debug: {result.DebugMessage}]";
+            }
+
+            return;
         }
-        else if (result.RequiresTwoFactor)
+
+        // Sent, or TooSoon (a still-valid code was already emailed) — either way, go enter it.
+        RedirectManager.RedirectTo("Account/LoginVerify", new()
         {
-            RedirectManager.RedirectTo(
-                "Account/LoginWith2fa",
-                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
-        }
-        else if (result.IsLockedOut)
-        {
-            Logger.LogWarning("User account locked out.");
-            RedirectManager.RedirectTo("Account/Lockout");
-        }
-        else
-        {
-            errorMessage = "Error: Invalid login attempt.";
-        }
+            ["email"] = Input.Email,
+            ["returnUrl"] = ReturnUrl
+        });
     }
 
     private sealed class InputModel
@@ -131,12 +117,5 @@ protected override async Task OnInitializedAsync()
         [Required]
         [EmailAddress]
         public string Email { get; set; } = "";
-
-        [Required]
-        [DataType(DataType.Password)]
-        public string Password { get; set; } = "";
-
-        [Display(Name = "Remember me?")]
-        public bool RememberMe { get; set; }
     }
 }

@@ -1,0 +1,73 @@
+@page "/membership-drive"
+
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Client.Components.Membership
+@inject HttpClient Http
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+
+<PageTitle>Membership Drive</PageTitle>
+
+<div class="text-center mb-4">
+    <h1><i class="bi bi-dragon text-purple"></i> PTA Membership Drive — Help Us Reach Our Goals!</h1>
+    @if (schoolYear != null)
+    {
+        <p class="text-muted">@schoolYear.Name</p>
+    }
+</div>
+
+@if (isLoading)
+{
+    <div class="alert alert-info text-center"><em>Loading membership drive...</em></div>
+}
+else if (schoolYear == null)
+{
+    <div class="alert alert-warning text-center">
+        <em>The membership drive page isn't set up for the selected school year yet. Try a different year from the header, or check back soon!</em>
+    </div>
+}
+else
+{
+    <div class="mb-5">
+        <MembershipStatsPanel Stats="stats" />
+    </div>
+
+    <h3 class="mb-3">Our Goals This Year</h3>
+    <MilestoneList Milestones="milestones" EmptyMessage="Milestones for this school year are coming soon." />
+
+    <div class="text-center mt-5">
+        <a href="/membership" class="btn btn-lg btn-primary">
+            <i class="bi bi-person-plus-fill"></i> Join the PTA
+        </a>
+    </div>
+}
+
+@code {
+    private SchoolYear? schoolYear;
+    private MembershipStatsDTO? stats;
+    private List<MilestoneProgressDTO>? milestones;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Follow the site-wide school-year selector in the header (not just the date-based
+            // "current" year), so switching years there filters this page too.
+            schoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+            if (schoolYear != null)
+            {
+                stats = await Http.GetFromJsonAsync<MembershipStatsDTO>($"api/membership/{schoolYear.Id}/stats");
+                milestones = await Http.GetFromJsonAsync<List<MilestoneProgressDTO>>($"api/membership/milestones/{schoolYear.Id}");
+            }
+        }
+        catch (Exception)
+        {
+            // Leave schoolYear null; the page shows a friendly "not set up yet" message.
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

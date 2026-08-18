@@ -1,0 +1,24 @@
+@using LuxfordPTAWeb.Shared.DTOs
+
+@if (Milestones == null || Milestones.Count == 0)
+{
+    <p class="text-muted"><em>@EmptyMessage</em></p>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var m in Milestones.OrderBy(m => m.SortOrder))
+        {
+            <div class="col-md-6 col-lg-4">
+                <MilestoneCard Milestone="m" ShowHiddenBadge="ShowHiddenBadge" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Caller decides what's included — the public page passes only visible milestones (the API already filters); admin previews can pass everything.</summary>
+    [Parameter] public List<MilestoneProgressDTO>? Milestones { get; set; }
+    [Parameter] public string EmptyMessage { get; set; } = "No milestones yet.";
+    [Parameter] public bool ShowHiddenBadge { get; set; }
+}

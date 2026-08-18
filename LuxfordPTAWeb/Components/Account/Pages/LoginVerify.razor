@@ -1,0 +1,106 @@
+@page "/Account/LoginVerify"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using LuxfordPTAWeb.Data
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Services
+
+@inject IPasswordlessLoginService PasswordlessLoginService
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<LoginVerify> Logger
+
+<PageTitle>Enter your login code</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <section>
+            <StatusMessage Message="@message" />
+            <h2>Enter your login code</h2>
+            <p class="text-muted mb-3">
+                We sent a 6-digit code to <strong>@Email</strong>. Enter it below to finish logging in.
+                It expires in 10 minutes.
+            </p>
+            <EditForm Model="Input" FormName="verifyCodeForm" method="post" OnValidSubmit="VerifyCode">
+                <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" role="alert" />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.Code" id="Input.Code" class="form-control" autocomplete="one-time-code" inputmode="numeric" aria-required="true" placeholder="123456" />
+                    <label for="Input.Code" class="form-label">Login code</label>
+                    <ValidationMessage For="() => Input.Code" class="text-danger" />
+                </div>
+                <div class="checkbox mb-3">
+                    <label class="form-label">
+                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
+                        Keep me logged in on this device
+                    </label>
+                </div>
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">Verify &amp; log in</button>
+                </div>
+            </EditForm>
+
+            <div class="mt-3">
+                <a href="@BackToLoginUrl">Use a different email or send a new code</a>
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    private string? message;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string BackToLoginUrl =>
+        $"Account/Login?email={Uri.EscapeDataString(Email ?? string.Empty)}&returnUrl={Uri.EscapeDataString(ReturnUrl ?? string.Empty)}";
+
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrWhiteSpace(Email))
+        {
+            RedirectManager.RedirectTo("Account/Login");
+        }
+    }
+
+    private async Task VerifyCode()
+    {
+        var result = await PasswordlessLoginService.VerifyCodeAsync(Email!, Input.Code);
+
+        switch (result.Status)
+        {
+            case VerifyCodeStatus.Success:
+                await SignInManager.SignInAsync(result.User!, isPersistent: Input.RememberMe);
+                Logger.LogInformation("User {Email} logged in via passwordless code.", Email);
+                RedirectManager.RedirectTo(ReturnUrl);
+                break;
+            case VerifyCodeStatus.TooManyAttempts:
+                message = "Error: Too many incorrect attempts. Please request a new code.";
+                break;
+            default:
+                message = "Error: That code is invalid or has expired. Please try again or request a new code.";
+                break;
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "Enter the 6-digit code.")]
+        [DataType(DataType.Text)]
+        [Display(Name = "Login code")]
+        public string Code { get; set; } = "";
+
+        [Display(Name = "Keep me logged in on this device")]
+        public bool RememberMe { get; set; } = true;
+    }
+}

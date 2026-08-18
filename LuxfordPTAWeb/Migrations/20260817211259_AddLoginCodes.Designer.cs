@@ -4,6 +4,7 @@ using LuxfordPTAWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxfordPTAWeb.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817211259_AddLoginCodes")]
+    partial class AddLoginCodes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -813,114 +816,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.HasIndex("Email", "CreatedAtUtc");
 
                     b.ToTable("LoginCodes");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.MembershipMilestone", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("ComparisonYearId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsVisible")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("MilestoneType")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SchoolYearId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TargetValue")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ComparisonYearId");
-
-                    b.HasIndex("SchoolYearId", "IsVisible", "SortOrder");
-
-                    b.ToTable("MembershipMilestones");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.MembershipRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("FirstName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsStaff")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("JoinDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("MemberType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PaymentType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<int>("SchoolYearId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TeacherName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SchoolYearId", "Email");
-
-                    b.HasIndex("SchoolYearId", "IsStaff");
-
-                    b.ToTable("MembershipRecords");
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.ProgramCard", b =>
@@ -1825,35 +1720,6 @@ namespace LuxfordPTAWeb.Migrations
                     b.Navigation("EventCatSub");
 
                     b.Navigation("SourceEvent");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.MembershipMilestone", b =>
-                {
-                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "ComparisonYear")
-                        .WithMany()
-                        .HasForeignKey("ComparisonYearId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "SchoolYear")
-                        .WithMany()
-                        .HasForeignKey("SchoolYearId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ComparisonYear");
-
-                    b.Navigation("SchoolYear");
-                });
-
-            modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.MembershipRecord", b =>
-                {
-                    b.HasOne("LuxfordPTAWeb.Shared.Models.SchoolYear", "SchoolYear")
-                        .WithMany()
-                        .HasForeignKey("SchoolYearId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("SchoolYear");
                 });
 
             modelBuilder.Entity("LuxfordPTAWeb.Shared.Models.SponsorAssignment", b =>

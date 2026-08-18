@@ -1,0 +1,154 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap gap-2">
+        <select class="form-select form-select-sm" style="width:auto" @bind="memberTypeFilter" @bind:after="ApplyFilters">
+            <option value="">All Member Types</option>
+            @foreach (var t in MemberTypes)
+            {
+                <option value="@t">@t</option>
+            }
+        </select>
+        <select class="form-select form-select-sm" style="width:auto" @bind="statusFilter" @bind:after="ApplyFilters">
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+        </select>
+        <select class="form-select form-select-sm" style="width:auto" @bind="paymentTypeFilter" @bind:after="ApplyFilters">
+            <option value="">All Payment Types</option>
+            @foreach (var t in PaymentTypes)
+            {
+                <option value="@t">@t</option>
+            }
+        </select>
+        <select class="form-select form-select-sm" style="width:auto" @bind="teacherFilter" @bind:after="ApplyFilters">
+            <option value="">All Teachers</option>
+            @foreach (var t in TeacherNames)
+            {
+                <option value="@t">@t</option>
+            }
+        </select>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OnImportClick.InvokeAsync()">
+            <i class="bi bi-upload"></i> Import CSV
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OnExportClick.InvokeAsync()">
+            <i class="bi bi-download"></i> Export CSV
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OnAddClick.InvokeAsync()">
+            <i class="bi bi-plus"></i> Add Member
+        </button>
+    </div>
+</div>
+
+@if (Records.Count == 0)
+{
+    <div class="alert alert-info"><em>No members found for this school year.</em></div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Type</th>
+                    <th>Teacher</th>
+                    <th>Join Date</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th width="90">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in PageItems)
+                {
+                    <tr>
+                        <td>
+                            @r.LastName, @r.FirstName
+                            @if (r.IsStaff)
+                            {
+                                <span class="badge bg-info ms-1">Staff</span>
+                            }
+                        </td>
+                        <td>@r.Email</td>
+                        <td>@r.PhoneNumber</td>
+                        <td>@r.MemberType</td>
+                        <td>@r.TeacherName</td>
+                        <td>@r.JoinDate.ToString("MM/dd/yyyy")</td>
+                        <td>@r.Price.ToString("C")</td>
+                        <td>
+                            <span class="badge @(r.Status == MembershipStatus.Active ? "bg-success" : "bg-secondary")">@r.Status</span>
+                        </td>
+                        <td>@r.PaymentType</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => OnEdit.InvokeAsync(r)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => OnDelete.InvokeAsync(r.Id)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (TotalPages > 1)
+    {
+        <nav aria-label="Membership list pages">
+            <ul class="pagination pagination-sm flex-wrap">
+                @for (int p = 1; p <= TotalPages; p++)
+                {
+                    var pageNum = p;
+                    <li class="page-item @(pageNum == ClampedPage ? "active" : "")">
+                        <button type="button" class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+    <div class="text-muted small">Showing @FilteredRecords.Count of @Records.Count members</div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<MembershipRecord> Records { get; set; } = [];
+    [Parameter] public EventCallback<MembershipRecord> OnEdit { get; set; }
+    [Parameter] public EventCallback<Guid> OnDelete { get; set; }
+    [Parameter] public EventCallback OnImportClick { get; set; }
+    [Parameter] public EventCallback OnExportClick { get; set; }
+    [Parameter] public EventCallback OnAddClick { get; set; }
+    [Parameter] public int PageSize { get; set; } = 25;
+
+    private string memberTypeFilter = "";
+    private string statusFilter = "";
+    private string paymentTypeFilter = "";
+    private string teacherFilter = "";
+    private int page = 1;
+
+    private IEnumerable<string> MemberTypes => Records.Select(r => r.MemberType).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().OrderBy(t => t);
+    private IEnumerable<string> PaymentTypes => Records.Select(r => r.PaymentType).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().OrderBy(t => t);
+    private IEnumerable<string> TeacherNames => Records.Select(r => r.TeacherName).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().OrderBy(t => t)!;
+
+    private List<MembershipRecord> FilteredRecords => Records.Where(r =>
+            (string.IsNullOrEmpty(memberTypeFilter) || r.MemberType == memberTypeFilter) &&
+            (string.IsNullOrEmpty(statusFilter) || r.Status.ToString() == statusFilter) &&
+            (string.IsNullOrEmpty(paymentTypeFilter) || r.PaymentType == paymentTypeFilter) &&
+            (string.IsNullOrEmpty(teacherFilter) || r.TeacherName == teacherFilter))
+        .ToList();
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredRecords.Count / (double)PageSize));
+    private int ClampedPage => Math.Min(page, TotalPages);
+    private List<MembershipRecord> PageItems => FilteredRecords.Skip((ClampedPage - 1) * PageSize).Take(PageSize).ToList();
+
+    private void ApplyFilters() => page = 1;
+    private void GoToPage(int p) => page = p;
+}

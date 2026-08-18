@@ -1,3 +1,4 @@
+using LuxfordPTAWeb.Authorization;
 using LuxfordPTAWeb.Data;
 using LuxfordPTAWeb.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -16,10 +17,11 @@ public class SchoolYearsController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<SchoolYear>> Get()
     {
-        // Only return years that are not hidden, or all if user is board/admin
-        var isBoard = User.IsInRole("Admin") || User.IsInRole("BoardMember");
+        // Any authenticated PTA role (Admin/BoardMember/Volunteer) sees all years; anonymous and
+        // roleless-authenticated visitors only see ones marked visible.
+        var isPtaMember = User.IsPtaMember();
         return await _db.SchoolYears
-            .Where(sy => isBoard || sy.IsVisibleToPublic)
+            .Where(sy => isPtaMember || sy.IsVisibleToPublic)
             .OrderByDescending(sy => sy.StartDate)
             .ToListAsync();
     }
@@ -76,9 +78,8 @@ public class SchoolYearsController : ControllerBase
         {
             return NotFound();
         }
-        // Only allow non-board to view if visible
-        var isBoard = User.IsInRole("Admin") || User.IsInRole("BoardMember");
-        if (!isBoard && !schoolYear.IsVisibleToPublic)
+        // Any authenticated PTA role sees hidden years too; everyone else only sees visible ones.
+        if (!User.IsPtaMember() && !schoolYear.IsVisibleToPublic)
         {
             return Forbid();
         }
@@ -166,9 +167,25 @@ public class SchoolYearsController : ControllerBase
         schoolYear.Name = dto.Name;
         schoolYear.StartDate = dto.StartDate;
         schoolYear.EndDate = dto.EndDate;
-        // Optionally allow updating status/visibility
-        // schoolYear.Status = dto.Status;
-        // schoolYear.IsVisibleToPublic = dto.IsVisibleToPublic;
+        schoolYear.IsVisibleToPublic = dto.IsVisibleToPublic;
+
+        if (schoolYear.Status != dto.Status)
+        {
+            // Only one school year should ever be "current" at a time. Demote any other
+            // year holding that status so lookups like "find the current year" stay unambiguous.
+            if (dto.Status == SchoolYearStatus.CurrentYear)
+            {
+                var otherCurrentYears = await _db.SchoolYears
+                    .Where(sy => sy.Id != id && sy.Status == SchoolYearStatus.CurrentYear)
+                    .ToListAsync();
+                foreach (var other in otherCurrentYears)
+                {
+                    other.Status = SchoolYearStatus.PrevYear;
+                }
+            }
+
+            schoolYear.Status = dto.Status;
+        }
 
         await _db.SaveChangesAsync();
         return NoContent();
@@ -189,6 +206,19 @@ public class SchoolYearsController : ControllerBase
         if (hasEvents)
         {
             return BadRequest("Cannot delete school year that contains events.");
+        }
+
+        // Check if there is any membership drive data tied to this school year
+        var hasMembershipRecords = await _db.MembershipRecords.AnyAsync(mr => mr.SchoolYearId == id);
+        if (hasMembershipRecords)
+        {
+            return BadRequest("Cannot delete school year that contains membership records.");
+        }
+
+        var hasMilestones = await _db.MembershipMilestones.AnyAsync(mm => mm.SchoolYearId == id);
+        if (hasMilestones)
+        {
+            return BadRequest("Cannot delete school year that contains membership milestones.");
         }
 
         _db.SchoolYears.Remove(schoolYear);
@@ -244,8 +274,8 @@ public class CreateSchoolYearDto
     public string Name { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    // Optionally: public SchoolYearStatus Status { get; set; }
-    // Optionally: public bool IsVisibleToPublic { get; set; }
+    public SchoolYearStatus Status { get; set; } = SchoolYearStatus.FutureYear;
+    public bool IsVisibleToPublic { get; set; } = false;
 }
 
 public class TransitionToNewYearDto

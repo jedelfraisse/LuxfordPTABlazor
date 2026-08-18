@@ -132,6 +132,7 @@ public class Program
 
         builder.Services.AddScoped<IEmailSender<ApplicationUser>, LuxfordPTAWeb.Services.IdentityEmailSender>();
         builder.Services.AddScoped<LuxfordPTAWeb.Services.IEmailSenderService, LuxfordPTAWeb.Services.EmailSenderService>();
+        builder.Services.AddScoped<LuxfordPTAWeb.Services.IPasswordlessLoginService, LuxfordPTAWeb.Services.PasswordlessLoginService>();
 
 		// Configure OAuth2 settings for Gmail SMTP
 		builder.Services.Configure<OAuth2Settings>(
@@ -147,6 +148,10 @@ public class Program
 		
 		// Register event permission service for category-based permissions
 		builder.Services.AddScoped<LuxfordPTAWeb.Services.IEventPermissionService, LuxfordPTAWeb.Services.EventPermissionService>();
+
+		// Register Membership Drive services
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IMembershipCsvImportService, LuxfordPTAWeb.Services.MembershipCsvImportService>();
+		builder.Services.AddScoped<LuxfordPTAWeb.Services.IMembershipMilestoneService, LuxfordPTAWeb.Services.MembershipMilestoneService>();
 
 		// Configure Google Analytics options
 		var googleAnalyticsOptions = builder.Configuration.GetSection("GoogleAnalytics").Get<GoogleAnalyticsOptions>() ?? new GoogleAnalyticsOptions();
@@ -396,7 +401,7 @@ public class Program
 			}
 		}
 
-		// Create admin user
+		// Create admin user (passwordless — logs in with an emailed one-time code like everyone else)
 		var adminEmail = "jonathan@delfraisse.com";
 		var adminUser = await userManager.FindByEmailAsync(adminEmail);
 		if (adminUser == null)
@@ -409,8 +414,11 @@ public class Program
 				FirstName = "Jonathan",
 				LastName = "Delfraisse"
 			};
-			await userManager.CreateAsync(adminUser, "JamesBond#007!");
-			await userManager.AddToRoleAsync(adminUser, "Admin");
+			var createResult = await userManager.CreateAsync(adminUser);
+			if (createResult.Succeeded)
+			{
+				await userManager.AddToRoleAsync(adminUser, "Admin");
+			}
 		}
 	}
 

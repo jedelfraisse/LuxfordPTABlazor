@@ -32,6 +32,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<BoardPositionTitle> BoardPositionTitles { get; set; }
 	public DbSet<BoardPosition> BoardPositions { get; set; }
 
+	// Passwordless login codes
+	public DbSet<LoginCode> LoginCodes { get; set; }
+
+	// Membership Drive
+	public DbSet<MembershipRecord> MembershipRecords { get; set; }
+	public DbSet<MembershipMilestone> MembershipMilestones { get; set; }
+
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
 		base.OnModelCreating(builder);
@@ -327,6 +334,55 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
 		builder.Entity<EventTemplate>()
 			.HasIndex(t => t.SourceEventId);
+
+		// Login code lookups are always by email, most-recent-first
+		builder.Entity<LoginCode>()
+			.HasIndex(c => new { c.Email, c.CreatedAtUtc });
+
+		// Membership Drive relationship configuration
+		builder.Entity<MembershipRecord>()
+			.HasOne(mr => mr.SchoolYear)
+			.WithMany()
+			.HasForeignKey(mr => mr.SchoolYearId)
+			.OnDelete(DeleteBehavior.Restrict);
+
+		builder.Entity<MembershipRecord>()
+			.Property(mr => mr.Status)
+			.HasConversion<int>();
+
+		builder.Entity<MembershipRecord>()
+			.Property(mr => mr.Price)
+			.HasPrecision(10, 2);
+
+		// Not a unique constraint: duplicate-by-email detection is enforced in the import
+		// service (which lets an admin choose skip/overwrite) rather than the database,
+		// since a hard DB constraint would reject legitimate edge cases (e.g. shared family emails).
+		builder.Entity<MembershipRecord>()
+			.HasIndex(mr => new { mr.SchoolYearId, mr.Email });
+
+		builder.Entity<MembershipRecord>()
+			.HasIndex(mr => new { mr.SchoolYearId, mr.IsStaff });
+
+		builder.Entity<MembershipMilestone>()
+			.HasOne(mm => mm.SchoolYear)
+			.WithMany()
+			.HasForeignKey(mm => mm.SchoolYearId)
+			.OnDelete(DeleteBehavior.Restrict);
+
+		// Second FK to SchoolYear — must not cascade (SQL Server disallows multiple cascade
+		// paths to the same table), and SetNull is fine since ComparisonYearId is nullable.
+		builder.Entity<MembershipMilestone>()
+			.HasOne(mm => mm.ComparisonYear)
+			.WithMany()
+			.HasForeignKey(mm => mm.ComparisonYearId)
+			.OnDelete(DeleteBehavior.SetNull);
+
+		builder.Entity<MembershipMilestone>()
+			.Property(mm => mm.MilestoneType)
+			.HasConversion<int>();
+
+		builder.Entity<MembershipMilestone>()
+			.HasIndex(mm => new { mm.SchoolYearId, mm.IsVisible, mm.SortOrder });
 	}
 
 	public static async Task SeedBoardPositionTitlesAsync(ApplicationDbContext db)

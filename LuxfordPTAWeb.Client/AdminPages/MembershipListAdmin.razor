@@ -1,0 +1,477 @@
+@page "/admin/membership/list"
+
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Client.Components.Membership
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
+
+<PageTitle>Membership List</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-people-fill"></i> Membership List</h1>
+    <a href="/admin" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <label class="form-label mb-0">School Year:</label>
+    <select class="form-select" style="width:auto" value="@selectedSchoolYearId" @onchange="OnYearChanged">
+        @foreach (var sy in schoolYears)
+        {
+            <option value="@sy.Id">@sy.Name</option>
+        }
+    </select>
+    <a href="/admin/membership/milestones" class="btn btn-outline-info btn-sm ms-2">
+        <i class="bi bi-flag"></i> Manage Milestones
+    </a>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+@if (showRecordForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">@(editingRecord.Id == Guid.Empty ? "Add" : "Edit") Member</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingRecord" OnValidSubmit="SaveRecord">
+                <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">First Name *</label>
+                        <InputText @bind-Value="editingRecord.FirstName" class="form-control" />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Last Name *</label>
+                        <InputText @bind-Value="editingRecord.LastName" class="form-control" />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Email</label>
+                        <InputText @bind-Value="editingRecord.Email" class="form-control" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <InputText @bind-Value="editingRecord.PhoneNumber" class="form-control" />
+                        <div class="form-text">An email or a phone number is required.</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Join Date</label>
+                        <InputDate @bind-Value="editingRecord.JoinDate" class="form-control" />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Price</label>
+                        <InputNumber @bind-Value="editingRecord.Price" class="form-control" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Member Type</label>
+                        <InputText @bind-Value="editingRecord.MemberType" class="form-control" placeholder="Parent/Guardian, Teacher/Staff, Student..." />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Teacher Name</label>
+                        <InputText @bind-Value="editingRecord.TeacherName" class="form-control" />
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Payment Type</label>
+                        <InputText @bind-Value="editingRecord.PaymentType" class="form-control" placeholder="cash, credit_card..." />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <InputSelect @bind-Value="editingRecord.Status" class="form-select" style="width:auto">
+                        <option value="@MembershipStatus.Active">Active</option>
+                        <option value="@MembershipStatus.Inactive">Inactive</option>
+                    </InputSelect>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success" disabled="@isSavingRecord">
+                        @if (isSavingRecord)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-check-circle me-1"></i> Save
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelRecordForm">
+                        <i class="bi bi-x-circle me-1"></i> Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (showImportPanel)
+{
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-upload"></i> Import Membership CSV</h5>
+            <button type="button" class="btn-close" @onclick="CloseImportPanel"></button>
+        </div>
+        <div class="card-body">
+            @if (importResult != null)
+            {
+                <div class="alert alert-success">
+                    <strong>Import complete.</strong>
+                    Imported: @importResult.Imported, Updated: @importResult.Updated, Skipped: @importResult.Skipped
+                    @if (importResult.Errors.Count > 0)
+                    {
+                        <ul class="mb-0 mt-2">
+                            @foreach (var e in importResult.Errors)
+                            {
+                                <li>@e</li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CloseImportPanel">Close</button>
+            }
+            else if (importPreview != null)
+            {
+                <p>
+                    <strong>@importPreview.TotalRows</strong> rows parsed —
+                    <span class="text-success">@importPreview.ValidRows valid</span>,
+                    <span class="text-danger">@importPreview.ErrorRows with errors</span>,
+                    <span class="text-warning">@importPreview.DuplicateRows duplicates</span>.
+                    Uncheck any rows you don't want to import.
+                </p>
+                @if (importPreview.DuplicateRows > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">For duplicate emails already on this year's list:</label>
+                        <select class="form-select" style="width:auto" @bind="duplicateStrategy">
+                            <option value="@DuplicateImportStrategy.Skip">Skip (keep existing record)</option>
+                            <option value="@DuplicateImportStrategy.Overwrite">Overwrite (update with imported values)</option>
+                        </select>
+                    </div>
+                }
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th></th><th>Row</th><th>Name</th><th>Email</th><th>Type</th><th>Status</th><th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in importPreview.Rows)
+                            {
+                                <tr class="@(row.Errors.Count > 0 ? "table-danger" : row.IsDuplicate ? "table-warning" : "")">
+                                    <td><input type="checkbox" @bind="row.Include" disabled="@(row.Errors.Count > 0)" /></td>
+                                    <td>@row.RowNumber</td>
+                                    <td>@row.FirstName @row.LastName</td>
+                                    <td>@row.Email</td>
+                                    <td>@row.MemberType</td>
+                                    <td>@row.Status</td>
+                                    <td>
+                                        @if (row.Errors.Count > 0)
+                                        {
+                                            <span class="text-danger">@string.Join("; ", row.Errors)</span>
+                                        }
+                                        else if (row.IsDuplicate)
+                                        {
+                                            <span class="text-warning">Duplicate email</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn btn-success" @onclick="CommitImport" disabled="@(isImporting || importPreview.ValidRows == 0)">
+                        @if (isImporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i class="bi bi-check-circle me-1"></i> Confirm Import (@importPreview.Rows.Count(r => r.Include) rows)
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseImportPanel">Cancel</button>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">Upload a CSV with First Name, Last Name, Join Date, Member Type, Price, Status, Payment Type, and Teacher Name columns (header names are flexible). You'll also need an Email and/or a Phone Number column — at least one is required per row.</p>
+                <InputFile OnChange="OnFileSelected" class="form-control mb-3" accept=".csv" />
+                <button type="button" class="btn btn-primary" @onclick="UploadPreview" disabled="@(selectedFile == null || isUploadingPreview)">
+                    @if (isUploadingPreview)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    }
+                    <i class="bi bi-eye me-1"></i> Preview Import
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@if (records == null)
+{
+    <div class="alert alert-info"><em>Loading members...</em></div>
+}
+else
+{
+    <MembershipListTable Records="records"
+                          OnEdit="EditRecord"
+                          OnDelete="DeleteRecord"
+                          OnAddClick="ShowAddForm"
+                          OnImportClick="ShowImportPanel"
+                          OnExportClick="ExportCsv" />
+}
+
+@code {
+    private List<SchoolYear> schoolYears = [];
+    private int selectedSchoolYearId;
+    private List<MembershipRecord>? records;
+
+    private bool showRecordForm;
+    private bool isSavingRecord;
+    private MembershipRecordDTO editingRecord = new();
+
+    private bool showImportPanel;
+    private IBrowserFile? selectedFile;
+    private bool isUploadingPreview;
+    private bool isImporting;
+    private MembershipImportPreviewDTO? importPreview;
+    private MembershipImportResultDTO? importResult;
+    private DuplicateImportStrategy duplicateStrategy = DuplicateImportStrategy.Skip;
+
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        schoolYears = await Http.GetFromJsonAsync<List<SchoolYear>>("api/schoolyears") ?? [];
+        var selectedInfo = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+        selectedSchoolYearId = selectedInfo?.Id ?? schoolYears.OrderByDescending(sy => sy.StartDate).FirstOrDefault()?.Id ?? 0;
+        await LoadRecords();
+    }
+
+    private async Task LoadRecords()
+    {
+        if (selectedSchoolYearId == 0) { records = []; return; }
+        try
+        {
+            records = await Http.GetFromJsonAsync<List<MembershipRecord>>($"api/membership/{selectedSchoolYearId}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading members: {ex.Message}";
+            records = [];
+        }
+    }
+
+    private async Task OnYearChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            selectedSchoolYearId = id;
+            await LoadRecords();
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        editingRecord = new MembershipRecordDTO { SchoolYearId = selectedSchoolYearId };
+        showRecordForm = true;
+        ClearMessages();
+    }
+
+    private void EditRecord(MembershipRecord r)
+    {
+        editingRecord = new MembershipRecordDTO
+        {
+            Id = r.Id,
+            SchoolYearId = r.SchoolYearId,
+            FirstName = r.FirstName,
+            LastName = r.LastName,
+            Email = r.Email,
+            PhoneNumber = r.PhoneNumber,
+            JoinDate = r.JoinDate,
+            MemberType = r.MemberType,
+            Price = r.Price,
+            Status = r.Status,
+            PaymentType = r.PaymentType,
+            TeacherName = r.TeacherName
+        };
+        showRecordForm = true;
+        ClearMessages();
+    }
+
+    private void CancelRecordForm() => showRecordForm = false;
+
+    private async Task SaveRecord()
+    {
+        isSavingRecord = true;
+        ClearMessages();
+        try
+        {
+            HttpResponseMessage response = editingRecord.Id == Guid.Empty
+                ? await Http.PostAsJsonAsync("api/membership", editingRecord)
+                : await Http.PutAsJsonAsync($"api/membership/{editingRecord.Id}", editingRecord);
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Member saved.";
+                showRecordForm = false;
+                await LoadRecords();
+            }
+            else
+            {
+                errorMessage = $"Error saving member: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving member: {ex.Message}";
+        }
+        finally
+        {
+            isSavingRecord = false;
+        }
+    }
+
+    private async Task DeleteRecord(Guid id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/membership/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Member deleted.";
+                await LoadRecords();
+            }
+            else
+            {
+                errorMessage = $"Error deleting member: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting member: {ex.Message}";
+        }
+    }
+
+    private void ShowImportPanel()
+    {
+        showImportPanel = true;
+        importPreview = null;
+        importResult = null;
+        selectedFile = null;
+        ClearMessages();
+    }
+
+    private void CloseImportPanel()
+    {
+        showImportPanel = false;
+        importPreview = null;
+        importResult = null;
+        selectedFile = null;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => selectedFile = e.File;
+
+    private async Task UploadPreview()
+    {
+        if (selectedFile == null) return;
+        isUploadingPreview = true;
+        ClearMessages();
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            using var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var streamContent = new StreamContent(fileStream);
+            content.Add(streamContent, "file", selectedFile.Name);
+            content.Add(new StringContent(selectedSchoolYearId.ToString()), "schoolYearId");
+
+            var response = await Http.PostAsync("api/membership/import/preview", content);
+            if (response.IsSuccessStatusCode)
+            {
+                importPreview = await response.Content.ReadFromJsonAsync<MembershipImportPreviewDTO>();
+                if (importPreview?.FileErrors.Count > 0)
+                {
+                    errorMessage = string.Join(" ", importPreview.FileErrors);
+                    importPreview = null;
+                }
+            }
+            else
+            {
+                errorMessage = $"Error previewing import: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error previewing import: {ex.Message}";
+        }
+        finally
+        {
+            isUploadingPreview = false;
+        }
+    }
+
+    private async Task CommitImport()
+    {
+        if (importPreview == null) return;
+        isImporting = true;
+        ClearMessages();
+        try
+        {
+            var commit = new MembershipImportCommitDTO
+            {
+                SchoolYearId = selectedSchoolYearId,
+                Rows = importPreview.Rows,
+                DuplicateStrategy = duplicateStrategy
+            };
+            var response = await Http.PostAsJsonAsync("api/membership/import/commit", commit);
+            if (response.IsSuccessStatusCode)
+            {
+                importResult = await response.Content.ReadFromJsonAsync<MembershipImportResultDTO>();
+                importPreview = null;
+                await LoadRecords();
+            }
+            else
+            {
+                errorMessage = $"Error importing: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error importing: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private void ExportCsv()
+    {
+        NavigationManager.NavigateTo($"api/membership/{selectedSchoolYearId}/export", forceLoad: true);
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+}

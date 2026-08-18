@@ -1,0 +1,146 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.Enums
+@using LuxfordPTAWeb.Shared.DTOs
+
+<EditForm Model="Milestone" OnValidSubmit="HandleSave">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label small text-muted">Quick start from a built-in template (optional)</label>
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var template in Templates)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ApplyTemplate(template)">
+                    @template.Title
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">School Year *</label>
+            <InputSelect @bind-Value="Milestone.SchoolYearId" class="form-select">
+                <option value="0">-- Select --</option>
+                @foreach (var sy in SchoolYears)
+                {
+                    <option value="@sy.Id">@sy.Name</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Milestone Type *</label>
+            <InputSelect @bind-Value="Milestone.MilestoneType" class="form-select">
+                <option value="@MilestoneType.Staff100Percent">100% Staff Participation</option>
+                <option value="@MilestoneType.StaffVolume">Staff Volume</option>
+                <option value="@MilestoneType.PercentGrowth">Percent Growth</option>
+                <option value="@MilestoneType.TotalMembership">Total Membership</option>
+                <option value="@MilestoneType.HistoricalSurpass">Historical Surpass</option>
+                <option value="@MilestoneType.Custom">Custom</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Title *</label>
+        <InputText @bind-Value="Milestone.Title" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <InputTextArea @bind-Value="Milestone.Description" class="form-control" rows="2" />
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Target Value</label>
+            <InputNumber @bind-Value="Milestone.TargetValue" class="form-control" />
+            <div class="form-text">@TargetHelpText</div>
+        </div>
+        @if (Milestone.MilestoneType is MilestoneType.PercentGrowth or MilestoneType.HistoricalSurpass)
+        {
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Comparison Year</label>
+                <InputSelect @bind-Value="ComparisonYearIdValue" class="form-select">
+                    <option value="0">-- None --</option>
+                    @foreach (var sy in SchoolYears)
+                    {
+                        <option value="@sy.Id">@sy.Name</option>
+                    }
+                </InputSelect>
+                <div class="form-text">
+                    @(Milestone.MilestoneType == MilestoneType.PercentGrowth
+                        ? "The baseline year to grow against."
+                        : "Earliest year to include when finding the historical high.")
+                </div>
+            </div>
+        }
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Sort Order</label>
+            <InputNumber @bind-Value="Milestone.SortOrder" class="form-control" />
+        </div>
+    </div>
+
+    <div class="form-check mb-3">
+        <InputCheckbox @bind-Value="Milestone.IsVisible" class="form-check-input" id="milestoneIsVisible" />
+        <label class="form-check-label" for="milestoneIsVisible">Visible on public page</label>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success" disabled="@IsSaving">
+            @if (IsSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            }
+            <i class="bi bi-check-circle me-1"></i> Save Milestone
+        </button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="() => OnCancel.InvokeAsync()">
+            <i class="bi bi-x-circle me-1"></i> Cancel
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public MembershipMilestoneDTO Milestone { get; set; } = null!;
+    [Parameter, EditorRequired] public List<SchoolYear> SchoolYears { get; set; } = [];
+    [Parameter] public EventCallback<MembershipMilestoneDTO> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+
+    private int ComparisonYearIdValue
+    {
+        get => Milestone.ComparisonYearId ?? 0;
+        set => Milestone.ComparisonYearId = value == 0 ? null : value;
+    }
+
+    private string TargetHelpText => Milestone.MilestoneType switch
+    {
+        MilestoneType.Staff100Percent => "Total staff headcount at the school — the number needed for 100%.",
+        MilestoneType.StaffVolume => "Number of staff members to reach.",
+        MilestoneType.PercentGrowth => "Percent of the comparison year's total to reach (e.g. 120 = 120%).",
+        MilestoneType.TotalMembership => "Total membership count to reach.",
+        MilestoneType.HistoricalSurpass => "Optional override — leave blank to auto-use the highest count since the comparison year.",
+        _ => "Optional target value."
+    };
+
+    private record Template(string Title, string Description, MilestoneType Type, int? TargetValue, bool NeedsComparisonYear);
+
+    private static readonly List<Template> Templates =
+    [
+        new("Behind the Wheel — 100% Faculty", "Every staff member joins the PTA.", MilestoneType.Staff100Percent, null, false),
+        new("Staff Volume Milestone", "Reach a target number of staff members.", MilestoneType.StaffVolume, 100, false),
+        new("President's Trailblazer Award", "Reach 120% of last year's membership.", MilestoneType.PercentGrowth, 120, true),
+        new("General 10% Growth Challenge", "Reach 110% of last year's membership.", MilestoneType.PercentGrowth, 110, true),
+        new("Total Membership Numerical Surpass", "Surpass the highest membership count on record.", MilestoneType.HistoricalSurpass, null, true)
+    ];
+
+    private void ApplyTemplate(Template t)
+    {
+        Milestone.Title = t.Title;
+        Milestone.Description = t.Description;
+        Milestone.MilestoneType = t.Type;
+        Milestone.TargetValue = t.TargetValue;
+        if (!t.NeedsComparisonYear) Milestone.ComparisonYearId = null;
+    }
+
+    private async Task HandleSave() => await OnSave.InvokeAsync(Milestone);
+}
