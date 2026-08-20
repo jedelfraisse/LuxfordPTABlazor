@@ -184,7 +184,7 @@
 	private string CurrentYearText => $"{startYear}-{endYear}";
 
 	private bool ShowPrevArrow => selectedYear > minYear;
-	private bool ShowNextArrow => selectedYear < SchoolYearSupport.GetCurrentSchoolYear().StartYear;
+	private bool ShowNextArrow => selectedYear < currentYear;
 	private bool IsViewingPreviousYear => selectedYear < currentYear;
 
 	private SchoolYear? SelectedSchoolYearInfo;
@@ -196,7 +196,9 @@
 		if (!_loaded)
 		{
 			selectedYear = await SchoolYearSupport.GetSelectedSchoolYearAsync();
-			currentYear = SchoolYearSupport.GetCurrentSchoolYear().StartYear;
+			// The real current year — driven by whichever school year an admin has marked
+			// Status=CurrentYear, not a calendar-date guess (see SchoolYearSupport).
+			currentYear = await SchoolYearSupport.GetActualCurrentYearAsync();
 			SelectedSchoolYearInfo = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
 			_loaded = true;
 			StateHasChanged();

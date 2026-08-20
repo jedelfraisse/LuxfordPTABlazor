@@ -20,11 +20,37 @@ public class SchoolYearSupport
         _http = http;
     }
 
+    /// <summary>
+    /// Guesses "the current year" from today's date. This is only a last-resort fallback for when
+    /// no school year has been marked Status=CurrentYear yet (or the API call failed) — the real
+    /// source of truth is <see cref="GetActualCurrentSchoolYearAsync"/>, which an admin controls
+    /// explicitly rather than it flipping automatically at a calendar boundary.
+    /// </summary>
     public (int StartYear, int EndYear) GetCurrentSchoolYear()
     {
         var today = DateTime.Today;
         int year = today.Month >= 7 ? today.Year : today.Year - 1;
         return (year, year + 1);
+    }
+
+    /// <summary>The school year with Status=CurrentYear, as the server sees it (respects visibility for anonymous callers). Null if none is configured/visible.</summary>
+    public async Task<SchoolYear?> GetActualCurrentSchoolYearAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<SchoolYear>("api/schoolyears/current");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The start year of the Status=CurrentYear school year, falling back to a date-based guess if none is configured.</summary>
+    public async Task<int> GetActualCurrentYearAsync()
+    {
+        var current = await GetActualCurrentSchoolYearAsync();
+        return current?.StartDate.Year ?? GetCurrentSchoolYear().StartYear;
     }
 
     public async Task<bool> IsLocalStorageAvailableAsync()
@@ -46,12 +72,12 @@ public class SchoolYearSupport
     public async Task<int> GetSelectedSchoolYearAsync()
     {
         if (!await IsLocalStorageAvailableAsync())
-            return GetCurrentSchoolYear().StartYear;
+            return await GetActualCurrentYearAsync();
 
         var storedYear = await _js.InvokeAsync<string>("localStorage.getItem", "selectedSchoolYear");
         if (int.TryParse(storedYear, out var year))
             return year;
-        return GetCurrentSchoolYear().StartYear;
+        return await GetActualCurrentYearAsync();
     }
 
     public async Task SetSelectedSchoolYearAsync(int year)

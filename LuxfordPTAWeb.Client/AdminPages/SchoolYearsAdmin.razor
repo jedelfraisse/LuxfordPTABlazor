@@ -6,6 +6,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
 
 
 <PageTitle>Manage School Years</PageTitle>
@@ -51,6 +52,31 @@
             <button type="button" class="btn btn-info btn-sm" @onclick="ShowTransitionForm">
                 <i class="bi bi-arrow-right-circle"></i> Transition to New Year
             </button>
+        </div>
+    </div>
+}
+
+<!-- Preview any school year, including ones not yet public. The header's arrows only let you step
+     up to the current year, so this is the only way to browse a hidden past/future year as an
+     Admin/BoardMember without changing its IsVisibleToPublic flag. -->
+@if (schoolYears != null && schoolYears.Any())
+{
+    <div class="card mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center gap-2">
+            <label class="form-label mb-0 fw-bold"><i class="bi bi-eye"></i> Preview a school year:</label>
+            <select class="form-select" style="width:auto" @bind="previewYearId">
+                @foreach (var year in schoolYears.OrderByDescending(sy => sy.StartDate))
+                {
+                    <option value="@year.Id">@year.Name @(year.IsVisibleToPublic ? "" : "(hidden from public)")</option>
+                }
+            </select>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="PreviewSelectedYear" disabled="@(previewYearId == 0)">
+                <i class="bi bi-box-arrow-in-right"></i> View site as this year
+            </button>
+            @if (selectedSchoolYear != null)
+            {
+                <span class="text-muted small">Currently viewing: <strong>@selectedSchoolYear.Name</strong></span>
+            }
         </div>
     </div>
 }
@@ -285,12 +311,16 @@ else
                 <tbody>
                     @foreach (var year in schoolYears.OrderByDescending(sy => sy.StartDate))
                     {
-                        <tr class="@(year.Id == currentSchoolYear?.Id ? "table-success" : "")">
+                        <tr class="@(year.Id == selectedSchoolYear?.Id ? "table-success" : "")">
                             <td>
                                 <strong>@year.Name</strong>
-                                @if (year.Id == currentSchoolYear?.Id)
+                                @if (year.Id == selectedSchoolYear?.Id)
                                 {
-                                    <span class="badge bg-success ms-2">Current</span>
+                                    <span class="badge bg-info text-dark ms-2" title="This is what the header's year picker is currently set to for you">Selected</span>
+                                }
+                                @if (!year.IsVisibleToPublic)
+                                {
+                                    <i class="bi bi-eye-slash text-muted ms-1" title="Hidden from the public"></i>
                                 }
                             </td>
 							<td>@(string.IsNullOrWhiteSpace(year.ReflectionsTheme) ? "<em class='text-muted'>N/A</em>" : year.ReflectionsTheme)</td>
@@ -335,6 +365,8 @@ else
     private List<SchoolYear>? schoolYears;
     private List<EventListItemDTO>? events;
     private SchoolYear? currentSchoolYear;
+    private SchoolYear? selectedSchoolYear;
+    private int previewYearId;
     private CreateSchoolYearDto editingSchoolYear = new();
     private TransitionToNewYearDto transitionModel = new();
     private bool showForm = false;
@@ -360,6 +392,7 @@ else
         Console.WriteLine($"SchoolYearsAdmin: Loaded {events?.Count ?? 0} events");
         await LoadCurrentSchoolYear();
         Console.WriteLine($"SchoolYearsAdmin: Current school year: {currentSchoolYear?.Name ?? "None"}");
+        await LoadSelectedSchoolYear();
         StateHasChanged(); // Force a re-render after all data is loaded
         Console.WriteLine("SchoolYearsAdmin: OnInitializedAsync completed");
     }
@@ -431,6 +464,35 @@ else
         {
             // No current school year found
         }
+    }
+
+    /// <summary>Whichever year the header's year-picker (localStorage) is on for this browser session — distinct from currentSchoolYear, the real Status=CurrentYear year.</summary>
+    private async Task LoadSelectedSchoolYear()
+    {
+        try
+        {
+            selectedSchoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
+            previewYearId = selectedSchoolYear?.Id ?? 0;
+        }
+        catch (Exception)
+        {
+            // No selected school year resolvable
+        }
+    }
+
+    /// <summary>
+    /// Lets an Admin/BoardMember browse the whole site as any school year — including ones not
+    /// yet marked IsVisibleToPublic — without changing that flag. Just sets the same localStorage
+    /// selection the header's arrows use, then does a full reload.
+    /// </summary>
+    private async Task PreviewSelectedYear()
+    {
+        if (previewYearId == 0) return;
+        var year = schoolYears?.FirstOrDefault(sy => sy.Id == previewYearId);
+        if (year == null) return;
+
+        await SchoolYearSupport.SetSelectedSchoolYearAsync(year.StartDate.Year);
+        SchoolYearSupport.ReloadPage();
     }
 
     // Rest of the component methods...

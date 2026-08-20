@@ -29,13 +29,22 @@ public class SchoolYearsController : ControllerBase
     [HttpGet("current")]
     public async Task<ActionResult<SchoolYear>> GetCurrent()
     {
-        var currentDate = DateTime.Now;
+        // "Current" is the admin-set Status field, not a date-range guess — an admin decides when
+        // the site flips over, rather than it happening automatically at the calendar boundary.
         var currentYear = await _db.SchoolYears
-            .FirstOrDefaultAsync(sy => currentDate >= sy.StartDate && currentDate <= sy.EndDate);
+            .FirstOrDefaultAsync(sy => sy.Status == SchoolYearStatus.CurrentYear);
         if (currentYear == null)
         {
             return NotFound("No current school year found");
         }
+
+        // PTA members can preview the current year even before it's public; everyone else only
+        // gets it once it's actually visible, so public pages can fall back to general info.
+        if (!User.IsPtaMember() && !currentYear.IsVisibleToPublic)
+        {
+            return NotFound("No current school year found");
+        }
+
         return currentYear;
     }
 
