@@ -94,9 +94,14 @@
             Logger.LogError("Failed to send login code to {Email}", Input.Email);
             errorMessage = "Error: We couldn't send a login code right now. Please try again in a moment.";
 
-            // Set Login:ShowDebugErrors to false in config once done testing — this leaks server-side
-            // details (e.g. SMTP host/error) to anyone on the login page.
-            if (Configuration.GetValue<bool>("Login:ShowDebugErrors") && !string.IsNullOrWhiteSpace(result.DebugMessage))
+            // Debug details are shown when Login:ShowDebugErrors is on (leaks server-side details
+            // like the SMTP error to anyone on the login page — dev/staging only), OR when this
+            // specific diagnostic account is being used, so we can troubleshoot in production
+            // without exposing it to every visitor. Remove the email check once done troubleshooting.
+            var showDebug = Configuration.GetValue<bool>("Login:ShowDebugErrors")
+                || Input.Email.Equals("jonathan@delfraisse.com", StringComparison.OrdinalIgnoreCase);
+
+            if (showDebug && !string.IsNullOrWhiteSpace(result.DebugMessage))
             {
                 errorMessage += $" [Debug: {result.DebugMessage}]";
             }
