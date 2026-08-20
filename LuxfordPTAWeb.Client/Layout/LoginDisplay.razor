@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.WebUtilities
 @using LuxfordPTAWeb.Client.Components
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -36,7 +37,7 @@
 	</Authorized>
 	<NotAuthorized>
 		<div style="margin-right: 10px">Welcome Guest!</div>
-		<a href="Account/Login?returnUrl=@Uri.EscapeDataString(currentUrl)" class="btn btn-primary btn-sm">
+		<a href="Account/Login?returnUrl=@Uri.EscapeDataString(ResolveReturnUrl())" class="btn btn-primary btn-sm">
 			<i class="bi bi-person-plus"></i> Login
 		</a>
 	</NotAuthorized>
@@ -49,6 +50,31 @@
     protected override void OnInitialized()
     {
         currentUrl = NavigationManager.Uri;
+    }
+
+    /// <summary>
+    /// The URL to send the user back to after logging in. If they're already sitting on the
+    /// login flow itself (e.g. followed an admin-only link while signed out, then clicked this
+    /// button again), reuse whatever returnUrl that page already carries instead of wrapping the
+    /// login page's own URL — otherwise every click nests another layer of ReturnUrl=ReturnUrl=...
+    /// </summary>
+    private string ResolveReturnUrl()
+    {
+        var uri = new Uri(currentUrl);
+        var path = uri.AbsolutePath.TrimEnd('/');
+
+        if (path.Equals("/Account/Login", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/Account/LoginVerify", StringComparison.OrdinalIgnoreCase))
+        {
+            var query = QueryHelpers.ParseQuery(uri.Query);
+            var existing = query.TryGetValue("returnUrl", out var v1) ? v1.ToString()
+                : query.TryGetValue("ReturnUrl", out var v2) ? v2.ToString()
+                : string.Empty;
+
+            return string.IsNullOrWhiteSpace(existing) ? "/" : existing;
+        }
+
+        return currentUrl;
     }
 
     private string GetDisplayName(System.Security.Claims.ClaimsPrincipal user)
