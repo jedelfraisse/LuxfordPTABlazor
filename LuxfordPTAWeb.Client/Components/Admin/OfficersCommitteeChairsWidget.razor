@@ -31,7 +31,7 @@
 				</div>
 			</div>
 			<div class="col-md-4 text-end">
-				@if (boardShowAllPositions && CanAddNewPositionTitles)
+				@if (boardShowAllPositions)
 				{
 					<button class="btn btn-success btn-sm" @onclick="ShowAddTitleForm">
 						<i class="bi bi-plus-circle"></i> Add New Position
@@ -46,15 +46,15 @@
 					<th>Title</th>
 					<th>Assigned User</th>
 					<th>Type</th>
-					@if (boardShowAllPositions && CanSortPositions)
+					@if (boardShowAllPositions)
 					{
 						<th width="60">Sort</th>
 					}
-					@if (boardShowAllPositions && CanEditPositionTitles)
+					@if (boardShowAllPositions)
 					{
 						<th width="60">Edit</th>
 					}
-					@if (showOverride && CanAssignUsers)
+					@if (showOverride)
 					{
 						<th>Action</th>
 					}
@@ -91,7 +91,7 @@
 						<td>
 							@(title?.IsElected == true ? "Elected" : "Appointed")
 						</td>
-						@if (boardShowAllPositions && CanSortPositions)
+						@if (boardShowAllPositions)
 						{
 							<td>
 								@if (title != null)
@@ -131,7 +131,7 @@
 								}
 							</td>
 						}
-						@if (boardShowAllPositions && CanEditPositionTitles)
+						@if (boardShowAllPositions)
 						{
 							<td>
 								@if (title != null)
@@ -144,7 +144,7 @@
 								}
 							</td>
 						}
-						@if (showOverride && CanAssignUsers)
+						@if (showOverride)
 						{
 							<td>
 								<select @onchange="(e) => OnUserSelected(title, pos, e.Value?.ToString())" disabled="@isSavingAssignment" class="form-select form-select-sm">
@@ -177,13 +177,13 @@
 				</p>
 			</div>
 			<div class="col-auto">
-				@if (CanAssignUsers && !showOverride)
+				@if (!showOverride)
 				{
 					<button class="btn btn-outline-danger btn-sm" @onclick="SwapOverride">
 						<i class="bi bi-pencil"></i> Edit Assignments
 					</button>
 				}
-				else if (showOverride && CanAssignUsers)
+				else if (showOverride)
 				{
 					<button class="btn btn-outline-secondary btn-sm" @onclick="SwapOverride">
 						<i class="bi bi-x"></i> Cancel Editing
@@ -193,7 +193,7 @@
 		</div>
 
 		<!-- Add/Edit Position Title Form -->
-		@if (boardShowAllPositions && (showAddTitleForm || editingPositionTitle != null) && CanEditPositionTitles)
+		@if (boardShowAllPositions && (showAddTitleForm || editingPositionTitle != null))
 		{
 			<div class="card mt-3 border-success">
 				<div class="card-header bg-light">
@@ -288,11 +288,8 @@
 	private BoardPositionTitle newPositionTitle = new();
 	private bool isSorting = false;
 
-	// School Year Status Logic - Enhanced to allow adding positions for current year too
-	private bool CanEditPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
-	private bool CanSortPositions => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
-	private bool CanAssignUsers => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear or SchoolYearStatus.Wrapup;
-	private bool CanAddNewPositionTitles => SchoolYear?.Status is SchoolYearStatus.FutureYear or SchoolYearStatus.CurrentYear;
+	// Board position management (sort, edit titles, assign users) is allowed on any school year
+	// regardless of status — including past ones, so historical data can be backfilled.
 
 	protected override async Task OnParametersSetAsync()
 	{
