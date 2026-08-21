@@ -1,4 +1,6 @@
 ﻿@page "/admin/event-categories"
+@using LuxfordPTAWeb.Client.Components.Admin
+@using LuxfordPTAWeb.Shared.Models
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,BoardMember")]
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -53,6 +55,8 @@
 	</div>
 }
 
+<EventColorOptionsManager OnColorsChanged="LoadColorOptions" />
+
 <!-- Create/Edit Form -->
 @if (showForm)
 {
@@ -101,12 +105,10 @@
 							<label for="colorClass" class="form-label">Color Class</label>
 							<InputSelect id="colorClass" @bind-Value="editingEventCat.ColorClass" class="form-select">
 								<option value="">Default</option>
-								<option value="text-primary">Blue</option>
-								<option value="text-success">Green</option>
-								<option value="text-danger">Red</option>
-								<option value="text-warning">Yellow</option>
-								<option value="text-info">Cyan</option>
-								<option value="text-secondary">Gray</option>
+								@foreach (var color in colorOptions)
+								{
+									<option value="@color.CssClass">@color.Name</option>
+								}
 							</InputSelect>
 						</div>
 					</div>
@@ -273,12 +275,10 @@
 										<label class="form-label">Color Class</label>
 										<select class="form-select" @bind="editModel.ColorClass">
 											<option value="">Default</option>
-											<option value="text-primary">Blue</option>
-											<option value="text-success">Green</option>
-											<option value="text-danger">Red</option>
-											<option value="text-warning">Yellow</option>
-											<option value="text-info">Cyan</option>
-											<option value="text-secondary">Gray</option>
+											@foreach (var color in colorOptions)
+											{
+												<option value="@color.CssClass">@color.Name</option>
+											}
 										</select>
 									</div>
 								</div>
@@ -354,6 +354,25 @@ else if (!showForm)
                                 <strong>Coordinator:</strong> @GetCoordinatorRequirementText(eventCat.CoordinatorRequirement)
                             </small>
                         </div>
+                        <div class="mb-2">
+                            <small class="text-muted d-block mb-1"><strong>Sub-Categories:</strong></small>
+                            @if (GetSubCategoriesFor(eventCat.Id).Count == 0)
+                            {
+                                <span class="text-muted small"><em>None yet</em></span>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var sub in GetSubCategoriesFor(eventCat.Id))
+                                    {
+                                        <span class="badge bg-light text-dark border fw-normal @(sub.IsActive ? "" : "opacity-50")" title="@(sub.IsActive ? sub.Name : $"{sub.Name} (inactive)")">
+                                            <i class="bi bi-circle-fill @(string.IsNullOrEmpty(sub.ColorClass) ? "text-secondary" : sub.ColorClass)" style="font-size: 0.55rem;"></i>
+                                            @sub.Name
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
                     </div>
                     <div class="card-footer d-flex justify-content-end gap-2">
                         <div class="btn-group">
@@ -387,14 +406,49 @@ else if (!showForm)
 	private string errorMessage = string.Empty;
 	private string successMessage = string.Empty;
 	private List<EventCatSubDto>? subCategories;
+	private List<EventCatSubDto>? allSubCategories;
 	private int? editingSubcatId = null;
 	private EventCatSubDto editModel = new();
 	private bool showSubcatModal = false;
+	private List<EventColorOption> colorOptions = [];
 
 	protected override async Task OnInitializedAsync()
 	{
 		await LoadEventCategories();
 		await LoadEvents();
+		await LoadAllSubCategories();
+		await LoadColorOptions();
+	}
+
+	private async Task LoadColorOptions()
+	{
+		try
+		{
+			colorOptions = await Http.GetFromJsonAsync<List<EventColorOption>>("api/eventcoloroptions") ?? [];
+		}
+		catch (Exception)
+		{
+			colorOptions = [];
+		}
+		StateHasChanged();
+	}
+
+	private async Task LoadAllSubCategories()
+	{
+		try
+		{
+			allSubCategories = await Http.GetFromJsonAsync<List<EventCatSubDto>>("api/eventcatsub");
+		}
+		catch (Exception)
+		{
+			allSubCategories = new List<EventCatSubDto>();
+		}
+	}
+
+	/// <summary>Sub-categories for one category's card in the list view — separate from `subCategories`, which only holds the one category currently being edited.</summary>
+	private List<EventCatSubDto> GetSubCategoriesFor(int eventCatId)
+	{
+		return allSubCategories?.Where(sc => sc.EventCatId == eventCatId).OrderBy(sc => sc.DisplayOrder).ToList() ?? new List<EventCatSubDto>();
 	}
 
 	private async Task LoadEventCategories()
@@ -761,6 +815,7 @@ else if (!showForm)
 				editingSubcatId = null;
 				showSubcatModal = false;
 				await LoadSubCategories(editModel.EventCatId);
+				await LoadAllSubCategories();
 			}
 			else
 			{
@@ -780,6 +835,7 @@ else if (!showForm)
 		editingSubcatId = null;
 		if (editingEventCat.Id > 0)
 			await LoadSubCategories(editingEventCat.Id);
+		await LoadAllSubCategories();
 	}
 
 	private async Task MoveUp(int id)
@@ -791,6 +847,7 @@ else if (!showForm)
 			{
 				if (editingEventCat.Id > 0)
 					await LoadSubCategories(editingEventCat.Id);
+				await LoadAllSubCategories();
 				StateHasChanged();
 			}
 			else
@@ -813,6 +870,7 @@ else if (!showForm)
 			{
 				if (editingEventCat.Id > 0)
 					await LoadSubCategories(editingEventCat.Id);
+				await LoadAllSubCategories();
 				StateHasChanged();
 			}
 			else

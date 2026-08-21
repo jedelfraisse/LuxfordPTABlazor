@@ -39,6 +39,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<MembershipRecord> MembershipRecords { get; set; }
 	public DbSet<MembershipMilestone> MembershipMilestones { get; set; }
 
+	// Admin-managed color choices for Event Category / Sub-Category "Color Class" dropdowns
+	public DbSet<EventColorOption> EventColorOptions { get; set; }
+
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
 		base.OnModelCreating(builder);
@@ -338,6 +341,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		// Login code lookups are always by email, most-recent-first
 		builder.Entity<LoginCode>()
 			.HasIndex(c => new { c.Email, c.CreatedAtUtc });
+
+		// Seed the colors that were previously hardcoded in the Event Category color dropdown, so
+		// the admin-managed table isn't empty on first deploy. HasData bakes this directly into the
+		// migration (unlike the unused SeedBoardPositionTitlesAsync pattern, which nothing calls).
+		builder.Entity<EventColorOption>().HasData(
+			new EventColorOption { Id = 1, Name = "Blue", CssClass = "text-primary", DisplayOrder = 1 },
+			new EventColorOption { Id = 2, Name = "Green", CssClass = "text-success", DisplayOrder = 2 },
+			new EventColorOption { Id = 3, Name = "Red", CssClass = "text-danger", DisplayOrder = 3 },
+			new EventColorOption { Id = 4, Name = "Yellow", CssClass = "text-warning", DisplayOrder = 4 },
+			new EventColorOption { Id = 5, Name = "Cyan", CssClass = "text-info", DisplayOrder = 5 },
+			new EventColorOption { Id = 6, Name = "Gray", CssClass = "text-secondary", DisplayOrder = 6 }
+		);
 
 		// Membership Drive relationship configuration
 		builder.Entity<MembershipRecord>()

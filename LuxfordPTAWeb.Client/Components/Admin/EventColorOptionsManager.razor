@@ -1,0 +1,190 @@
+@using LuxfordPTAWeb.Shared.Models
+@inject HttpClient Http
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer;" @onclick="() => expanded = !expanded">
+        <h6 class="mb-0"><i class="bi bi-palette"></i> Manage Colors</h6>
+        <i class="bi @(expanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+    </div>
+    @if (expanded)
+    {
+        <div class="card-body">
+            <p class="text-muted small">
+                These are the choices offered in the "Color Class" dropdowns above. Add a Bootstrap
+                utility class (e.g. <code>text-primary</code>) or any custom CSS class defined
+                elsewhere on the site (e.g. <code>text-purple</code>).
+            </p>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
+                    @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+                </div>
+            }
+
+            @if (colors == null)
+            {
+                <div class="text-muted"><em>Loading colors...</em></div>
+            }
+            else
+            {
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="50">Preview</th>
+                                <th>Name</th>
+                                <th>CSS Class</th>
+                                <th width="110">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var color in colors.OrderBy(c => c.DisplayOrder))
+                            {
+                                <tr>
+                                    <td><i class="bi bi-circle-fill @color.CssClass"></i></td>
+                                    <td>@color.Name</td>
+                                    <td><code>@color.CssClass</code></td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" title="Edit" @onclick="() => EditColor(color)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteColor(color.Id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            @if (colors.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-muted text-center"><em>No colors yet — add one below.</em></td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <EditForm Model="editingColor" OnValidSubmit="SaveColor">
+                <DataAnnotationsValidator />
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Preview</label>
+                        <div class="form-control-plaintext"><i class="bi bi-circle-fill @editingColor.CssClass"></i></div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-0">Name</label>
+                        <InputText @bind-Value="editingColor.Name" class="form-control form-control-sm" placeholder="e.g. Sky Blue" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-0">CSS Class</label>
+                        <InputText @bind-Value="editingColor.CssClass" class="form-control form-control-sm" placeholder="e.g. text-primary" />
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-success btn-sm" disabled="@isSaving">
+                            <i class="bi @(editingColor.Id > 0 ? "bi-check-circle" : "bi-plus-circle")"></i>
+                            @(editingColor.Id > 0 ? "Update" : "Add") Color
+                        </button>
+                    </div>
+                    @if (editingColor.Id > 0)
+                    {
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit">Cancel</button>
+                        </div>
+                    }
+                </div>
+            </EditForm>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback OnColorsChanged { get; set; }
+
+    private bool expanded = false;
+    private List<EventColorOption>? colors;
+    private EventColorOption editingColor = new();
+    private bool isSaving;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadColors();
+    }
+
+    public async Task LoadColors()
+    {
+        try
+        {
+            colors = await Http.GetFromJsonAsync<List<EventColorOption>>("api/eventcoloroptions") ?? [];
+        }
+        catch (Exception)
+        {
+            colors = [];
+        }
+    }
+
+    private void EditColor(EventColorOption color)
+    {
+        editingColor = new EventColorOption { Id = color.Id, Name = color.Name, CssClass = color.CssClass, DisplayOrder = color.DisplayOrder };
+    }
+
+    private void CancelEdit()
+    {
+        editingColor = new EventColorOption();
+    }
+
+    private async Task SaveColor()
+    {
+        isSaving = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var response = editingColor.Id > 0
+                ? await Http.PutAsJsonAsync($"api/eventcoloroptions/{editingColor.Id}", editingColor)
+                : await Http.PostAsJsonAsync("api/eventcoloroptions", editingColor);
+
+            if (response.IsSuccessStatusCode)
+            {
+                editingColor = new EventColorOption();
+                await LoadColors();
+                await OnColorsChanged.InvokeAsync();
+            }
+            else
+            {
+                errorMessage = $"Error saving color: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving color: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteColor(int id)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync($"api/eventcoloroptions/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadColors();
+                await OnColorsChanged.InvokeAsync();
+            }
+            else
+            {
+                errorMessage = $"Error deleting color: {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting color: {ex.Message}";
+        }
+    }
+}
