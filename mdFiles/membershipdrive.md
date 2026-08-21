@@ -62,6 +62,14 @@ the following deviations made during implementation — agreed with the site own
     stats panel now shows an explicit `+`/`-` sign and colors ≥0% green, <0% red (previously ≥100%/
     <100%). Note this fix does **not** apply to the milestone system's `PercentGrowth` type (e.g.
     "reach 120% of last year") — that one is intentionally ratio-based per the original §6 spec.
+11. **"Historical High" removed from the stats panel/dashboard/API** (§4.3, §5B, §8's
+    MembershipStatsPanel — each marked inline below). With only a couple school years of data on
+    record, "highest count since 2019" doesn't mean much yet and was more misleading than useful.
+    `MembershipStatsDTO` no longer has `HistoricalHigh`/`HistoricalHighYearName`, and
+    `MembershipStatsPanel` shows 3 stat tiles instead of 4. The underlying `GetHistoricalHigh` logic
+    is untouched and still powers the `HistoricalSurpass` milestone type — this only removed the
+    always-on stats-panel tile, not the milestone feature. Worth re-adding once there's enough
+    year-over-year history for it to be meaningful.
 
 See §7 for the actual API surface as built (it differs slightly from the original endpoint list).
 
@@ -234,7 +242,7 @@ Shows:
 - Current membership count (per selected school year)
 - Staff membership count
 - Growth %
-- Historical high
+- ~~Historical high~~ — removed, see §0.11
 - All milestones with progress bars
 
 ---
@@ -257,7 +265,7 @@ PTA Membership Drive — Help Us Reach Our Goals!
 - Current members
 - Staff members
 - Percent growth
-- Historical comparison
+- ~~Historical comparison~~ — removed, see §0.11
 
 #### C. Milestone List
 For each visible milestone:
@@ -362,7 +370,7 @@ PUT    /api/membership/milestones/reorder
 - Current members
 - Staff members
 - Growth %
-- Historical high
+- ~~Historical high~~ — removed, see §0.11
 
 ### AdminMilestoneEditor
 - SchoolYear selector

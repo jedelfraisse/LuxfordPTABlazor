@@ -57,8 +57,6 @@ public class MembershipMilestoneService : IMembershipMilestoneService
             growthPercent = Math.Round((current.Total - priorCounts.Total) / (decimal)priorCounts.Total * 100, 1);
         }
 
-        var (historicalHigh, historicalHighYear) = GetHistoricalHigh(allYears, counts, DefaultHistoricalAnchor, excludeYearId: null);
-
         return new MembershipStatsDTO
         {
             SchoolYearId = schoolYear.Id,
@@ -66,9 +64,7 @@ public class MembershipMilestoneService : IMembershipMilestoneService
             CurrentCount = current.Total,
             StaffCount = current.Staff,
             GrowthPercent = growthPercent,
-            ComparisonYearName = priorYear?.Name,
-            HistoricalHigh = historicalHigh,
-            HistoricalHighYearName = historicalHighYear?.Name
+            ComparisonYearName = priorYear?.Name
         };
     }
 

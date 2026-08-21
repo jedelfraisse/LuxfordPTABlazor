@@ -12,7 +12,4 @@ public class MembershipStatsDTO
     /// <summary>Percent CHANGE from the prior school year's total (negative = decline). Null if no prior year data exists.</summary>
     public decimal? GrowthPercent { get; set; }
     public string? ComparisonYearName { get; set; }
-
-    public int HistoricalHigh { get; set; }
-    public string? HistoricalHighYearName { get; set; }
 }

@@ -7,7 +7,7 @@
 else
 {
     <div class="row g-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
             <div class="card text-center h-100">
                 <div class="card-body">
                     <div class="text-muted small text-uppercase">Current Members</div>
@@ -15,7 +15,7 @@ else
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
             <div class="card text-center h-100">
                 <div class="card-body">
                     <div class="text-muted small text-uppercase">Staff Members</div>
@@ -23,7 +23,7 @@ else
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
             <div class="card text-center h-100">
                 <div class="card-body">
                     <div class="text-muted small text-uppercase">Growth</div>
@@ -33,18 +33,6 @@ else
                     @if (!string.IsNullOrEmpty(Stats.ComparisonYearName))
                     {
                         <div class="text-muted small">vs @Stats.ComparisonYearName</div>
-                    }
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center h-100">
-                <div class="card-body">
-                    <div class="text-muted small text-uppercase">Historical High</div>
-                    <div class="display-6 fw-bold text-warning">@Stats.HistoricalHigh</div>
-                    @if (!string.IsNullOrEmpty(Stats.HistoricalHighYearName))
-                    {
-                        <div class="text-muted small">@Stats.HistoricalHighYearName</div>
                     }
                 </div>
             </div>
