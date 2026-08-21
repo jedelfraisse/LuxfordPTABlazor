@@ -38,15 +38,23 @@ public class MembershipCsvImportService : IMembershipCsvImportService
         new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     /// <summary>
-    /// Identity key for duplicate detection: email if present, otherwise phone number (digits only)
-    /// so members with no email on file still get deduped. Null means we have no reliable identifier
-    /// at all — such a row is never flagged as a duplicate.
+    /// Identity key for duplicate detection: email if present, else phone number (digits only), else
+    /// First+Last name — student members commonly have neither an email nor a phone of their own, and
+    /// we still want to count and dedupe them rather than reject the row. Name-based matching is the
+    /// least reliable of the three (two different people can share a name), but it's better than
+    /// nothing. Null only when even a name isn't available.
     /// </summary>
-    private static string? GetDedupeKey(string? email, string? phone)
+    private static string? GetDedupeKey(string? email, string? phone, string? firstName, string? lastName)
     {
         if (!string.IsNullOrWhiteSpace(email)) return "email:" + email.Trim().ToLowerInvariant();
+
         var digits = new string((phone ?? "").Where(char.IsDigit).ToArray());
-        return digits.Length > 0 ? "phone:" + digits : null;
+        if (digits.Length > 0) return "phone:" + digits;
+
+        if (!string.IsNullOrWhiteSpace(firstName) && !string.IsNullOrWhiteSpace(lastName))
+            return "name:" + firstName.Trim().ToLowerInvariant() + "|" + lastName.Trim().ToLowerInvariant();
+
+        return null;
     }
 
     public async Task<MembershipImportPreviewDTO> ParsePreviewAsync(Stream csvStream, int schoolYearId)
@@ -87,18 +95,13 @@ public class MembershipCsvImportService : IMembershipCsvImportService
             preview.FileErrors.Add("The file must include First Name and Last Name columns.");
             return preview;
         }
-        if (columnMap["Email"] == null && columnMap["PhoneNumber"] == null)
-        {
-            preview.FileErrors.Add("The file must include an Email or a Phone Number column.");
-            return preview;
-        }
 
         var existingKeys = new HashSet<string>(
             (await _db.MembershipRecords
                 .Where(mr => mr.SchoolYearId == schoolYearId)
-                .Select(mr => new { mr.Email, mr.PhoneNumber })
+                .Select(mr => new { mr.Email, mr.PhoneNumber, mr.FirstName, mr.LastName })
                 .ToListAsync())
-            .Select(r => GetDedupeKey(r.Email, r.PhoneNumber))
+            .Select(r => GetDedupeKey(r.Email, r.PhoneNumber, r.FirstName, r.LastName))
             .Where(k => k != null)!);
 
         var seenInFile = new HashSet<string>();
@@ -138,12 +141,10 @@ public class MembershipCsvImportService : IMembershipCsvImportService
 
             if (string.IsNullOrWhiteSpace(row.FirstName)) row.Errors.Add("First name is required.");
             if (string.IsNullOrWhiteSpace(row.LastName)) row.Errors.Add("Last name is required.");
-            if (string.IsNullOrWhiteSpace(row.Email) && string.IsNullOrWhiteSpace(row.PhoneNumber))
-                row.Errors.Add("Either an email or a phone number is required.");
-            else if (!string.IsNullOrWhiteSpace(row.Email) && !row.Email.Contains('@'))
+            if (!string.IsNullOrWhiteSpace(row.Email) && !row.Email.Contains('@'))
                 row.Errors.Add($"Email '{row.Email}' doesn't look valid.");
 
-            var dedupeKey = GetDedupeKey(row.Email, row.PhoneNumber);
+            var dedupeKey = GetDedupeKey(row.Email, row.PhoneNumber, row.FirstName, row.LastName);
             if (dedupeKey != null)
             {
                 row.IsDuplicate = existingKeys.Contains(dedupeKey) || !seenInFile.Add(dedupeKey);
@@ -180,7 +181,7 @@ public class MembershipCsvImportService : IMembershipCsvImportService
         var existing = new Dictionary<string, MembershipRecord>();
         foreach (var r in await _db.MembershipRecords.Where(mr => mr.SchoolYearId == commit.SchoolYearId).ToListAsync())
         {
-            var key = GetDedupeKey(r.Email, r.PhoneNumber);
+            var key = GetDedupeKey(r.Email, r.PhoneNumber, r.FirstName, r.LastName);
             if (key != null) existing.TryAdd(key, r);
         }
 
@@ -199,7 +200,7 @@ public class MembershipCsvImportService : IMembershipCsvImportService
                 continue;
             }
 
-            var dedupeKey = GetDedupeKey(row.Email, row.PhoneNumber);
+            var dedupeKey = GetDedupeKey(row.Email, row.PhoneNumber, row.FirstName, row.LastName);
             var isStaff = row.MemberType.Contains("staff", StringComparison.OrdinalIgnoreCase)
                           || row.MemberType.Contains("teacher", StringComparison.OrdinalIgnoreCase);
             var status = row.Status.Trim().Equals("Inactive", StringComparison.OrdinalIgnoreCase)

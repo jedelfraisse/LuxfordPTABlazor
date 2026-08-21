@@ -73,7 +73,7 @@
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Phone Number</label>
                         <InputText @bind-Value="editingRecord.PhoneNumber" class="form-control" />
-                        <div class="form-text">An email or a phone number is required.</div>
+                        <div class="form-text">Optional if this member has neither (e.g. a student) — matched by name instead.</div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Join Date</label>
@@ -211,7 +211,7 @@
             }
             else
             {
-                <p class="text-muted">Upload a CSV with First Name, Last Name, Join Date, Member Type, Price, Status, Payment Type, and Teacher Name columns (header names are flexible). You'll also need an Email and/or a Phone Number column — at least one is required per row.</p>
+                <p class="text-muted">Upload a CSV with First Name, Last Name, Join Date, Member Type, Price, Status, Payment Type, and Teacher Name columns (header names are flexible). Email and Phone Number are both optional — members with neither (e.g. students) are still imported and matched by name instead.</p>
                 <InputFile OnChange="OnFileSelected" class="form-control mb-3" accept=".csv" />
                 <button type="button" class="btn btn-primary" @onclick="UploadPreview" disabled="@(selectedFile == null || isUploadingPreview)">
                     @if (isUploadingPreview)

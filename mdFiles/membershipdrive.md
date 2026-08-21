@@ -42,17 +42,26 @@ the following deviations made during implementation — agreed with the site own
    The one public/anonymous exception is aggregate stats (`GET /api/membership/{schoolYearId}/stats`)
    and visible-milestone progress (`GET /api/membership/milestones/{schoolYearId}`) — both contain no
    PII and are what powers the public `/membership-drive` page's live stats and milestone list.
-8. **Email is not required — Email OR PhoneNumber is required.** Some members (notably staff) may
-   only have a phone number on file. Both CSV import and the manual add/edit form require at least
-   one of the two, not specifically Email. Duplicate detection (§2.1) now keys off Email when present,
-   falling back to a digits-only PhoneNumber match when it isn't; a row with neither is never flagged
-   as a duplicate (there's no reliable identity to compare).
+8. **Neither Email nor PhoneNumber is required.** Some members (notably staff) may only have a phone
+   number on file, and student members commonly have neither. Both CSV import and the manual add/edit
+   form accept a record with just a name. Duplicate detection (§2.1) keys off Email when present,
+   falls back to a digits-only PhoneNumber match, and finally falls back to First+Last name when
+   neither contact field is present — name matching is the least reliable of the three (two different
+   people can share a name) but still lets these members be counted and deduped rather than rejected.
 9. **Visibility of not-yet-public school years/milestones is role-based, not Admin/BoardMember-only.**
    Any authenticated user holding one of the app's real roles (`Admin`, `BoardMember`, or
    `Volunteer`) can see hidden/future school years and hidden milestones; only anonymous and
    authenticated-but-roleless visitors are restricted to `IsVisibleToPublic`/visible-only content.
    This is purely a *view* rule — editing (`[Authorize(Roles = "Admin,BoardMember")]` on write
    endpoints) is unchanged.
+10. **Bug fix: `MembershipStatsDTO.GrowthPercent` was a ratio, not a percent change.** It computed
+    `current/prior*100` ("this year as a % of last year") but was labeled "Growth" and colored as if
+    0% growth were a full loss — e.g. a decline from 116 to 61 members displayed as "+52.6%" in red,
+    reading as strong growth when membership had actually nearly halved. Fixed to the standard percent-
+    change formula `(current-prior)/prior*100`, which correctly yields -47.4% for that example. The
+    stats panel now shows an explicit `+`/`-` sign and colors ≥0% green, <0% red (previously ≥100%/
+    <100%). Note this fix does **not** apply to the milestone system's `PercentGrowth` type (e.g.
+    "reach 120% of last year") — that one is intentionally ratio-based per the original §6 spec.
 
 See §7 for the actual API surface as built (it differs slightly from the original endpoint list).
 
@@ -104,8 +113,8 @@ public class MembershipRecord
 - Admin uploads a CSV file.
 - System parses fields matching the structure of the uploaded CSV.
 - All records are stored under the selected **SchoolYear**.
-- Duplicate detection by Email + SchoolYear — falling back to PhoneNumber + SchoolYear when a row
-  has no email (see §0.8; Email is not strictly required, but Email or PhoneNumber is).
+- Duplicate detection by Email + SchoolYear — falling back to PhoneNumber, then to First+Last name,
+  + SchoolYear when a row has less contact info (see §0.8; neither Email nor PhoneNumber is required).
 - Admin can review before final import.
 - **As built**: import is two steps — `POST /api/membership/import/preview` parses the file and
   returns validation/duplicate flags per row without writing anything; the admin reviews (can

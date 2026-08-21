@@ -52,7 +52,9 @@ public class MembershipMilestoneService : IMembershipMilestoneService
         decimal? growthPercent = null;
         if (priorYear != null && counts.TryGetValue(priorYear.Id, out var priorCounts) && priorCounts.Total > 0)
         {
-            growthPercent = Math.Round(current.Total / (decimal)priorCounts.Total * 100, 1);
+            // Percent CHANGE from last year — e.g. going from 116 members to 61 is a -47.4% change,
+            // not "current/prior*100" (52.6%), which is a ratio and would misreport a decline as growth.
+            growthPercent = Math.Round((current.Total - priorCounts.Total) / (decimal)priorCounts.Total * 100, 1);
         }
 
         var (historicalHigh, historicalHighYear) = GetHistoricalHigh(allYears, counts, DefaultHistoricalAnchor, excludeYearId: null);

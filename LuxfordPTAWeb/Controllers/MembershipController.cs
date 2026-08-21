@@ -92,8 +92,6 @@ public class MembershipController : ControllerBase
     {
         var schoolYearExists = await _db.SchoolYears.AnyAsync(sy => sy.Id == dto.SchoolYearId);
         if (!schoolYearExists) return BadRequest("Selected school year does not exist.");
-        if (string.IsNullOrWhiteSpace(dto.Email) && string.IsNullOrWhiteSpace(dto.PhoneNumber))
-            return BadRequest("Either an email or a phone number is required.");
 
         var record = new MembershipRecord
         {
@@ -124,8 +122,6 @@ public class MembershipController : ControllerBase
     {
         var record = await _db.MembershipRecords.FindAsync(id);
         if (record == null) return NotFound();
-        if (string.IsNullOrWhiteSpace(dto.Email) && string.IsNullOrWhiteSpace(dto.PhoneNumber))
-            return BadRequest("Either an email or a phone number is required.");
 
         record.FirstName = dto.FirstName;
         record.LastName = dto.LastName;

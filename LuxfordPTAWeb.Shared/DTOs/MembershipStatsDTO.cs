@@ -9,7 +9,7 @@ public class MembershipStatsDTO
     public int CurrentCount { get; set; }
     public int StaffCount { get; set; }
 
-    /// <summary>Percent of the prior school year's total this year has reached. Null if no prior year data exists.</summary>
+    /// <summary>Percent CHANGE from the prior school year's total (negative = decline). Null if no prior year data exists.</summary>
     public decimal? GrowthPercent { get; set; }
     public string? ComparisonYearName { get; set; }
 

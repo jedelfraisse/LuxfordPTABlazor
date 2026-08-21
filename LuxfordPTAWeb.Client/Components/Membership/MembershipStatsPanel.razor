@@ -28,7 +28,7 @@ else
                 <div class="card-body">
                     <div class="text-muted small text-uppercase">Growth</div>
                     <div class="display-6 fw-bold @GrowthClass">
-                        @(Stats.GrowthPercent.HasValue ? $"{Stats.GrowthPercent:0.#}%" : "N/A")
+                        @GrowthDisplay
                     </div>
                     @if (!string.IsNullOrEmpty(Stats.ComparisonYearName))
                     {
@@ -55,10 +55,19 @@ else
 @code {
     [Parameter] public MembershipStatsDTO? Stats { get; set; }
 
+    // GrowthPercent is percent CHANGE from last year (0 = no change), not a ratio — so the
+    // no-change baseline for coloring/sign is 0, not 100.
     private string GrowthClass => Stats?.GrowthPercent switch
     {
         null => "text-muted",
-        >= 100 => "text-success",
+        >= 0 => "text-success",
         _ => "text-danger"
+    };
+
+    private string GrowthDisplay => Stats?.GrowthPercent switch
+    {
+        null => "N/A",
+        >= 0 => $"+{Stats.GrowthPercent:0.#}%",
+        _ => $"{Stats.GrowthPercent:0.#}%" // already carries its own minus sign
     };
 }
