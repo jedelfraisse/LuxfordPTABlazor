@@ -13,7 +13,7 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h1 class="card-title text-center mb-3">Events for @(selectedSchoolYear?.Name ?? "Loading...")!</h1>
-        <p class="lead text-center mb-0">
+        <p class="lead text-center @(showGetInvolved ? "mb-3" : "mb-0")">
             @if (isCurrentSchoolYear)
             {
                 <span>Welcome to the events page for Luxford Elementary School. Here you'll find both PTA and school events &mdash; browse the calendar or by category, and use the search box to narrow either view down.</span>
@@ -23,6 +23,18 @@
                 <span>Here are the events that helped make @selectedSchoolYear?.Name a great year at Luxford Elementary. Browse the calendar or by category to see what happened!</span>
             }
         </p>
+        @if (showGetInvolved)
+        {
+            <hr class="my-3" />
+            <p class="text-center mb-0">
+                🙋‍♀️ <strong>Want to help?</strong> We're always looking for volunteers to help make our events successful!
+                Contact our @contactPersonTitle: <strong>@contactPersonName</strong>
+                @if (!string.IsNullOrEmpty(contactPersonEmail))
+                {
+                    <text> &mdash; <a href="mailto:@contactPersonEmail">@contactPersonEmail</a></text>
+                }
+            </p>
+        }
     </div>
 </div>
 
@@ -34,83 +46,7 @@
     </div>
 }
 
-@if (isCurrentSchoolYear)
-{
-    <h2 class="h4 mt-4">📅 Coming Up Next</h2>
-    @if (upcomingEvents == null)
-    {
-        <div class="alert alert-info">
-            <em>Loading upcoming events...</em>
-        </div>
-    }
-    else if (!upcomingEvents.Any())
-    {
-        <div class="alert alert-warning">
-            <em>No upcoming events in the next 30 days.</em>
-        </div>
-    }
-    else
-    {
-        <div class="row mb-4">
-            @foreach (var evt in upcomingEvents.Take(3))
-            {
-                <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100 border-start border-4" style="border-left-color: @EventDisplayHelpers.GetBorderColorHex(evt.EventCatColorClass) !important;">
-                        <div class="card-body">
-                            <h6 class="card-title">@evt.Title</h6>
-                            <p class="text-muted mb-2">
-                                <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
-                                @if (!string.IsNullOrWhiteSpace(EventDisplayHelpers.GetEventTimeText(evt)))
-                                {
-                                    <span class="ms-1"><i class="bi bi-clock"></i> @EventDisplayHelpers.GetEventTimeText(evt)</span>
-                                }
-                                @if (EventDisplayHelpers.IsToday(evt)) {<span class="badge bg-warning ms-2">Tonight!</span>}
-                            </p>
-                            @if (!string.IsNullOrWhiteSpace(evt.Location))
-                            {
-                                <p class="text-muted mb-2">
-                                    <i class="bi bi-geo-alt"></i> @evt.Location
-                                </p>
-                            }
-                            @if (evt.RequiresVolunteers)
-                            {
-                                <p class="text-muted mb-2">
-                                    <i class="bi bi-people"></i>
-                                    @if (!string.IsNullOrWhiteSpace(evt.ExcelImportId))
-                                    {
-                                        <a href="@evt.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
-                                    }
-                                    else
-                                    {
-                                        <span>@EventDisplayHelpers.GetVolunteerSignupText(evt)</span>
-                                    }
-                                </p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(evt.EventCatName))
-                            {
-                                <span class="badge bg-light text-dark">@evt.EventCatName</span>
-                            }
-                            @if (EventDisplayHelpers.HasDetailsOrFlyer(evt))
-                            {
-                                <div class="mt-2 d-flex gap-2 flex-wrap">
-                                    @if (EventDisplayHelpers.GetFlyerUrls(evt).Any())
-                                    {
-                                        <a class="btn btn-sm btn-outline-primary" href="@EventDisplayHelpers.GetPrimaryFlyerUrl(evt)" target="_blank" rel="noopener noreferrer">View Flyer</a>
-                                    }
-                                    @if (EventDisplayHelpers.HasEventDetails(evt))
-                                    {
-                                        <a class="btn btn-sm btn-outline-primary" href="@EventDisplayHelpers.GetEventDetailsUrl(evt)">View Details</a>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    }
-}
-else
+@if (!isCurrentSchoolYear)
 {
     <h2 class="h4 mt-4">📅 Past Events from @selectedSchoolYear?.Name</h2>
 }
@@ -152,20 +88,6 @@ else
     <EventsCategoriesTab EventCategories="eventCategories" EventSubcategories="eventSubcategories" AllEvents="FilteredEvents" IsCurrentSchoolYear="isCurrentSchoolYear" SelectedSchoolYear="selectedSchoolYear" IsFiltered="HasActiveFilters" />
 }
 
-@if (showGetInvolved)
-{
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white fw-bold">🙋‍♀️ Get Involved</div>
-        <div class="card-body">
-            <p>We're always looking for volunteers to help make our events successful! Contact our @contactPersonTitle: @contactPersonName</p>
-            @if (!string.IsNullOrEmpty(contactPersonEmail))
-            {
-                <p class="mb-0"><strong>Email:</strong> <a href="mailto:@contactPersonEmail">@contactPersonEmail</a></p>
-            }
-        </div>
-    </div>
-}
-
 <div class="alert alert-success text-center mt-4">
     <em>@(isCurrentSchoolYear ? "Mark your calendars and join us for these wonderful community events!" : $"These events helped make {selectedSchoolYear?.Name} a great year!")</em><br />
     @if (isCurrentSchoolYear)
@@ -182,7 +104,6 @@ else
 
     private EventsTab activeTab = EventsTab.Calendar;
 
-    private List<EventListItemDTO>? upcomingEvents;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
     private List<EventListItemDTO>? allEvents;
@@ -268,11 +189,6 @@ else
             await LoadEventSubcategories();
             await LoadAllEvents();
 
-            if (isCurrentSchoolYear)
-            {
-                await LoadUpcomingEvents();
-            }
-
             if (showGetInvolved)
             {
                 await LoadContactPerson();
@@ -331,29 +247,6 @@ else
         catch (Exception)
         {
             eventSubcategories = new List<EventCatSub>();
-        }
-    }
-
-    private async Task LoadUpcomingEvents()
-    {
-        if (selectedSchoolYear == null) return;
-
-        try
-        {
-            // Get upcoming events for the current school year
-            var events = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
-
-            var now = DateTime.UtcNow.Date;
-            var in30Days = now.AddDays(30);
-
-            upcomingEvents = events?
-                .Where(e => e.Date >= now && e.Date <= in30Days)
-                .OrderBy(e => e.Date)
-                .ToList() ?? new List<EventListItemDTO>();
-        }
-        catch (Exception)
-        {
-            upcomingEvents = new List<EventListItemDTO>();
         }
     }
 
