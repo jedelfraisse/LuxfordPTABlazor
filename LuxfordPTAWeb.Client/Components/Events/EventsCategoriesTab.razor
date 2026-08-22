@@ -1,0 +1,304 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Client.Code
+
+<p>@(IsCurrentSchoolYear ? "Browse our events by category:" : $"Events from {SelectedSchoolYear?.Name} organized by category:")</p>
+
+@if (EventCategories == null || AllEvents == null)
+{
+    <div class="alert alert-info">
+        <em>Loading event categories and events...</em>
+    </div>
+}
+else if (IsFiltered && !VisibleCategories.Any())
+{
+    <div class="alert alert-warning text-center">
+        <h5>No Categories Match Your Filters</h5>
+        <p class="mb-0">Try clearing a filter to see more categories.</p>
+    </div>
+}
+else
+{
+    <div class="row mb-4">
+        @foreach (var category in VisibleCategories)
+        {
+            var categoryEvents = GetEventsForCategory(category.Id);
+            var subcategories = GetSubcategoriesForCategory(category.Id);
+
+            var colClass = (int)category.Size == 1 ? "col-12 mb-4" : "col-md-6 mb-4";
+            <div class="@colClass">
+                <div class="card h-100">
+                    <div class="card-header @EventDisplayHelpers.GetBackgroundColorClass(category.ColorClass) text-white">
+                        <h5 class="mb-0">
+                            @if (!string.IsNullOrEmpty(category.Icon))
+                            {
+                                <i class="@category.Icon me-2"></i>
+                            }
+                            @category.Name
+                            <span class="badge bg-light text-dark ms-2">@categoryEvents.Count() events</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!categoryEvents.Any() && !subcategories.Any())
+                        {
+                            <p class="text-muted mb-0">@category.Description</p>
+                            <p class="text-muted small mt-2">No events scheduled for this category.</p>
+                        }
+                        else if (subcategories.Any())
+                        {
+                            <!-- Show subcategories with their next event or description -->
+                            @foreach (var subcat in subcategories.OrderBy(sc => sc.DisplayOrder))
+                            {
+                                var subcatEvents = categoryEvents.Where(e => e.EventSubTypeId == subcat.Id);
+                                var nextEvent = GetNextEventForSubcategory(subcatEvents);
+
+                                <div class="mb-3 @(subcat != subcategories.Last() ? "border-bottom pb-2" : "")">
+                                    <h6 class="text-primary mb-1">
+                                        @if (!string.IsNullOrEmpty(subcat.Icon))
+                                        {
+                                            <i class="@subcat.Icon @subcat.ColorClass me-1"></i>
+                                        }
+                                        @subcat.Name
+                                    </h6>
+
+                                    @if (nextEvent != null)
+                                    {
+                                        <div class="small">
+                                            <strong>@(IsCurrentSchoolYear ? "Next" : "Event"):</strong> @nextEvent.Title
+                                            <br>
+                                            <span class="text-muted">
+                                                <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
+                                        @if (!string.IsNullOrWhiteSpace(EventDisplayHelpers.GetEventTimeText(nextEvent)))
+                                        {
+                                                    <br><i class="bi bi-clock"></i> @EventDisplayHelpers.GetEventTimeText(nextEvent)
+                                        }
+                                                @if (nextEvent.RequiresVolunteers)
+                                                {
+                                                    <br><i class="bi bi-people"></i>
+                                                    @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
+                                                    {
+                                                        <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@EventDisplayHelpers.GetVolunteerSignupText(nextEvent)</span>
+                                                    }
+                                                }
+                                                @if (!string.IsNullOrEmpty(nextEvent.Location))
+                                                {
+                                                    <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
+                                                }
+                                            </span>
+                                        </div>
+
+                                        @if (subcatEvents.Count() > 1)
+                                        {
+                                            <div class="mt-1">
+                                                <small class="text-muted">+@(subcatEvents.Count() - 1) more events</small>
+                                            </div>
+                                        }
+                                        @if (EventDisplayHelpers.HasDetailsOrFlyer(nextEvent))
+                                        {
+                                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                @if (EventDisplayHelpers.GetFlyerUrls(nextEvent).Any())
+                                                {
+                                                    <a href="@EventDisplayHelpers.GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                }
+                                                @if (EventDisplayHelpers.HasEventDetails(nextEvent))
+                                                {
+                                                    <a href="@EventDisplayHelpers.GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <p class="small text-muted mb-1">@subcat.Description</p>
+                                        @if (!subcatEvents.Any())
+                                        {
+                                            <small class="text-muted">No events scheduled</small>
+                                        }
+                                    }
+                                </div>
+                            }
+
+                            <!-- Show events without subcategories -->
+                            @if (GetEventsWithoutSubcategory(categoryEvents).Any())
+                            {
+                                var eventsWithoutSubcat = GetEventsWithoutSubcategory(categoryEvents);
+                                var nextGeneralEvent = GetNextEventForSubcategory(eventsWithoutSubcat);
+                                if (nextGeneralEvent != null)
+                                {
+                                    <div class="mb-3 border-top pt-2">
+                                        <h6 class="text-secondary mb-1">General Events</h6>
+                                        <div class="small">
+                                            <strong>@(IsCurrentSchoolYear ? "Next" : "Event"):</strong> @nextGeneralEvent.Title
+                                            <br>
+                                            <span class="text-muted">
+                                                <i class="bi bi-calendar"></i> @nextGeneralEvent.Date.ToString("MMM d, yyyy")
+                                                @if (!string.IsNullOrWhiteSpace(EventDisplayHelpers.GetEventTimeText(nextGeneralEvent)))
+                                                {
+                                                    <br><i class="bi bi-clock"></i> @EventDisplayHelpers.GetEventTimeText(nextGeneralEvent)
+                                                }
+                                                @if (nextGeneralEvent.RequiresVolunteers)
+                                                {
+                                                    <br><i class="bi bi-people"></i>
+                                                    @if (!string.IsNullOrWhiteSpace(nextGeneralEvent.ExcelImportId))
+                                                    {
+                                                        <a href="@nextGeneralEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@EventDisplayHelpers.GetVolunteerSignupText(nextGeneralEvent)</span>
+                                                    }
+                                                }
+                                            </span>
+                                        </div>
+                                        @if (eventsWithoutSubcat.Count() > 1)
+                                        {
+                                            <div class="mt-1">
+                                                <small class="text-muted">+@(eventsWithoutSubcat.Count() - 1) more events</small>
+                                            </div>
+                                        }
+                                        @if (EventDisplayHelpers.HasDetailsOrFlyer(nextGeneralEvent))
+                                        {
+                                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                @if (EventDisplayHelpers.GetFlyerUrls(nextGeneralEvent).Any())
+                                                {
+                                                    <a href="@EventDisplayHelpers.GetPrimaryFlyerUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                                }
+                                                @if (EventDisplayHelpers.HasEventDetails(nextGeneralEvent))
+                                                {
+                                                    <a href="@EventDisplayHelpers.GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <!-- Category without subcategories - show next event or description -->
+                            var nextEvent = GetNextEventForSubcategory(categoryEvents);
+                            @if (nextEvent != null)
+                            {
+                                <div class="mb-3">
+                                    <h6 class="text-primary mb-1">@(IsCurrentSchoolYear ? "Next Event" : "Event"): @nextEvent.Title</h6>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
+                                        @if (!string.IsNullOrWhiteSpace(EventDisplayHelpers.GetEventTimeText(nextEvent)))
+                                        {
+                                            <br><i class="bi bi-clock"></i> @EventDisplayHelpers.GetEventTimeText(nextEvent)
+                                        }
+                                        @if (nextEvent.RequiresVolunteers)
+                                        {
+                                            <br><i class="bi bi-people"></i>
+                                            @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
+                                            {
+                                                <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
+                                            }
+                                            else
+                                            {
+                                                <span>@EventDisplayHelpers.GetVolunteerSignupText(nextEvent)</span>
+                                            }
+                                        }
+                                        @if (!string.IsNullOrEmpty(nextEvent.Location))
+                                        {
+                                            <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(nextEvent.Description))
+                                    {
+                                        <p class="small mt-1 mb-1">@EventDisplayHelpers.TruncateDescription(nextEvent.Description, 100)</p>
+                                    }
+                                </div>
+
+                                @if (categoryEvents.Count() > 1)
+                                {
+                                    <div class="mt-2">
+                                        <small class="text-muted">+@(categoryEvents.Count() - 1) more events in this category</small>
+                                    </div>
+                                }
+                                @if (EventDisplayHelpers.HasDetailsOrFlyer(nextEvent))
+                                {
+                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                        @if (EventDisplayHelpers.GetFlyerUrls(nextEvent).Any())
+                                        {
+                                            <a href="@EventDisplayHelpers.GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                        }
+                                        @if (EventDisplayHelpers.HasEventDetails(nextEvent))
+                                        {
+                                            <a href="@EventDisplayHelpers.GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">@category.Description</p>
+                            }
+                        }
+
+                        @if (category.ShowViewEventsButton && categoryEvents.Any())
+                        {
+                            <div class="mt-3 pt-2 border-top">
+                                <a href="events/category/@category.Slug" class="btn btn-sm btn-outline-primary">
+                                    View All @category.Name <i class="bi bi-arrow-right"></i>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public List<EventCat>? EventCategories { get; set; }
+    [Parameter] public List<EventCatSub>? EventSubcategories { get; set; }
+    [Parameter] public List<EventListItemDTO>? AllEvents { get; set; }
+    [Parameter] public bool IsCurrentSchoolYear { get; set; }
+    [Parameter] public SchoolYear? SelectedSchoolYear { get; set; }
+    [Parameter] public bool IsFiltered { get; set; }
+
+    private List<EventCat> VisibleCategories =>
+        (EventCategories ?? new List<EventCat>())
+            .Where(ec => ec.IsActive && (!IsFiltered || GetEventsForCategory(ec.Id).Any()))
+            .OrderBy(ec => ec.DisplayOrder)
+            .ToList();
+
+    private IEnumerable<EventListItemDTO> GetEventsForCategory(int categoryId)
+    {
+        return AllEvents?.Where(e => e.EventCatId == categoryId) ?? Enumerable.Empty<EventListItemDTO>();
+    }
+
+    private IEnumerable<EventCatSub> GetSubcategoriesForCategory(int categoryId)
+    {
+        return EventSubcategories?.Where(esc => esc.EventCatId == categoryId && esc.IsActive) ?? Enumerable.Empty<EventCatSub>();
+    }
+
+    private IEnumerable<EventListItemDTO> GetEventsWithoutSubcategory(IEnumerable<EventListItemDTO> categoryEvents)
+    {
+        return categoryEvents.Where(e => e.EventSubTypeId == null);
+    }
+
+    private EventListItemDTO? GetNextEventForSubcategory(IEnumerable<EventListItemDTO> events)
+    {
+        if (IsCurrentSchoolYear)
+        {
+            var now = DateTime.UtcNow;
+            return events
+                .Where(e => e.Date >= now)
+                .OrderBy(e => e.Date)
+                .FirstOrDefault();
+        }
+        else
+        {
+            return events
+                .OrderBy(e => e.Date)
+                .FirstOrDefault();
+        }
+    }
+}

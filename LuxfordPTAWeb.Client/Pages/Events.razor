@@ -1,10 +1,12 @@
-﻿@page "/events"
+@page "/events"
 @inject HttpClient Http
+@inject NavigationManager NavigationManager
 @inject LuxfordPTAWeb.Client.Code.SchoolYearSupport SchoolYearSupport
 @using LuxfordPTAWeb.Shared.Models
 @using LuxfordPTAWeb.Shared.Enums
 @using LuxfordPTAWeb.Shared.DTOs
-@using System.Text.Json
+@using LuxfordPTAWeb.Client.Code
+@using LuxfordPTAWeb.Client.Components.Events
 
 <PageTitle>Events - @(selectedSchoolYear?.Name ?? "Loading...")</PageTitle>
 
@@ -14,11 +16,11 @@
         <p class="lead text-center mb-0">
             @if (isCurrentSchoolYear)
             {
-                <span>Welcome to the events page for Luxford Elementary School. Here you'll find both PTA and school events, organized by category to help you plan your year and stay involved in our community.</span>
+                <span>Welcome to the events page for Luxford Elementary School. Here you'll find both PTA and school events &mdash; browse the calendar or by category, and use the search box to narrow either view down.</span>
             }
             else
             {
-                <span>Here are the events that helped make @selectedSchoolYear?.Name a great year at Luxford Elementary. Browse by category to see what happened!</span>
+                <span>Here are the events that helped make @selectedSchoolYear?.Name a great year at Luxford Elementary. Browse the calendar or by category to see what happened!</span>
             }
         </p>
     </div>
@@ -34,7 +36,7 @@
 
 @if (isCurrentSchoolYear)
 {
-    <h2 class="h4 mt-4">📅 Upcoming Events</h2>
+    <h2 class="h4 mt-4">📅 Coming Up Next</h2>
     @if (upcomingEvents == null)
     {
         <div class="alert alert-info">
@@ -50,19 +52,19 @@
     else
     {
         <div class="row mb-4">
-            @foreach (var evt in upcomingEvents.Take(6))
+            @foreach (var evt in upcomingEvents.Take(3))
             {
                 <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100 border-start border-4" style="@GetEventBorderStyle(evt)">
+                    <div class="card h-100 border-start border-4" style="border-left-color: @EventDisplayHelpers.GetBorderColorHex(evt.EventCatColorClass) !important;">
                         <div class="card-body">
                             <h6 class="card-title">@evt.Title</h6>
                             <p class="text-muted mb-2">
                                 <i class="bi bi-calendar"></i> @evt.Date.ToString("MMMM d, yyyy")
-                                @if (!string.IsNullOrWhiteSpace(GetEventTimeText(evt)))
+                                @if (!string.IsNullOrWhiteSpace(EventDisplayHelpers.GetEventTimeText(evt)))
                                 {
-                                    <span class="ms-1"><i class="bi bi-clock"></i> @GetEventTimeText(evt)</span>
+                                    <span class="ms-1"><i class="bi bi-clock"></i> @EventDisplayHelpers.GetEventTimeText(evt)</span>
                                 }
-                                @if(evt.Date.Date == DateTime.Now.Date){<span class="badge bg-warning ms-2">Tonight!</span>}
+                                @if (EventDisplayHelpers.IsToday(evt)) {<span class="badge bg-warning ms-2">Tonight!</span>}
                             </p>
                             @if (!string.IsNullOrWhiteSpace(evt.Location))
                             {
@@ -80,36 +82,24 @@
                                     }
                                     else
                                     {
-                                        <span>@GetVolunteerSignupText(evt)</span>
+                                        <span>@EventDisplayHelpers.GetVolunteerSignupText(evt)</span>
                                     }
                                 </p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(evt.DescriptionHtml))
-                            {
-                                <div class="card-text small scrollable-content" style="max-height:180px;">
-                                    @((MarkupString)evt.DescriptionHtml)
-                                </div>
-                            }
-                            else if (!string.IsNullOrWhiteSpace(evt.DescriptionMarkdown))
-                            {
-                                <div class="card-text small scrollable-content" style="max-height:180px;">
-                                    <BlazorMarkdown.Markdown Content="@evt.DescriptionMarkdown" />
-                                </div>
                             }
                             @if (!string.IsNullOrWhiteSpace(evt.EventCatName))
                             {
                                 <span class="badge bg-light text-dark">@evt.EventCatName</span>
                             }
-                            @if (HasDetailsOrFlyer(evt))
+                            @if (EventDisplayHelpers.HasDetailsOrFlyer(evt))
                             {
                                 <div class="mt-2 d-flex gap-2 flex-wrap">
-                                    @if (GetFlyerUrls(evt).Any())
+                                    @if (EventDisplayHelpers.GetFlyerUrls(evt).Any())
                                     {
-                                        <a class="btn btn-sm btn-outline-primary" href="@GetPrimaryFlyerUrl(evt)" target="_blank" rel="noopener noreferrer">View Flyer</a>
+                                        <a class="btn btn-sm btn-outline-primary" href="@EventDisplayHelpers.GetPrimaryFlyerUrl(evt)" target="_blank" rel="noopener noreferrer">View Flyer</a>
                                     }
-                                    @if (HasEventDetails(evt))
+                                    @if (EventDisplayHelpers.HasEventDetails(evt))
                                     {
-                                        <a class="btn btn-sm btn-outline-primary" href="@GetEventDetailsUrl(evt)">View Details</a>
+                                        <a class="btn btn-sm btn-outline-primary" href="@EventDisplayHelpers.GetEventDetailsUrl(evt)">View Details</a>
                                     }
                                 </div>
                             }
@@ -125,251 +115,41 @@ else
     <h2 class="h4 mt-4">📅 Past Events from @selectedSchoolYear?.Name</h2>
 }
 
-<h2 class="h4 mt-4">Event Categories</h2>
-<p>@(isCurrentSchoolYear ? "Browse our events by category:" : $"Events from {selectedSchoolYear?.Name} organized by category:")</p>
+<!-- Tabs: Calendar / Categories -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == EventsTab.Calendar ? "active" : "")" @onclick='() => SetActiveTab(EventsTab.Calendar)'>
+            <i class="bi bi-calendar3"></i> Calendar
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == EventsTab.Categories ? "active" : "")" @onclick='() => SetActiveTab(EventsTab.Categories)'>
+            <i class="bi bi-grid-3x3-gap"></i> Categories
+        </button>
+    </li>
+</ul>
 
-@if (eventCategories == null || allEvents == null)
+<EventsFilterBar Categories="eventCategories"
+                  SearchText="searchText" SearchTextChanged="OnSearchTextChanged"
+                  SelectedCategoryId="selectedCategoryId" SelectedCategoryIdChanged="OnSelectedCategoryIdChanged" ShowCategoryFilter="activeTab == EventsTab.Calendar"
+                  VolunteersOnly="volunteersOnly" VolunteersOnlyChanged="OnVolunteersOnlyChanged"
+                  TimeFilter="timeFilter" TimeFilterChanged="OnTimeFilterChanged" ShowTimeFilter="activeTab == EventsTab.Categories && isCurrentSchoolYear"
+                  ResultCount="FilteredEvents.Count" TotalCount="allEvents?.Count ?? 0" />
+
+@if (allEvents == null)
 {
     <div class="alert alert-info">
-        <em>Loading event categories and events...</em>
+        <em>Loading events...</em>
     </div>
+}
+else if (activeTab == EventsTab.Calendar)
+{
+    <EventsCalendarTab Events="FilteredEvents" SchoolYear="selectedSchoolYear" IsCurrentSchoolYear="isCurrentSchoolYear" IsFiltered="HasActiveFilters" />
 }
 else
 {
-    <div class="row mb-4">
-        @foreach (var category in eventCategories.Where(ec => ec.IsActive).OrderBy(ec => ec.DisplayOrder))
-        {
-            var categoryEvents = GetEventsForCategory(category.Id);
-            var subcategories = GetSubcategoriesForCategory(category.Id);
-            
-            var colClass = (int)category.Size == 1 ? "col-12 mb-4" : "col-md-6 mb-4";
-            <div class="@colClass">
-                <div class="card h-100">
-                    <div class="card-header @GetHeaderColorClass(category) text-white">
-                        <h5 class="mb-0">
-                            @if (!string.IsNullOrEmpty(category.Icon))
-                            {
-                                <i class="@category.Icon me-2"></i>
-                            }
-                            @category.Name
-                            <span class="badge bg-light text-dark ms-2">@categoryEvents.Count() events</span>
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        @if (!categoryEvents.Any() && !subcategories.Any())
-                        {
-                            <p class="text-muted mb-0">@category.Description</p>
-                            <p class="text-muted small mt-2">No events scheduled for this category.</p>
-                        }
-                        else if (subcategories.Any())
-                        {
-                            <!-- Show subcategories with their next event or description -->
-                            @foreach (var subcat in subcategories.OrderBy(sc => sc.DisplayOrder))
-                            {
-                                var subcatEvents = categoryEvents.Where(e => e.EventSubTypeId == subcat.Id);
-                                var nextEvent = GetNextEventForSubcategory(subcatEvents);
-                                
-                                <div class="mb-3 @(subcat != subcategories.Last() ? "border-bottom pb-2" : "")">
-                                    <h6 class="text-primary mb-1">
-                                        @if (!string.IsNullOrEmpty(subcat.Icon))
-                                        {
-                                            <i class="@subcat.Icon @subcat.ColorClass me-1"></i>
-                                        }
-                                        @subcat.Name
-                                    </h6>
-                                    
-                                    @if (nextEvent != null)
-                                    {
-                                        <div class="small">
-                                            <strong>@(isCurrentSchoolYear ? "Next" : "Event"):</strong> @nextEvent.Title
-                                            <br>
-                                            <span class="text-muted">
-                                                <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
-                                        @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextEvent)))
-                                        {
-                                                    <br><i class="bi bi-clock"></i> @GetEventTimeText(nextEvent)
-                                        }
-                                                @if (nextEvent.RequiresVolunteers)
-                                                {
-                                                    <br><i class="bi bi-people"></i>
-                                                    @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
-                                                    {
-                                                        <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span>@GetVolunteerSignupText(nextEvent)</span>
-                                                    }
-                                                }
-                                                @if (!string.IsNullOrEmpty(nextEvent.Location))
-                                                {
-                                                    <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
-                                                }
-                                            </span>
-                                        </div>
-                                        
-                                        @if (subcatEvents.Count() > 1)
-                                        {
-                                            <div class="mt-1">
-                                                <small class="text-muted">+@(subcatEvents.Count() - 1) more events</small>
-                                            </div>
-                                        }
-                                        @if (HasDetailsOrFlyer(nextEvent))
-                                        {
-                                            <div class="mt-2 d-flex gap-2 flex-wrap">
-                                                @if (GetFlyerUrls(nextEvent).Any())
-                                                {
-                                                    <a href="@GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
-                                                }
-                                                @if (HasEventDetails(nextEvent))
-                                                {
-                                                    <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
-                                                }
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <p class="small text-muted mb-1">@subcat.Description</p>
-                                        @if (!subcatEvents.Any())
-                                        {
-                                            <small class="text-muted">No events scheduled</small>
-                                        }
-                                    }
-                                </div>
-                            }
-                            
-                            <!-- Show events without subcategories -->
-                            @if (GetEventsWithoutSubcategory(categoryEvents).Any())
-                            {
-                                var eventsWithoutSubcat = GetEventsWithoutSubcategory(categoryEvents);
-                                var nextGeneralEvent = GetNextEventForSubcategory(eventsWithoutSubcat);
-                                if (nextGeneralEvent != null)
-                                {
-                                    <div class="mb-3 border-top pt-2">
-                                        <h6 class="text-secondary mb-1">General Events</h6>
-                                        <div class="small">
-                                            <strong>@(isCurrentSchoolYear ? "Next" : "Event"):</strong> @nextGeneralEvent.Title
-                                            <br>
-                                            <span class="text-muted">
-                                                <i class="bi bi-calendar"></i> @nextGeneralEvent.Date.ToString("MMM d, yyyy")
-                                                @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextGeneralEvent)))
-                                                {
-                                                    <br><i class="bi bi-clock"></i> @GetEventTimeText(nextGeneralEvent)
-                                                }
-                                                @if (nextGeneralEvent.RequiresVolunteers)
-                                                {
-                                                    <br><i class="bi bi-people"></i>
-                                                    @if (!string.IsNullOrWhiteSpace(nextGeneralEvent.ExcelImportId))
-                                                    {
-                                                        <a href="@nextGeneralEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span>@GetVolunteerSignupText(nextGeneralEvent)</span>
-                                                    }
-                                                }
-                                            </span>
-                                        </div>
-                                        @if (eventsWithoutSubcat.Count() > 1)
-                                        {
-                                            <div class="mt-1">
-                                                <small class="text-muted">+@(eventsWithoutSubcat.Count() - 1) more events</small>
-                                            </div>
-                                        }
-                                        @if (HasDetailsOrFlyer(nextGeneralEvent))
-                                        {
-                                            <div class="mt-2 d-flex gap-2 flex-wrap">
-                                                @if (GetFlyerUrls(nextGeneralEvent).Any())
-                                                {
-                                                    <a href="@GetPrimaryFlyerUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
-                                                }
-                                                @if (HasEventDetails(nextGeneralEvent))
-                                                {
-                                                    <a href="@GetEventDetailsUrl(nextGeneralEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                }
-                            }
-                        }
-                        else
-                        {
-                            <!-- Category without subcategories - show next event or description -->
-                            var nextEvent = GetNextEventForSubcategory(categoryEvents);
-                            @if (nextEvent != null)
-                            {
-                                <div class="mb-3">
-                                    <h6 class="text-primary mb-1">@(isCurrentSchoolYear ? "Next Event" : "Event"): @nextEvent.Title</h6>
-                                    <div class="small text-muted">
-                                        <i class="bi bi-calendar"></i> @nextEvent.Date.ToString("MMM d, yyyy")
-                                        @if (!string.IsNullOrWhiteSpace(GetEventTimeText(nextEvent)))
-                                        {
-                                            <br><i class="bi bi-clock"></i> @GetEventTimeText(nextEvent)
-                                        }
-                                        @if (nextEvent.RequiresVolunteers)
-                                        {
-                                            <br><i class="bi bi-people"></i>
-                                            @if (!string.IsNullOrWhiteSpace(nextEvent.ExcelImportId))
-                                            {
-                                                <a href="@nextEvent.ExcelImportId" target="_blank" rel="noopener noreferrer">Volunteer signup</a>
-                                            }
-                                            else
-                                            {
-                                                <span>@GetVolunteerSignupText(nextEvent)</span>
-                                            }
-                                        }
-                                        @if (!string.IsNullOrEmpty(nextEvent.Location))
-                                        {
-                                            <br><i class="bi bi-geo-alt"></i> @nextEvent.Location
-                                        }
-                                    </div>
-                                    @if (!string.IsNullOrEmpty(nextEvent.Description))
-                                    {
-                                        <p class="small mt-1 mb-1">@TruncateDescription(nextEvent.Description, 100)</p>
-                                    }
-                                </div>
-                                
-                                @if (categoryEvents.Count() > 1)
-                                {
-                                    <div class="mt-2">
-                                        <small class="text-muted">+@(categoryEvents.Count() - 1) more events in this category</small>
-                                    </div>
-                                }
-                                @if (HasDetailsOrFlyer(nextEvent))
-                                {
-                                    <div class="mt-2 d-flex gap-2 flex-wrap">
-                                        @if (GetFlyerUrls(nextEvent).Any())
-                                        {
-                                            <a href="@GetPrimaryFlyerUrl(nextEvent)" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">View Flyer</a>
-                                        }
-                                        @if (HasEventDetails(nextEvent))
-                                        {
-                                            <a href="@GetEventDetailsUrl(nextEvent)" class="btn btn-sm btn-outline-primary">View Details</a>
-                                        }
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">@category.Description</p>
-                            }
-                        }
-                        
-                        @if (category.ShowViewEventsButton && categoryEvents.Any())
-                        {
-                            <div class="mt-3 pt-2 border-top">
-                                <a href="events/category/@category.Slug" class="btn btn-sm btn-outline-primary">
-                                    View All @category.Name <i class="bi bi-arrow-right"></i>
-                                </a>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        }
-    </div>
+    <h2 class="h4 mt-2">Event Categories</h2>
+    <EventsCategoriesTab EventCategories="eventCategories" EventSubcategories="eventSubcategories" AllEvents="FilteredEvents" IsCurrentSchoolYear="isCurrentSchoolYear" SelectedSchoolYear="selectedSchoolYear" IsFiltered="HasActiveFilters" />
 }
 
 @if (showGetInvolved)
@@ -395,6 +175,13 @@ else
 </div>
 
 @code {
+    private enum EventsTab { Calendar, Categories }
+
+    [SupplyParameterFromQuery(Name = "tab")]
+    private string? TabQuery { get; set; }
+
+    private EventsTab activeTab = EventsTab.Calendar;
+
     private List<EventListItemDTO>? upcomingEvents;
     private List<EventCat>? eventCategories;
     private List<EventCatSub>? eventSubcategories;
@@ -406,32 +193,122 @@ else
     private string contactPersonName = "PTA Board";
     private string contactPersonEmail = string.Empty;
 
+    // Shared filters used by both the Calendar and Categories tabs
+    private string searchText = string.Empty;
+    private int? selectedCategoryId;
+    private bool volunteersOnly;
+    private EventTimeFilter timeFilter = EventTimeFilter.All;
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchText) || selectedCategoryId.HasValue || volunteersOnly || timeFilter != EventTimeFilter.All;
+
+    private List<EventListItemDTO> FilteredEvents
+    {
+        get
+        {
+            IEnumerable<EventListItemDTO> query = allEvents ?? Enumerable.Empty<EventListItemDTO>();
+
+            if (selectedCategoryId.HasValue)
+            {
+                query = query.Where(e => e.EventCatId == selectedCategoryId.Value);
+            }
+
+            if (volunteersOnly)
+            {
+                query = query.Where(e => e.RequiresVolunteers);
+            }
+
+            if (timeFilter == EventTimeFilter.Upcoming)
+            {
+                query = query.Where(e => e.Date >= DateTime.Now.Date);
+            }
+            else if (timeFilter == EventTimeFilter.Past)
+            {
+                query = query.Where(e => e.Date < DateTime.Now.Date);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var term = searchText.Trim();
+                query = query.Where(e =>
+                    Contains(e.Title, term) ||
+                    Contains(e.Description, term) ||
+                    Contains(e.DescriptionMarkdown, term) ||
+                    Contains(e.Location, term) ||
+                    Contains(e.EventCatName, term) ||
+                    Contains(e.EventSubCatName, term));
+            }
+
+            return query.OrderBy(e => e.Date).ToList();
+        }
+    }
+
+    private static bool Contains(string? haystack, string needle)
+    {
+        return !string.IsNullOrWhiteSpace(haystack) && haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        activeTab = TabQuery?.ToLowerInvariant() switch
+        {
+            "categories" => EventsTab.Categories,
+            _ => EventsTab.Calendar
+        };
+
         // Get the selected school year from the header/localStorage
         selectedSchoolYear = await SchoolYearSupport.GetSelectedSchoolYearInfoAsync();
-        
+
         if (selectedSchoolYear != null)
         {
             // Determine if this is the current school year
             isCurrentSchoolYear = selectedSchoolYear.Status == SchoolYearStatus.CurrentYear;
             showGetInvolved = isCurrentSchoolYear;
-            
+
             await LoadEventCategories();
             await LoadEventSubcategories();
             await LoadAllEvents();
-            
+
             if (isCurrentSchoolYear)
             {
                 await LoadUpcomingEvents();
             }
-            
+
             if (showGetInvolved)
             {
                 await LoadContactPerson();
             }
         }
     }
+
+    private void SetActiveTab(EventsTab tab)
+    {
+        if (activeTab == tab) return;
+        activeTab = tab;
+
+        // Category filter only applies on Calendar; the When filter only applies on Categories
+        // (Categories is already organized by category, and Calendar already shows the whole year).
+        // Reset whichever one doesn't apply to the tab we're switching to.
+        if (tab == EventsTab.Categories)
+        {
+            selectedCategoryId = null;
+        }
+        else
+        {
+            timeFilter = EventTimeFilter.All;
+        }
+
+        var tabName = tab == EventsTab.Categories ? "categories" : "calendar";
+        var uri = NavigationManager.GetUriWithQueryParameter("tab", tabName);
+        NavigationManager.NavigateTo(uri, forceLoad: false, replace: true);
+    }
+
+    private void OnSearchTextChanged(string value) => searchText = value;
+
+    private void OnSelectedCategoryIdChanged(int? value) => selectedCategoryId = value;
+
+    private void OnVolunteersOnlyChanged(bool value) => volunteersOnly = value;
+
+    private void OnTimeFilterChanged(EventTimeFilter value) => timeFilter = value;
 
     private async Task LoadEventCategories()
     {
@@ -460,15 +337,15 @@ else
     private async Task LoadUpcomingEvents()
     {
         if (selectedSchoolYear == null) return;
-        
+
         try
         {
             // Get upcoming events for the current school year
             var events = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/by-school-year/{selectedSchoolYear.Id}");
-            
+
             var now = DateTime.UtcNow.Date;
             var in30Days = now.AddDays(30);
-            
+
             upcomingEvents = events?
                 .Where(e => e.Date >= now && e.Date <= in30Days)
                 .OrderBy(e => e.Date)
@@ -483,7 +360,7 @@ else
     private async Task LoadAllEvents()
     {
         if (selectedSchoolYear == null) return;
-        
+
         try
         {
             // Get all events for the selected school year
@@ -495,7 +372,7 @@ else
             else
             {
                 // For past years, we need all events (including completed), use admin endpoint if available
-                try 
+                try
                 {
                     allEvents = await Http.GetFromJsonAsync<List<EventListItemDTO>>($"api/events/all-admin?schoolYearId={selectedSchoolYear.Id}");
                     // Filter to show completed and active events for past years
@@ -520,19 +397,19 @@ else
     private async Task LoadContactPerson()
     {
         if (selectedSchoolYear == null) return;
-        
+
         try
         {
             // Use the public board positions endpoint
             var boardPositions = await Http.GetFromJsonAsync<List<AssignedUserDTO>>($"api/boardpositions/public/by-schoolyear/{selectedSchoolYear.Id}");
-            
+
             if (boardPositions?.Any() == true)
             {
                 // Look for Event Coordinator first
-                var eventCoordinator = boardPositions.FirstOrDefault(bp => 
+                var eventCoordinator = boardPositions.FirstOrDefault(bp =>
                     bp.RoleTitle?.Contains("Event Coordinator", StringComparison.OrdinalIgnoreCase) == true ||
                     bp.RoleTitle?.Contains("VP of Volunteer Engagement", StringComparison.OrdinalIgnoreCase) == true);
-                
+
                 if (eventCoordinator != null)
                 {
                     contactPersonTitle = eventCoordinator.RoleTitle ?? "Event Coordinator";
@@ -542,9 +419,9 @@ else
                 else
                 {
                     // Fall back to President
-                    var president = boardPositions.FirstOrDefault(bp => 
+                    var president = boardPositions.FirstOrDefault(bp =>
                         bp.RoleTitle?.Contains("President", StringComparison.OrdinalIgnoreCase) == true);
-                    
+
                     if (president != null)
                     {
                         contactPersonTitle = "President";
@@ -557,197 +434,5 @@ else
         {
             // Keep default values
         }
-    }
-
-    private IEnumerable<EventListItemDTO> GetEventsForCategory(int categoryId)
-    {
-        return allEvents?.Where(e => e.EventCatId == categoryId) ?? Enumerable.Empty<EventListItemDTO>();
-    }
-
-    private IEnumerable<EventCatSub> GetSubcategoriesForCategory(int categoryId)
-    {
-        return eventSubcategories?.Where(esc => esc.EventCatId == categoryId && esc.IsActive) ?? Enumerable.Empty<EventCatSub>();
-    }
-
-    private IEnumerable<EventListItemDTO> GetEventsWithoutSubcategory(IEnumerable<EventListItemDTO> categoryEvents)
-    {
-        return categoryEvents.Where(e => e.EventSubTypeId == null);
-    }
-
-    private EventListItemDTO? GetNextEventForSubcategory(IEnumerable<EventListItemDTO> events)
-    {
-        if (isCurrentSchoolYear)
-        {
-            // For current year, get next upcoming event
-            var now = DateTime.UtcNow;
-            return events
-                .Where(e => e.Date >= now)
-                .OrderBy(e => e.Date)
-                .FirstOrDefault();
-        }
-        else
-        {
-            // For past years, get the first/earliest event
-            return events
-                .OrderBy(e => e.Date)
-                .FirstOrDefault();
-        }
-    }
-
-    private string GetHeaderColorClass(EventCat category)
-    {
-        return category.ColorClass switch
-        {
-            "text-danger" => "bg-danger",
-            "text-success" => "bg-success", 
-            "text-primary" => "bg-primary",
-            "text-info" => "bg-info",
-            "text-warning" => "bg-warning",
-            "text-secondary" => "bg-secondary",
-            _ => "bg-secondary"
-        };
-    }
-
-    private static string GetEventBorderStyle(EventListItemDTO evt)
-    {
-        var borderColor = evt.EventCatColorClass switch
-        {
-            "text-danger" => "#dc3545",
-            "text-success" => "#198754",
-            "text-primary" => "#0d6efd",
-            "text-info" => "#0dcaf0",
-            "text-warning" => "#ffc107",
-            "text-secondary" => "#6c757d",
-            "text-purple" => "#7F4592",
-            _ => "#198754"
-        };
-
-        return $"border-left-color: {borderColor} !important;";
-    }
-
-    private string TruncateDescription(string description, int maxLength)
-    {
-        if (string.IsNullOrEmpty(description) || description.Length <= maxLength)
-            return description;
-        
-        return description.Substring(0, maxLength - 3) + "...";
-    }
-
-    private static string GetEventTimeText(EventListItemDTO evt)
-    {
-        var firstDay = evt.EventDays?
-            .OrderBy(d => d.DayNumber)
-            .FirstOrDefault();
-
-        if (firstDay != null && !firstDay.StartTime.HasValue)
-            return string.Empty; // all day event
-
-        if (firstDay?.StartTime.HasValue == true && firstDay.EndTime.HasValue)
-        {
-            if (firstDay.StartTime.Value.TimeOfDay == firstDay.EndTime.Value.TimeOfDay)
-            {
-                return firstDay.StartTime.Value.ToString("h:mm tt");
-            }
-
-            return $"{firstDay.StartTime.Value:h:mm tt} - {firstDay.EndTime.Value:h:mm tt}";
-        }
-
-        if (evt.EventDays?.Count > 1)
-        {
-            return string.Empty;
-        }
-
-        if (evt.EventStartTime == default || evt.EventEndTime == default)
-        {
-            return string.Empty;
-        }
-
-        if (evt.EventStartTime.TimeOfDay == TimeSpan.Zero && evt.EventEndTime.TimeOfDay == TimeSpan.Zero)
-        {
-            return string.Empty;
-        }
-
-        if (evt.EventStartTime.TimeOfDay == evt.EventEndTime.TimeOfDay)
-        {
-            return evt.EventStartTime.ToString("h:mm tt");
-        }
-
-        return $"{evt.EventStartTime:h:mm tt} - {evt.EventEndTime:h:mm tt}";
-    }
-
-    private static string GetVolunteerSignupText(EventListItemDTO evt)
-    {
-        if (evt.SignupWindowStart.HasValue && evt.SignupWindowEnd.HasValue)
-        {
-            return $"Signups: {evt.SignupWindowStart.Value:MMM d h:mm tt} - {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
-        }
-
-        if (evt.SignupWindowStart.HasValue)
-        {
-            return $"Signups open: {evt.SignupWindowStart.Value:MMM d h:mm tt}";
-        }
-
-        if (evt.SignupWindowEnd.HasValue)
-        {
-            return $"Signups close: {evt.SignupWindowEnd.Value:MMM d h:mm tt}";
-        }
-
-        return "Volunteers needed";
-    }
-
-    private static bool HasDetailsOrFlyer(EventListItemDTO evt)
-    {
-        return HasEventDetails(evt) || GetFlyerUrls(evt).Any();
-    }
-
-    private static bool HasEventDetails(EventListItemDTO evt)
-    {
-        return !string.IsNullOrWhiteSpace(evt.MoreDetailsMarkdown)
-            || HasPublicControlInfo(evt);
-    }
-
-    private static string GetEventDetailsUrl(EventListItemDTO evt)
-    {
-        return $"/events/{evt.Slug}";
-    }
-
-    private static string GetPrimaryFlyerUrl(EventListItemDTO evt)
-    {
-        return GetFlyerUrls(evt).FirstOrDefault() ?? string.Empty;
-    }
-
-    private static bool HasPublicControlInfo(EventListItemDTO evt)
-    {
-        return evt.HasPublicControlInformation;
-    }
-
-    private static IReadOnlyList<string> GetFlyerUrls(EventListItemDTO evt)
-    {
-        var flyers = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(evt.FlyerUrl))
-        {
-            flyers.Add(evt.FlyerUrl.Trim());
-        }
-
-        if (!string.IsNullOrWhiteSpace(evt.FlyerUrlsJson))
-        {
-            try
-            {
-                var extraFlyers = JsonSerializer.Deserialize<List<string>>(evt.FlyerUrlsJson);
-                if (extraFlyers != null)
-                {
-                    flyers.AddRange(extraFlyers.Where(url => !string.IsNullOrWhiteSpace(url)).Select(url => url.Trim()));
-                }
-            }
-            catch (JsonException)
-            {
-            }
-        }
-
-        return flyers
-            .Where(url => !string.IsNullOrWhiteSpace(url))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 }

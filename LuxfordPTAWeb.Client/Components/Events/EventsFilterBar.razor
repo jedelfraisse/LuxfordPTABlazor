@@ -1,0 +1,140 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Client.Code
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="search" class="form-control" placeholder="Search events by name, location, or keyword..."
+                           value="@SearchText" @oninput="OnSearchInput" aria-label="Search events" />
+                </div>
+            </div>
+            @if (ShowCategoryFilter)
+            {
+                <div class="col-md-3">
+                    <select class="form-select" value="@(SelectedCategoryId?.ToString() ?? "")" @onchange="OnCategoryChanged" aria-label="Filter by category">
+                        <option value="">All Categories</option>
+                        @if (Categories != null)
+                        {
+                            @foreach (var cat in Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder))
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+            }
+            else if (ShowTimeFilter)
+            {
+                <div class="col-md-3">
+                    <select class="form-select" value="@TimeFilter.ToString()" @onchange="OnTimeFilterChanged" aria-label="Filter by when">
+                        <option value="@EventTimeFilter.All">All Year</option>
+                        <option value="@EventTimeFilter.Upcoming">Upcoming</option>
+                        <option value="@EventTimeFilter.Past">Past</option>
+                    </select>
+                </div>
+            }
+            <div class="col-md-3">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="volunteersOnlySwitch"
+                           checked="@VolunteersOnly" @onchange="OnVolunteersOnlyChanged" />
+                    <label class="form-check-label" for="volunteersOnlySwitch">
+                        <i class="bi bi-people"></i> Needs volunteers
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-1 text-md-end">
+                @if (HasActiveFilters)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">
+                        <i class="bi bi-x-lg"></i> Clear
+                    </button>
+                }
+            </div>
+        </div>
+        @if (ShowResultCount)
+        {
+            <div class="mt-2 small text-muted">
+                @if (HasActiveFilters)
+                {
+                    <span>Showing @ResultCount of @TotalCount events</span>
+                }
+                else
+                {
+                    <span>@TotalCount events</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<EventCat>? Categories { get; set; }
+
+    [Parameter] public string SearchText { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchTextChanged { get; set; }
+
+    [Parameter] public int? SelectedCategoryId { get; set; }
+    [Parameter] public EventCallback<int?> SelectedCategoryIdChanged { get; set; }
+    [Parameter] public bool ShowCategoryFilter { get; set; } = true;
+
+    [Parameter] public bool VolunteersOnly { get; set; }
+    [Parameter] public EventCallback<bool> VolunteersOnlyChanged { get; set; }
+
+    [Parameter] public EventTimeFilter TimeFilter { get; set; } = EventTimeFilter.All;
+    [Parameter] public EventCallback<EventTimeFilter> TimeFilterChanged { get; set; }
+    [Parameter] public bool ShowTimeFilter { get; set; } = true;
+
+    [Parameter] public bool ShowResultCount { get; set; } = true;
+    [Parameter] public int ResultCount { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+
+    // Only count a filter as "active" if its control is actually shown on the current tab —
+    // the other tab's leftover value (e.g. a category picked while on Calendar) doesn't apply here.
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(SearchText) || VolunteersOnly ||
+        (ShowCategoryFilter && SelectedCategoryId.HasValue) ||
+        (ShowTimeFilter && TimeFilter != EventTimeFilter.All);
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        await SearchTextChanged.InvokeAsync(SearchText);
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        SelectedCategoryId = string.IsNullOrEmpty(raw) ? null : int.Parse(raw);
+        await SelectedCategoryIdChanged.InvokeAsync(SelectedCategoryId);
+    }
+
+    private async Task OnVolunteersOnlyChanged(ChangeEventArgs e)
+    {
+        VolunteersOnly = e.Value is bool b && b;
+        await VolunteersOnlyChanged.InvokeAsync(VolunteersOnly);
+    }
+
+    private async Task OnTimeFilterChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<EventTimeFilter>(e.Value?.ToString(), out var value))
+        {
+            TimeFilter = value;
+            await TimeFilterChanged.InvokeAsync(TimeFilter);
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        SearchText = string.Empty;
+        SelectedCategoryId = null;
+        VolunteersOnly = false;
+        TimeFilter = EventTimeFilter.All;
+        await SearchTextChanged.InvokeAsync(SearchText);
+        await SelectedCategoryIdChanged.InvokeAsync(SelectedCategoryId);
+        await VolunteersOnlyChanged.InvokeAsync(VolunteersOnly);
+        await TimeFilterChanged.InvokeAsync(TimeFilter);
+    }
+}

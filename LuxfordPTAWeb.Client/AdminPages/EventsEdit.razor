@@ -16,6 +16,11 @@
     private Event? eventModel;
     private EventDay primaryDay = new();
     private List<EventDay> additionalDays = new();
+    private bool showRangeForm = false;
+    private DateTime rangeStartDate = DateTime.Today;
+    private DateTime rangeEndDate = DateTime.Today;
+    private bool rangeSkipWeekends = false;
+    private string? rangeErrorMessage;
     private List<EventDay> originalEventDays = new(); // Track original days for restoration
     private List<SchoolYear>? schoolYears;
     private List<EventCat>? eventCategories;
@@ -188,26 +193,94 @@
         dayIsAllDay.Remove(day.DayNumber);
         dayStartTimes.Remove(day.DayNumber);
         dayEndTimes.Remove(day.DayNumber);
-        
-        // Renumber remaining additional days (keeping primary as day 1)
+        RenumberAdditionalDays();
+    }
+
+    /// <summary>Reassigns sequential DayNumbers (starting at 2 — primary day is always 1) after
+    /// days are added or removed out of order, and keeps the per-day time-tracking dictionaries
+    /// in sync with the new numbering.</summary>
+    private void RenumberAdditionalDays()
+    {
         var orderedDays = additionalDays.OrderBy(d => d.Date).ToList();
         additionalDays.Clear();
         dayIsAllDay.Clear();
         dayStartTimes.Clear();
         dayEndTimes.Clear();
-        
+
         for (int i = 0; i < orderedDays.Count; i++)
         {
             orderedDays[i].DayNumber = i + 2; // Start from 2 since primary is 1
             additionalDays.Add(orderedDays[i]);
-            
-            // Re-initialize time tracking
+
             dayIsAllDay[orderedDays[i].DayNumber] = orderedDays[i].StartTime == null;
             dayStartTimes[orderedDays[i].DayNumber] = orderedDays[i].StartTime?.ToString("HH:mm") ?? "09:00";
             dayEndTimes[orderedDays[i].DayNumber] = orderedDays[i].EndTime?.ToString("HH:mm") ?? "15:00";
         }
     }
-    
+
+    private void ShowAddRangeForm()
+    {
+        var lastDate = additionalDays.Any() ? additionalDays.Max(d => d.Date)
+            : primaryDay.Date != default ? primaryDay.Date
+            : DateTime.Today;
+        rangeStartDate = lastDate.AddDays(1);
+        rangeEndDate = rangeStartDate.AddDays(4);
+        rangeErrorMessage = null;
+        showRangeForm = true;
+    }
+
+    private void CancelAddRangeForm()
+    {
+        showRangeForm = false;
+        rangeErrorMessage = null;
+    }
+
+    /// <summary>Bulk-creates one EventDay per date in [rangeStartDate, rangeEndDate], skipping
+    /// weekends if requested and skipping any date already covered by the primary day or an
+    /// existing additional day — so re-running this (or overlapping ranges) never duplicates days.</summary>
+    private void ApplyDayRange()
+    {
+        rangeErrorMessage = null;
+
+        if (rangeEndDate.Date < rangeStartDate.Date)
+        {
+            rangeErrorMessage = "End date must be on or after the start date.";
+            return;
+        }
+
+        var existingDates = new HashSet<DateTime>(additionalDays.Select(d => d.Date.Date));
+        if (primaryDay.Date != default) existingDates.Add(primaryDay.Date.Date);
+
+        var added = 0;
+        for (var date = rangeStartDate.Date; date <= rangeEndDate.Date; date = date.AddDays(1))
+        {
+            if (rangeSkipWeekends && (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday))
+                continue;
+            if (!existingDates.Add(date))
+                continue; // already covered by the primary day or an existing additional day
+
+            additionalDays.Add(new EventDay
+            {
+                Date = date,
+                DayTitle = date.ToString("dddd, MMM d"),
+                Description = "",
+                Location = "",
+                IsActive = true,
+                EventId = EventId
+            });
+            added++;
+        }
+
+        if (added == 0)
+        {
+            rangeErrorMessage = "Every date in that range is already covered by the primary day or an existing additional day.";
+            return;
+        }
+
+        RenumberAdditionalDays();
+        showRangeForm = false;
+    }
+
     private void RestoreAdditionalDays()
     {
         if (originalEventDays.Where(d => !d.IsFromTryOuts).Count() <= 1) return;
@@ -1325,11 +1398,53 @@ else if (eventModel != null)
                     <div class="card mb-4 border-info">
                         <div class="card-header d-flex justify-content-between align-items-center bg-light">
                             <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Additional Event Days <span class="badge bg-info ms-2">Multi-Day Event</span></h5>
-                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAdditionalDay">
-                                <i class="bi bi-plus"></i> Add Another Day
-                            </button>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" @onclick="AddAdditionalDay">
+                                    <i class="bi bi-plus"></i> Add Another Day
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" @onclick="ShowAddRangeForm">
+                                    <i class="bi bi-calendar-range"></i> Add a Range
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
+                            @if (showRangeForm)
+                            {
+                                <div class="card border-info mb-3">
+                                    <div class="card-body">
+                                        <h6 class="mb-3"><i class="bi bi-calendar-range"></i> Add a Range of Days</h6>
+                                        @if (!string.IsNullOrEmpty(rangeErrorMessage))
+                                        {
+                                            <div class="alert alert-danger py-2 small mb-2">@rangeErrorMessage</div>
+                                        }
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Start Date</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="rangeStartDate" @bind:format="yyyy-MM-dd" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">End Date</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="rangeEndDate" @bind:format="yyyy-MM-dd" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="skipWeekends" @bind="rangeSkipWeekends" />
+                                                    <label class="form-check-label small" for="skipWeekends">Skip weekends</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 d-flex gap-2">
+                                                <button type="button" class="btn btn-primary btn-sm" @onclick="ApplyDayRange">
+                                                    <i class="bi bi-check-circle"></i> Add Days
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAddRangeForm">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">Adds one day per date in the range. Dates already covered by the primary day or an existing additional day are skipped automatically.</div>
+                                    </div>
+                                </div>
+                            }
                             <div class="row">
                                 @foreach (var day in additionalDays.OrderBy(d => d.DayNumber))
                                 {
@@ -1419,10 +1534,55 @@ else if (eventModel != null)
                     <div class="card mb-4 border-info">
                         <div class="card-body text-center py-4">
                             <h6 class="text-muted mb-3"><i class="bi bi-calendar-plus"></i> Convert to multi-day event?</h6>
-                            <button type="button" class="btn btn-outline-info" @onclick="AddAdditionalDay">
-                                <i class="bi bi-plus-circle"></i> Add Additional Days
-                            </button>
-                            <p class="text-muted small mt-2">Perfect for events like Fire Prevention Week, Book Fair, Spirit Week, etc.</p>
+                            @if (showRangeForm)
+                            {
+                                <div class="card border-info mb-3 text-start">
+                                    <div class="card-body">
+                                        <h6 class="mb-3"><i class="bi bi-calendar-range"></i> Add a Range of Days</h6>
+                                        @if (!string.IsNullOrEmpty(rangeErrorMessage))
+                                        {
+                                            <div class="alert alert-danger py-2 small mb-2">@rangeErrorMessage</div>
+                                        }
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-3">
+                                                <label class="form-label small">Start Date</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="rangeStartDate" @bind:format="yyyy-MM-dd" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">End Date</label>
+                                                <input type="date" class="form-control form-control-sm" @bind="rangeEndDate" @bind:format="yyyy-MM-dd" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="skipWeekendsInitial" @bind="rangeSkipWeekends" />
+                                                    <label class="form-check-label small" for="skipWeekendsInitial">Skip weekends</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 d-flex gap-2">
+                                                <button type="button" class="btn btn-primary btn-sm" @onclick="ApplyDayRange">
+                                                    <i class="bi bi-check-circle"></i> Add Days
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAddRangeForm">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">Adds one day per date in the range. The primary day's date is skipped automatically if it falls in the range.</div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-outline-info" @onclick="AddAdditionalDay">
+                                        <i class="bi bi-plus-circle"></i> Add Additional Days
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info" @onclick="ShowAddRangeForm">
+                                        <i class="bi bi-calendar-range"></i> Add a Range of Days
+                                    </button>
+                                </div>
+                                <p class="text-muted small mt-2">Perfect for events like Fire Prevention Week, Book Fair, Spirit Week, etc.</p>
+                            }
                         </div>
                     </div>
                 }

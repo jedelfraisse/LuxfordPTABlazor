@@ -1,0 +1,129 @@
+@using LuxfordPTAWeb.Shared.Models
+@using LuxfordPTAWeb.Shared.DTOs
+@using LuxfordPTAWeb.Client.Code
+
+@if (SchoolYear == null)
+{
+    <div class="alert alert-info"><em>Loading calendar...</em></div>
+}
+else if (IsFiltered && !Events.Any())
+{
+    <div class="alert alert-warning text-center">
+        <h5>No Events Match Your Filters</h5>
+        <p class="mb-0">Try clearing a filter to see more of the year.</p>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var month in GetSchoolYearMonths())
+        {
+            var monthEvents = Events.Where(e => e.Date.Year == month.Year && e.Date.Month == month.Month).OrderBy(e => e.Date).ToList();
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100 @(IsCurrentMonth(month) ? "border-primary border-2" : "")">
+                    <div class="card-header @(IsCurrentMonth(month) ? "bg-primary text-white" : "bg-light")">
+                        <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-calendar3 me-2"></i>@month.ToString("MMMM yyyy")</span>
+                            <span class="badge @(IsCurrentMonth(month) ? "bg-light text-primary" : "bg-secondary")">@monthEvents.Count</span>
+                        </h6>
+                    </div>
+                    <div class="card-body p-2" style="min-height: 120px;">
+                        @if (monthEvents.Any())
+                        {
+                            @foreach (var evt in monthEvents)
+                            {
+                                <div class="mb-2 p-2 rounded" style="border-left: 4px solid @EventDisplayHelpers.GetBorderColorHex(evt.EventCatColorClass); background-color: #f8f9fa;">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold small">
+                                                @if (EventDisplayHelpers.HasDetailsOrFlyer(evt))
+                                                {
+                                                    <a class="text-decoration-none" href="@GetLinkUrl(evt)" target="@(EventDisplayHelpers.HasEventDetails(evt) ? "" : "_blank")">@evt.Title</a>
+                                                }
+                                                else
+                                                {
+                                                    @evt.Title
+                                                }
+                                                @if (EventDisplayHelpers.IsToday(evt))
+                                                {
+                                                    <span class="badge bg-warning ms-1">Today</span>
+                                                }
+                                            </div>
+                                            <div class="text-muted small">
+                                                <i class="bi bi-calendar-date me-1"></i>@evt.Date.ToString("MMM d")
+                                                @{ var timeText = EventDisplayHelpers.GetEventTimeText(evt); }
+                                                @if (!string.IsNullOrWhiteSpace(timeText))
+                                                {
+                                                    <span class="ms-2"><i class="bi bi-clock me-1"></i>@timeText</span>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(evt.Location))
+                                            {
+                                                <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>@evt.Location</div>
+                                            }
+                                            @if (evt.RequiresVolunteers)
+                                            {
+                                                <div class="small"><span class="badge bg-info-subtle text-info-emphasis"><i class="bi bi-people"></i> Volunteers needed</span></div>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(evt.EventCatName))
+                                        {
+                                            <span class="badge bg-light text-dark border ms-1" title="@evt.EventCatName">@TruncateCat(evt.EventCatName)</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-calendar-x"></i>
+                                <p class="small mb-0 mt-1">No events</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public List<EventListItemDTO> Events { get; set; } = new();
+    [Parameter] public SchoolYear? SchoolYear { get; set; }
+    [Parameter] public bool IsCurrentSchoolYear { get; set; }
+    [Parameter] public bool IsFiltered { get; set; }
+
+    private List<DateTime> GetSchoolYearMonths()
+    {
+        if (SchoolYear == null) return new List<DateTime>();
+
+        var months = new List<DateTime>();
+        var current = new DateTime(SchoolYear.StartDate.Year, SchoolYear.StartDate.Month, 1);
+        var end = new DateTime(SchoolYear.EndDate.Year, SchoolYear.EndDate.Month, 1);
+
+        while (current <= end)
+        {
+            months.Add(current);
+            current = current.AddMonths(1);
+        }
+
+        return months;
+    }
+
+    private bool IsCurrentMonth(DateTime month)
+    {
+        if (!IsCurrentSchoolYear) return false;
+        var now = DateTime.Now;
+        return month.Year == now.Year && month.Month == now.Month;
+    }
+
+    private static string GetLinkUrl(EventListItemDTO evt)
+    {
+        return EventDisplayHelpers.HasEventDetails(evt)
+            ? EventDisplayHelpers.GetEventDetailsUrl(evt)
+            : EventDisplayHelpers.GetPrimaryFlyerUrl(evt);
+    }
+
+    private static string TruncateCat(string name) => name.Length <= 14 ? name : name.Substring(0, 13) + "…";
+}
